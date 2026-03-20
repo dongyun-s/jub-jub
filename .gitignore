@@ -77,3 +77,4 @@ docker-compose.override.yml
 # Spring Local Config
 # ========================
 application-local.yml
+application-docker.yml
