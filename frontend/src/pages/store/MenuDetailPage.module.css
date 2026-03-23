@@ -1,0 +1,362 @@
+/**
+ * MenuDetailPage.module.css
+ * 음식 상세 페이지 - 옵션 선택 및 장바구니 담기
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background-color: #ffffff;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background-color: transparent;
+}
+
+.backButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.backIcon {
+  color: rgb(51 65 85);
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8rem;
+  margin-top: -4rem;
+}
+
+.heroWrap {
+  position: relative;
+}
+
+.heroImage {
+  width: 100%;
+  height: 18rem;
+  background-position: center;
+  background-size: cover;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.5), transparent);
+}
+
+.tagsWrap {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tagBest {
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.tagLoot {
+  background-image: linear-gradient(to right, rgb(251 191 36), rgb(251 146 60));
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.infoSection {
+  padding: 1.25rem;
+}
+
+.menuName {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 0.5rem;
+}
+
+.menuDesc {
+  color: rgb(100 116 139);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menuPrice {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.xpBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: rgb(255 251 235);
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+}
+
+.xpIcon {
+  color: rgb(245 158 11);
+  font-size: 1.125rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.xpText {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: rgb(217 119 6);
+}
+
+.optionsSection {
+  border-top: 2rem solid rgb(248 250 252);
+}
+
+.optionGroup {
+  border-bottom: 1px solid rgb(241 245 249);
+}
+
+.optionGroupHeader {
+  padding: 1rem 1rem 0.5rem;
+}
+
+.optionGroupTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.optionGroupTitle {
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.optionRequired {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #ffffff;
+  background-color: var(--color-primary);
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.optionOptional {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgb(100 116 139);
+  background-color: rgb(241 245 249);
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.optionList {
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.optionButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 2px solid transparent;
+  transition: all 150ms ease;
+}
+
+.optionButtonSelected {
+  border-color: var(--color-primary);
+  background-color: rgba(246, 49, 154, 0.05);
+}
+
+.optionButtonUnselected {
+  border-color: rgb(241 245 249);
+}
+
+.optionButtonUnselected:hover {
+  border-color: rgba(246, 49, 154, 0.3);
+}
+
+.optionLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.optionRadio {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.optionRadioSelected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+}
+
+.optionRadioUnselected {
+  border-color: rgb(203 213 225);
+}
+
+.optionRadioIcon {
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+
+.optionName {
+  font-weight: 500;
+}
+
+.optionNameSelected {
+  color: var(--color-primary);
+}
+
+.optionNameUnselected {
+  color: rgb(51 65 85);
+}
+
+.optionPrice {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.optionPriceSelected {
+  color: var(--color-primary);
+}
+
+.optionPriceUnselected {
+  color: rgb(148 163 184);
+}
+
+.quantitySection {
+  padding: 1rem;
+  border-bottom: 1px solid rgb(241 245 249);
+}
+
+.quantityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quantityLabel {
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.quantityControls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.quantityMinus {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 2px solid rgb(226 232 240);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(71 85 105);
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.quantityMinus:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.quantityValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  width: 2rem;
+  text-align: center;
+}
+
+.quantityPlus {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-image: linear-gradient(to bottom right, var(--color-primary), #ec4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 10px 15px -3px rgba(246, 49, 154, 0.3);
+}
+
+.addToCartBar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 28rem;
+  padding: 1rem;
+  background-color: #ffffff;
+  border-top: 1px solid rgb(241 245 249);
+}
+
+.addToCartButton {
+  width: 100%;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  padding: 1rem;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.125rem;
+  box-shadow: 0 20px 25px -5px rgba(246, 49, 154, 0.3);
+  transition: transform 150ms ease;
+}
+
+.addToCartButton:active {
+  transform: scale(0.98);
+}
