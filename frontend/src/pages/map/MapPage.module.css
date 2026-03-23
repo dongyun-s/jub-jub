@@ -1,0 +1,432 @@
+/**
+ * MapPage.module.css
+ * 지도 페이지 - 픽업 경로 안내 / 주변 매장
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  height: 3.5rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.backButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: -0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backIcon {
+  color: rgb(31 41 55);
+}
+
+.headerTitle {
+  flex: 1;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.headerSpacer {
+  width: 2.5rem;
+}
+
+.transportRow {
+  display: flex;
+  padding: 0 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.transportTab {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.transportTabActive {
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.transportTabInactive {
+  color: rgb(156 163 175);
+}
+
+.searchBarWrap {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: rgb(249 250 251);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.searchIcon {
+  color: rgb(156 163 175);
+}
+
+.searchLabel {
+  font-size: 0.875rem;
+  color: rgb(31 41 55);
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: rgb(156 163 175);
+}
+
+.mapWrap {
+  flex: 1;
+  position: relative;
+}
+
+.mapIframe {
+  border: 0;
+}
+
+.locationButton {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  width: 3rem;
+  height: 3rem;
+  background-color: #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 150ms ease;
+}
+
+.locationButton:active {
+  transform: scale(0.95);
+}
+
+.locationIcon {
+  color: var(--color-primary);
+}
+
+.locationIconMuted {
+  color: rgb(75 85 99);
+}
+
+.locationIconLoading {
+  color: rgb(156 163 175);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.zoomGroup {
+  position: absolute;
+  right: 1rem;
+  top: 5rem;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.zoomButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.zoomButton:last-child {
+  border-bottom: none;
+}
+
+.zoomIcon {
+  color: rgb(75 85 99);
+}
+
+.locationError {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 5rem;
+  background-color: rgb(254 242 242);
+  border: 1px solid rgb(254 202 202);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.locationErrorText {
+  font-size: 0.875rem;
+  color: rgb(220 38 38);
+}
+
+.bottomCard {
+  position: absolute;
+  bottom: 5rem;
+  left: 0;
+  right: 0;
+  padding: 0 1rem;
+}
+
+.destCard {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+}
+
+.destCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.destImage {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.destInfo {
+  flex: 1;
+}
+
+.destTime {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.destMeta {
+  font-size: 0.875rem;
+  color: rgb(107 114 128);
+}
+
+.locationOk {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: rgb(34 197 94);
+}
+
+.locationOkIcon {
+  font-size: 0.875rem;
+}
+
+.locationOkText {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.destActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.destActionBtn {
+  flex: 1;
+  padding: 0.75rem;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: transform 150ms ease;
+}
+
+.destActionBtn:active {
+  transform: scale(0.98);
+}
+
+.destActionSecondary {
+  background-color: rgb(243 244 246);
+  color: rgb(55 65 81);
+}
+
+.destActionPrimary {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.destActionIcon {
+  font-size: 0.875rem;
+}
+
+.storesPanel {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.storesPanelHeader {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.storesPanelHeaderInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.storesPanelTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.storesPanelIcon {
+  color: var(--color-primary);
+}
+
+.storesPanelTitle {
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.locationBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(34 197 94);
+}
+
+.locationBadgeIcon {
+  font-size: 0.75rem;
+}
+
+.loadingBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(156 163 175);
+}
+
+.loadingBadgeIcon {
+  font-size: 0.75rem;
+  animation: spin 1s linear infinite;
+}
+
+.moreLink {
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.storesList {
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.storeRow {
+  width: 100%;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgb(249 250 251);
+  transition: background-color 150ms ease;
+}
+
+.storeRow:last-child {
+  border-bottom: none;
+}
+
+.storeRow:hover {
+  background-color: rgb(249 250 251);
+}
+
+.storeRow:active {
+  background-color: rgb(243 244 246);
+}
+
+.storeRowImage {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.storeRowInfo {
+  flex: 1;
+  text-align: left;
+}
+
+.storeRowName {
+  font-weight: 700;
+  color: rgb(31 41 55);
+  font-size: 0.875rem;
+}
+
+.storeRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  margin-top: 0.125rem;
+}
+
+.storeRowStar {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  color: rgb(234 179 8);
+}
+
+.starIcon {
+  font-size: 0.75rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.storeRowDot {
+  color: rgb(209 213 219);
+}
+
+.storeRowDistance {
+  color: rgb(107 114 128);
+}
+
+.storeRowTime {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.storeRowChevron {
+  color: rgb(209 213 219);
+  font-size: 0.875rem;
+}

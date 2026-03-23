@@ -1,0 +1,285 @@
+/**
+ * OrderStatusPage.module.css
+ * 주문 현황 페이지 - 실시간 주문 상태 및 픽업 정보
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  height: 3.5rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.backButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: -0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backIcon {
+  color: rgb(31 41 55);
+}
+
+.headerTitle {
+  flex: 1;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.headerSpacer {
+  width: 2.5rem;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 5rem;
+}
+
+.mapWrap {
+  position: relative;
+  height: 18rem;
+  background-color: rgb(243 244 246);
+}
+
+.mapIframe {
+  border: 0;
+}
+
+.distanceCard {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+}
+
+.distanceCardInner {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.distanceIconWrap {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-image: linear-gradient(to bottom right, var(--color-primary), #f472b6);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.distanceIcon {
+  color: #ffffff;
+}
+
+.distanceLabel {
+  font-size: 0.75rem;
+  color: rgb(107 114 128);
+}
+
+.distanceValue {
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.distanceTime {
+  color: var(--color-primary);
+}
+
+.orderSection {
+  padding: 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.orderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.orderNumber {
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.pickupBadge {
+  padding: 0.25rem 0.75rem;
+  background-color: rgba(246, 49, 154, 0.1);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 9999px;
+}
+
+.orderTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.stepsSection {
+  padding: 1rem 1rem 1.5rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.stepsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stepItem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.stepIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.stepIconCompleted {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.stepIconActive {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(246, 49, 154, 0.2);
+}
+
+.stepIconPending {
+  background-color: rgb(243 244 246);
+  color: rgb(209 213 219);
+}
+
+.stepIconSpan {
+  font-size: 1.25rem;
+}
+
+.stepLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.stepLabelActive {
+  color: var(--color-primary);
+}
+
+.stepLabelCompleted {
+  color: rgb(75 85 99);
+}
+
+.stepLabelPending {
+  color: rgb(209 213 219);
+}
+
+.stepConnector {
+  position: absolute;
+  height: 0.125rem;
+  width: 3rem;
+}
+
+.stepConnectorDone {
+  background-color: var(--color-primary);
+}
+
+.stepConnectorPending {
+  background-color: rgb(229 231 235);
+}
+
+.storeSection {
+  padding: 1rem;
+}
+
+.storeCard {
+  background-image: linear-gradient(to right, #f472b6, var(--color-primary));
+  border-radius: 1rem;
+  padding: 1.25rem;
+  color: #ffffff;
+}
+
+.storeCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.storeCardIcon {
+  width: 3rem;
+  height: 3rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.storeCardIconSpan {
+  font-size: 1.5rem;
+}
+
+.storeCardName {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.storeCardAddress {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.storeCardAddressIcon {
+  font-size: 0.875rem;
+}
+
+.navButton {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #ffffff;
+  color: var(--color-primary);
+  font-weight: 700;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: transform 150ms ease;
+}
+
+.navButton:active {
+  transform: scale(0.98);
+}

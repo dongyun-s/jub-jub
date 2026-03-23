@@ -1,0 +1,517 @@
+/* HomePage.module.css
+ * 메인 홈 페이지 스타일
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hero {
+  background-image: linear-gradient(to bottom, #fce7f3, #ffe4f0, #ffffff);
+}
+
+.searchSection {
+  padding: 1rem 1rem 0.75rem;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 0.75rem 1rem;
+  box-shadow: 0 4px 8px rgba(236, 72, 153, 0.15);
+  border: 1px solid #fecdd3; /* border-pink-100 */
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  font-size: 0.875rem;
+  color: #374151;
+  outline: none;
+}
+
+.activeOrderWrapper {
+  padding: 0 1rem 1rem;
+}
+
+.activeOrderBanner {
+  width: 100%;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgba(246, 49, 154, 0.2);
+  box-shadow: 0 10px 15px -3px rgba(236, 72, 153, 0.25);
+  transition: transform 150ms ease;
+}
+
+.activeOrderBanner:active {
+  transform: scale(0.98);
+}
+
+.activeOrderIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image: linear-gradient(to bottom right, var(--color-primary), #ec4899);
+}
+
+.activeOrderText {
+  flex: 1;
+  text-align: left;
+}
+
+.activeOrderLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.activeOrderTitle {
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.activeOrderTime {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.activeOrderLink {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.main {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #ffffff;
+  border-radius: 1.5rem 1.5rem 0 0;
+  margin-top: -0.5rem;
+  box-shadow: 0 -4px 20px rgba(236, 72, 153, 0.1);
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1rem 0.5rem;
+}
+
+.sectionTitle {
+  color: #111827;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem 1rem 0.75rem;
+}
+
+.gradeCard {
+  grid-column: span 7 / span 7;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(246, 49, 154, 0.4);
+}
+
+.gradeCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.25rem;
+}
+
+.gradeBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.gradeBadgeLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #67e8f9;
+}
+
+.gradeBenefit {
+  margin-top: 0.25rem;
+  font-size: 0.5625rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.25);
+  font-weight: 500;
+}
+
+.gradeAvatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+}
+
+.gradeName {
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+.gradeProgressBar {
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.gradeProgressFill {
+  height: 100%;
+  background-color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.gradeProgressLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.5625rem;
+}
+
+.missionColumn {
+  grid-column: span 5 / span 5;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.distanceCard,
+.attendanceCard {
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #f3f4f6;
+  padding: 0.625rem;
+  box-shadow: 0 1px 2px rgba(148, 163, 184, 0.25);
+}
+
+.distanceMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.distanceLabel {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.distanceValue {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.distanceBarWrapper {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 9999px;
+  overflow: hidden;
+  background-color: #f3f4f6;
+  position: relative;
+  margin-top: 0.25rem;
+}
+
+.distanceBarFill {
+  height: 100%;
+  background-color: var(--color-primary);
+  box-shadow: 0 0 8px rgba(246, 49, 154, 0.8);
+}
+
+.distanceCheckpoint {
+  position: absolute;
+  top: 0;
+  left: 33%;
+  width: 2px;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.attendanceLabel {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.attendanceStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.sectionWrapper {
+  padding: 0.5rem 1rem;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.categoryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: 1.5rem;
+  column-gap: 1rem;
+}
+
+.categoryButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.categoryIconWrapper {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(148, 163, 184, 0.3);
+}
+
+.promoWrapper {
+  padding: 0.5rem 1rem;
+}
+
+.promoCard {
+  width: 100%;
+  height: 8rem;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background-image: linear-gradient(to bottom right, var(--color-primary), #ec4899, #7c3aed);
+  box-shadow: 0 10px 20px rgba(148, 27, 99, 0.6);
+}
+
+.promoChip {
+  display: inline-block;
+  background-color: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 0.625rem;
+  font-weight: 800;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.promoTitle {
+  margin-top: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+}
+
+.promoCircleBig,
+.promoCircleSmall {
+  position: absolute;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.promoCircleBig {
+  top: 0;
+  right: 0;
+  width: 8rem;
+  height: 8rem;
+  transform: translate(50%, -50%);
+}
+
+.promoCircleSmall {
+  bottom: 0;
+  left: 0;
+  width: 5rem;
+  height: 5rem;
+  transform: translate(-50%, 50%);
+}
+
+.promoIcon {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.75rem;
+}
+
+.listSection {
+  padding: 0 1rem 6rem;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.listHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.listTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.listMoreButton {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.restaurantList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.restaurantCard {
+  position: relative;
+  border-radius: 1rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  text-align: left;
+}
+
+.restaurantImageWrapper {
+  position: relative;
+  height: 11rem;
+}
+
+.restaurantImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.restaurantImageOverlay {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent);
+}
+
+.restaurantTags {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  gap: 0.375rem;
+}
+
+.restaurantTag {
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+}
+
+.restaurantCardBody {
+  padding: 1rem;
+}
+
+.restaurantTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.restaurantTitle {
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.25rem;
+}
+
+.restaurantMeta {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.restaurantPointChip {
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  box-shadow: 0 4px 8px rgba(236, 72, 153, 0.5);
+}
+
+.restaurantHashtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.restaurantHashtag {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  background-color: #fdf2f8;
+  color: var(--color-primary);
+}
+
