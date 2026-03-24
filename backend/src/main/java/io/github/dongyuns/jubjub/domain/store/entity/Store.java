@@ -16,14 +16,15 @@ public class Store {
     private Long id;
 
     @Column(nullable = false)
-    private Long ownerProfileId; // 사장님 프로필 ID (ERD 기준)
+    private Long ownerProfileId; // 매장주 프로필 ID (외래키 역할)
+    private Integer categoryId; // 카테고리번호 (외래키 역할)
 
     @Column(nullable = false)
     private String name; // 매장명
 
-    private String category; // 한식, 중식, 일식 등
-
     private String address; // 주소
+
+    private String phoneNumber; // 매장 전화번호
 
     private Double latitude; // 위도
     private Double longitude; // 경도
@@ -32,19 +33,24 @@ public class Store {
 
     private String status = "OPEN"; // 영업 상태 (OPEN, CLOSED 등)
 
-    // 🌟 UI 프로토타입을 반영하여 추가한 필드!
+    @Column(columnDefinition = "TEXT")
+    private String originInfo; // 원산지 통합 정보
+
+    // 💡 UI 프로토타입 구현을 위해 유지!
     private int minOrderAmount = 0; // 최소 주문 금액
 
     @Builder
-    public Store(Long ownerProfileId, String name, String category, String address, Double latitude, Double longitude, int cookingTimeMinutes, String status, int minOrderAmount) {
+    public Store(Long ownerProfileId, Integer categoryId, String name, String address, String phoneNumber, Double latitude, Double longitude, int cookingTimeMinutes, String status, String originInfo, int minOrderAmount) {
         this.ownerProfileId = ownerProfileId;
+        this.categoryId = categoryId;
         this.name = name;
-        this.category = category;
         this.address = address;
+        this.phoneNumber = phoneNumber;
         this.latitude = latitude;
         this.longitude = longitude;
         this.cookingTimeMinutes = cookingTimeMinutes;
         this.status = status;
+        this.originInfo = originInfo;
         this.minOrderAmount = minOrderAmount;
     }
 }

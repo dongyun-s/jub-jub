@@ -43,6 +43,8 @@ public class StoreService {
                 store.getId(),
                 store.getName(),
                 store.getAddress(),
+                store.getPhoneNumber(),
+                store.getOriginInfo(),
                 store.getCookingTimeMinutes(),
                 store.getMinOrderAmount(),
                 menus
