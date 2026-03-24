@@ -1,6 +1,7 @@
 package io.github.dongyuns.jubjub.domain.store.dto;
 
 import io.github.dongyuns.jubjub.domain.store.entity.Menu;
+import java.util.List;
 
 public record MenuResponse(
         Long menuId,
@@ -8,7 +9,8 @@ public record MenuResponse(
         int price,
         String description,
         boolean isSoldOut,
-        int rewardXp
+        int rewardXp,
+        List<MenuOptionResponse> options
 ) {
     public static MenuResponse from(Menu menu) {
         return new MenuResponse(
@@ -17,7 +19,10 @@ public record MenuResponse(
                 menu.getPrice(),
                 menu.getDescription(),
                 menu.isSoldOut(),
-                menu.getRewardXp()
+                menu.getRewardXp(),
+                menu.getOptions().stream()
+                        .map(MenuOptionResponse::from)
+                        .toList()
         );
     }
 }
