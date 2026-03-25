@@ -34,10 +34,6 @@ public class Menu {
     // 🌟 UI 프로토타입을 반영하여 추가한 필드!
     private int rewardXp = 0; // 메뉴 주문 시 획득 가능한 경험치
 
-    // 메뉴가 자신의 옵션들을 리스트로 꽉 쥐고 있게
-    @OneToMany(mappedBy = "menu", fetch = FetchType.LAZY)
-    private java.util.List<MenuOption> options = new java.util.ArrayList<>();
-
     @Builder
     public Menu(Store store, String name, int price, String description, boolean isSoldOut, int rewardXp) {
         this.store = store;
