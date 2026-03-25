@@ -1,11 +1,11 @@
 /**
  * FindIdPage.tsx
- * 아이디 찾기
+ * 아이디 찾기 (데모: mocks/authMock)
  */
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
-import { findId } from '../../api/auth'
+import { mockFindId } from '../../mocks/authMock'
 
 interface FindIdPageProps {
   onBack: () => void
@@ -25,7 +25,7 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
     setResult(null)
     setLoading(true)
     try {
-      const masked = await findId(name.trim(), phone.trim())
+      const masked = await mockFindId(name.trim(), phone.trim())
       setResult(masked)
     } catch (err) {
       setError(err instanceof Error ? err.message : '아이디 찾기에 실패했습니다.')
@@ -52,6 +52,7 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
         <div className="mb-6 text-center">
           <h1 className="mb-2 text-xl font-bold text-gray-900">아이디를 잊으셨나요?</h1>
           <p className="text-sm text-gray-500">가입 시 등록한 이름과 휴대폰 번호로 조회합니다.</p>
+          <p className="mt-2 text-xs text-amber-800/80">데모 · 가짜 마스킹 이메일이 표시됩니다.</p>
         </div>
 
         {error && (

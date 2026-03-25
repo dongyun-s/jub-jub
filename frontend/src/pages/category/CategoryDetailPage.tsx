@@ -12,16 +12,13 @@ import BottomNav from '../../components/BottomNav'
 import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
 import SearchBar from '../../components/SearchBar'
 import { useDragScroll } from '../../hooks'
-import { fetchStores } from '../../api/store'
-import type { FeaturedRestaurant } from '../../constants'
 import { CATEGORY_TABS, FEATURED_RESTAURANTS, FILTER_OPTIONS } from '../../constants'
-import { mapStoreListItemToFeatured, restaurantMatchesCategoryTab } from '../../lib/storeUi'
 import styles from './CategoryDetailPage.module.css'
 
 interface CategoryDetailPageProps {
   onBack: () => void
   onGoHome: () => void
-  onStoreSelect?: (storeId: number) => void
+  onStoreClick?: () => void
   onCartClick?: () => void
   onOrdersClick?: () => void
   onMapClick?: () => void
@@ -30,32 +27,10 @@ interface CategoryDetailPageProps {
   cartCount?: number
 }
 
-function CategoryDetailPage({
-  onBack,
-  onGoHome,
-  onStoreSelect,
-  onCartClick,
-  onOrdersClick,
-  onMapClick,
-  onMypageClick,
-  onFavoritesClick,
-  cartCount = 0,
-}: CategoryDetailPageProps) {
-  const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
+/** 홈과 동일한 맛집 던전 데이터 사용 */
+const restaurants = FEATURED_RESTAURANTS
 
-  useEffect(() => {
-    let cancelled = false
-    fetchStores()
-      .then((list) => {
-        if (!cancelled && list.length > 0) {
-          setRestaurants(list.map(mapStoreListItemToFeatured))
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
+function CategoryDetailPage({ onBack, onGoHome, onStoreClick, onCartClick, onOrdersClick, onMapClick, onMypageClick, onFavoritesClick, cartCount = 0 }: CategoryDetailPageProps) {
   const [activeTab, setActiveTab] = useState('전체')
   const [sortOrder, setSortOrder] = useState<'default' | 'distance' | 'rating'>('default')
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false)
@@ -99,22 +74,19 @@ function CategoryDetailPage({
 
   const filteredRestaurants = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    const bySearch = !q
-      ? restaurants
-      : restaurants.filter(
-          (item) =>
-            item.title.toLowerCase().includes(q) ||
-            item.hashtags.some((h) => h.toLowerCase().includes(q.replace('#', ''))),
-        )
+    const base = !q ? restaurants : restaurants.filter((item) =>
+      item.title.toLowerCase().includes(q) ||
+      item.hashtags.some((h) => h.toLowerCase().includes(q.replace('#', '')))
+    )
 
-    const byTab = bySearch.filter((item) => restaurantMatchesCategoryTab(activeTab, item))
-
-    const sorted = [...byTab]
+    const sorted = [...base]
     if (sortOrder === 'rating') {
       sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0))
     }
+    // distance 정렬은 실제 거리 필드가 생기면 그때 구현
+
     return sorted
-  }, [searchQuery, sortOrder, activeTab, restaurants])
+  }, [searchQuery, sortOrder])
 
   return (
     <Layout showBackground={false}>
@@ -210,7 +182,7 @@ function CategoryDetailPage({
       <main className={styles.main}>
         <FeaturedRestaurantList
           restaurants={filteredRestaurants}
-          onCardClick={(id) => onStoreSelect?.(id)}
+          onCardClick={() => onStoreClick?.()}
         />
       </main>
 

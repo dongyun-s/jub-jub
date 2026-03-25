@@ -4,24 +4,13 @@
  * - 히어로 이미지, 프로필·퀘스트 배너, 탭(메뉴/리뷰/매장정보), 카테고리·검색, 메뉴 카드 그리드
  */
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
-import { fetchStoreDetail } from '../../api/store'
-import type { StoreDetailDto } from '../../api/store'
-import { ApiError } from '../../api/authClient'
-import { STORE_LIST_CARD_IMAGES } from '../../constants/categories'
-import {
-  buildMenuCategoriesFromApi,
-  demoMenuCategories,
-  type MenuItem,
-  type MenuCategory,
-} from '../../lib/storeDetailMenu'
 import styles from './StoreDetailPage.module.css'
 
 interface StoreDetailPageProps {
-  storeId: number
   onBack: () => void
   onGoHome: () => void
   onMenuClick?: () => void
@@ -32,6 +21,115 @@ interface StoreDetailPageProps {
   onFavoritesClick?: () => void
   cartCount?: number
 }
+
+interface MenuItem {
+  id: number
+  name: string
+  description?: string
+  price: number
+  xp?: number
+  image?: string
+  tags: ('best' | 'loot')[]
+  rank?: number
+}
+
+interface MenuCategory {
+  id: string
+  name: string
+  description?: string
+  items: MenuItem[]
+}
+
+/** 매장 메뉴 카테고리·아이템 (데모) */
+const menuCategories: MenuCategory[] = [
+  {
+    id: 'popular',
+    name: '인기 메뉴',
+    description: '한 달간 주문수가 많고 만족도가 높은 메뉴에요.',
+    items: [
+      {
+        id: 1,
+        name: '프리미엄 줍줍 보울',
+        description: '신선한 아보카도와 수비드 연어가 어우러진 줍줍의 시그니처 메뉴',
+        price: 14900,
+        xp: 50,
+        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBjgVhe4RpU1CvWptSpJUoVU6IWkiGA1oG3BmLNe5Fh1sqjYiPgkIXsrWt2H4SC5dcLQJ33jO4h7uzFoDzlUYa-JYGPjg2Y2v_QTMV3JO_zi-sgUddtwX3objPZO-BZlh1r7riAc1TBA-_wfa2OrkfucW-kowHakz8w_hY7kyQpNdG_iRxqxaoWSGyNOtHlh4UMMyAaivn4TQSa-9b8IBqAgKhCgY6EXsC2yjE9XfW7vCsoiet34uBobR72zX2MlHJFLMbdAUbkXguB',
+        tags: ['best', 'loot'],
+        rank: 1,
+      },
+      {
+        id: 2,
+        name: '아보카도 가든 샐러드',
+        description: '숲의 버터 아보카도와 유기농 채소의 환상적인 만남',
+        price: 12500,
+        xp: 30,
+        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBw4rxEQgBxqN4CKtcZuvBE2E5x0k4tDJ0mTNDdD4_iqdLuLsxMGpsoX9CamCeS01CVp6-imTUzpJVWUbNnQpKCxn8aA3DvjOGALM44rLFJdDCFCXe-5-UbGAgwNqS0OpmmwEsmd_5dJFJrvAiZ6Kco4thTfCjEHfV9HcH_CAEE5XNq6RBljD95QWJnhIDHabkXsOqpo_YdSafC7tLNC9HcDqa9aZz54iNTXpHSyt_PFKOoO6dRkwcjGtwapWVxNSzmMBeQKV1RPu6A',
+        tags: ['best'],
+        rank: 2,
+      },
+    ],
+  },
+  {
+    id: 'main',
+    name: '메인 메뉴',
+    items: [
+      {
+        id: 3,
+        name: '그릴드 치킨 스테이크',
+        description: '부드러운 닭가슴살을 그릴에 구워 특제 소스와 함께',
+        price: 15900,
+        xp: 40,
+        image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&h=200&fit=crop',
+        tags: [],
+      },
+      {
+        id: 4,
+        name: '연어 포케 보울',
+        description: '신선한 연어와 아보카도, 특제 간장 소스',
+        price: 16900,
+        xp: 45,
+        image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
+        tags: ['loot'],
+      },
+      {
+        id: 5,
+        name: '불고기 라이스 보울',
+        description: '달콤한 불고기와 신선한 야채의 조화',
+        price: 13900,
+        image: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=200&h=200&fit=crop',
+        tags: [],
+      },
+    ],
+  },
+  {
+    id: 'side',
+    name: '사이드 & 드링크',
+    items: [
+      {
+        id: 6,
+        name: '트러플 프렌치 프라이',
+        description: '트러플 오일과 파마산 치즈를 곁들인 감자튀김',
+        price: 6500,
+        tags: [],
+      },
+      {
+        id: 7,
+        name: '수제 핑크 레모네이드',
+        description: '상큼한 레몬과 자몽의 조화',
+        price: 4500,
+        tags: [],
+      },
+      {
+        id: 8,
+        name: '콤부차 (레몬/진저)',
+        description: '건강한 발효 음료',
+        price: 5000,
+        xp: 10,
+        tags: ['loot'],
+      },
+    ],
+  },
+]
 
 /** 메뉴 아이템 카드 컴포넌트 */
 function MenuItemCard({ 
@@ -64,10 +162,7 @@ function MenuItemCard({
       )}
       <div className={styles.menuCardInfo}>
         <div>
-          <h4 className={styles.menuCardName}>
-            {item.name}
-            {item.isSoldOut ? ' (품절)' : ''}
-          </h4>
+          <h4 className={styles.menuCardName}>{item.name}</h4>
           {item.description && <p className={styles.menuCardDesc}>{item.description}</p>}
         </div>
         <div className={styles.menuCardBottom}>
@@ -89,22 +184,7 @@ function MenuItemCard({
   )
 }
 
-function StoreDetailPage({
-  storeId,
-  onBack,
-  onGoHome,
-  onMenuClick,
-  onCartClick,
-  onOrdersClick,
-  onMapClick,
-  onMypageClick,
-  onFavoritesClick: _onFavoritesClick,
-  cartCount = 0,
-}: StoreDetailPageProps) {
-  const [detail, setDetail] = useState<StoreDetailDto | null>(null)
-  const [storeLoading, setStoreLoading] = useState(true)
-  const [storeError, setStoreError] = useState<string | null>(null)
-
+function StoreDetailPage({ onBack, onGoHome, onMenuClick, onCartClick, onOrdersClick, onMapClick, onMypageClick, onFavoritesClick: _onFavoritesClick, cartCount = 0 }: StoreDetailPageProps) {
   const [activeTab, setActiveTab] = useState<'menu' | 'review' | 'info'>('menu')
   const [activeCategory, setActiveCategory] = useState('popular')
   const [showSearch, setShowSearch] = useState(false)
@@ -115,51 +195,6 @@ function StoreDetailPage({
   const categoryScrollRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setStoreLoading(true)
-    setStoreError(null)
-    fetchStoreDetail(storeId)
-      .then((d) => {
-        if (!cancelled) {
-          setDetail(d)
-          setStoreLoading(false)
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setDetail(null)
-          setStoreError(
-            e instanceof ApiError ? e.message : '매장 정보를 불러오지 못했습니다.',
-          )
-          setStoreLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [storeId])
-
-  const menuCategories = useMemo((): MenuCategory[] => {
-    if (detail?.menus?.length) {
-      const built = buildMenuCategoriesFromApi(detail.menus)
-      if (built.length > 0) return built
-    }
-    return demoMenuCategories
-  }, [detail])
-
-  useEffect(() => {
-    const first = menuCategories[0]?.id
-    if (first) setActiveCategory(first)
-  }, [menuCategories])
-
-  const heroImage =
-    STORE_LIST_CARD_IMAGES[Math.abs(Number(storeId)) % STORE_LIST_CARD_IMAGES.length]
-  const storeName = detail?.name ?? '매장'
-  const addressLine = detail?.address ?? '서울시 강남구 역삼동'
-  const minOrderLabel = detail ? `${detail.minOrderAmount.toLocaleString()}원` : '12,000원'
-  const cookTimeLabel = detail ? `약 ${detail.cookingTimeMinutes}분` : '10-15분'
 
   const tabs = [
     { id: 'menu', label: '메뉴' },
@@ -245,7 +280,7 @@ function StoreDetailPage({
 
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [activeCategory, menuCategories])
+  }, [activeCategory])
 
   // 검색 필터링
   const filteredItems = searchQuery
@@ -258,19 +293,10 @@ function StoreDetailPage({
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
-        {storeError && (
-          <p className="mx-4 mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
-            {storeError} · 데모 메뉴를 표시합니다.
-          </p>
-        )}
-        {storeLoading && (
-          <p className="mx-4 mt-2 text-center text-xs text-gray-500">매장 정보 불러오는 중…</p>
-        )}
-
         <Header
           showBack
           onBack={onBack}
-          title={storeName}
+          title="줍줍 (Jub-Jub)"
           rightContent={
             <div className={styles.headerActions}>
               <button
@@ -280,7 +306,7 @@ function StoreDetailPage({
                   if (typeof window === 'undefined' || typeof navigator === 'undefined') return
                   const url = window.location.href
                   if (navigator.share) {
-                    navigator.share({ url, title: storeName }).catch(() => {})
+                    navigator.share({ url, title: '줍줍 (Jub-Jub)' }).catch(() => {})
                   } else if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(url).then(() => {
                       window.alert('현재 페이지 주소를 클립보드에 복사했어요.')
@@ -315,7 +341,7 @@ function StoreDetailPage({
           <div
             className={styles.hero}
             style={{
-              backgroundImage: `url("${heroImage}")`,
+              backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDCngcYIep9C9BP9oAIy2pBl2ogkuZ5baHG_sVSzCNdHOEmoo8ptcW4RFfaQ9IHqWVxuZJFpW-WSA08f563ET9J7_T5o1GpZ7Iq5DLuqEy-V8Y7DqdbRE-wEgqvC32NhtlOns7c-I-VvHyvnCmHQRoJfOWq7OSjZuVwvJT4WVyNRTVOJjUALvG82KsjU4Fb54qGni0T-wcI9OeBuna5mLxle-gzF2R94FwufBbqDiON1TGT7CE1YcLizGmlFJ2mjehcBqInzazNV8ZS')`,
             }}
           >
             <div className={styles.heroOverlay} />
@@ -328,7 +354,7 @@ function StoreDetailPage({
               <div className={styles.profileRow}>
                 <div>
                   <div className={styles.profileTitleRow}>
-                    <h1 className={styles.storeName}>{storeName}</h1>
+                    <h1 className={styles.storeName}>줍줍 (Jub-Jub)</h1>
                     <span className={styles.verifiedBadge}>Verified</span>
                   </div>
                   <div className={styles.profileMeta}>
@@ -336,18 +362,18 @@ function StoreDetailPage({
                     <span className={styles.profileRating}>4.8</span>
                     <span>(500+ 리뷰)</span>
                     <span className={styles.profileMetaDot}>•</span>
-                    <span>{addressLine}</span>
+                    <span>서울시 강남구 역삼동</span>
                   </div>
                 </div>
               </div>
               <div className={styles.statsRow}>
                 <div className={styles.statBox}>
                   <span className={styles.statLabel}>최소주문</span>
-                  <span className={styles.statValue}>{minOrderLabel}</span>
+                  <span className={styles.statValue}>12,000원</span>
                 </div>
                 <div className={styles.statBox}>
                   <span className={styles.statLabel}>포장시간</span>
-                  <span className={styles.statValue}>{cookTimeLabel}</span>
+                  <span className={styles.statValue}>10-15분</span>
                 </div>
                 <div className={`${styles.statBox} ${styles.statBoxHighlight}`}>
                   <span className={`${styles.statLabel} ${styles.statLabelPrimary}`}>포장 할인</span>
@@ -463,13 +489,7 @@ function StoreDetailPage({
                       <div className={styles.categoryHeader}>
                         <div className={styles.categoryHeaderRow}>
                           <span className={`material-symbols-outlined ${styles.categoryIcon}`}>
-                            {category.id === 'popular'
-                              ? 'auto_awesome'
-                              : category.id === 'main'
-                                ? 'restaurant'
-                                : category.id === 'all'
-                                  ? 'restaurant_menu'
-                                  : 'local_cafe'}
+                            {category.id === 'popular' ? 'auto_awesome' : category.id === 'main' ? 'restaurant' : 'local_cafe'}
                           </span>
                           <h3 className={styles.categoryTitle}>
                             {category.id === 'popular' ? '가장 인기 있는 메뉴' : category.name}
@@ -583,10 +603,10 @@ function StoreDetailPage({
           {activeTab === 'info' && (
             <div className={styles.infoTab}>
               <div className={styles.infoSection}>
-                <h3 className={styles.infoTitle}>원산지</h3>
+                <h3 className={styles.infoTitle}>매장 소개</h3>
                 <p className={styles.infoText}>
-                  {detail?.originInfo ??
-                    '서버에서 불러오면 원산지 정보가 표시됩니다. 포장·테이크아웃 전문 매장입니다.'}
+                  줍줍 (Jub-Jub)은 신선한 재료로 만드는 샐러드·보울 전문 매장입니다. 모든 메뉴는 포장·테이크아웃에
+                  최적화되어 있어, 바쁜 일상 속에서도 가볍게 건강한 한 끼를 즐길 수 있어요.
                 </p>
               </div>
 
@@ -601,19 +621,15 @@ function StoreDetailPage({
 
               <div className={styles.infoSection}>
                 <h3 className={styles.infoTitle}>위치</h3>
-                <p className={styles.infoText}>{detail?.address ?? addressLine}</p>
-                {detail?.phoneNumber && (
-                  <p className={styles.infoSubText}>전화 {detail.phoneNumber}</p>
-                )}
+                <p className={styles.infoText}>서울시 강남구 역삼동 123-45, 1층 줍줍 (Jub-Jub)</p>
+                <p className={styles.infoSubText}>2호선 강남역 11번 출구에서 도보 5분 거리</p>
               </div>
 
               <div className={styles.infoSection}>
                 <h3 className={styles.infoTitle}>안내 사항</h3>
                 <ul className={styles.infoList}>
                   <li>포장 주문만 가능하며, 매장 내 취식은 어려운 점 양해 부탁드립니다.</li>
-                  <li>
-                    모든 메뉴는 주문 후 바로 제조되며, 평균 준비 시간은 약 {detail?.cookingTimeMinutes ?? 15}분입니다.
-                  </li>
+                  <li>모든 메뉴는 주문 후 바로 제조되며, 평균 준비 시간은 10–15분입니다.</li>
                   <li>땅콩·견과류 알레르기가 있는 경우 주문 시 꼭 미리 말씀해주세요.</li>
                 </ul>
               </div>
