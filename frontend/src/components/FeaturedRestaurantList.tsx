@@ -1,7 +1,5 @@
-import type { FEATURED_RESTAURANTS } from '../constants/categories'
+import type { FeaturedRestaurant } from '../constants/categories'
 import styles from '../pages/home/HomePage.module.css'
-
-type FeaturedRestaurant = (typeof FEATURED_RESTAURANTS)[number]
 
 interface FeaturedRestaurantListProps {
   restaurants: FeaturedRestaurant[]

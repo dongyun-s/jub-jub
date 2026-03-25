@@ -1,15 +1,15 @@
 /**
  * FindPasswordPage.tsx
- * 비밀번호 찾기 (데모: mocks/authMock)
+ * 비밀번호 찾기
  */
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
 import {
-  mockFindPasswordSend,
-  mockResetPassword,
-  mockVerifyConfirm,
-} from '../../mocks/authMock'
+  findPasswordSend,
+  resetPassword,
+  verifyConfirm,
+} from '../../api/auth'
 
 interface FindPasswordPageProps {
   onBack: () => void
@@ -34,7 +34,7 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
     setError(null)
     setLoading(true)
     try {
-      const id = await mockFindPasswordSend(email.trim())
+      const id = await findPasswordSend(email.trim())
       setLogId(id)
       setStep('code')
     } catch (err) {
@@ -50,7 +50,7 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
     setError(null)
     setLoading(true)
     try {
-      const res = await mockVerifyConfirm(logId, code.trim())
+      const res = await verifyConfirm(logId, code.trim())
       if (res.isVerified) setStep('newPassword')
       else setError('인증번호가 올바르지 않습니다.')
     } catch (err) {
@@ -70,7 +70,7 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
     setError(null)
     setLoading(true)
     try {
-      await mockResetPassword(email.trim(), logId, newPassword)
+      await resetPassword(email.trim(), logId, newPassword)
       setStep('done')
     } catch (err) {
       setError(err instanceof Error ? err.message : '비밀번호 재설정에 실패했습니다.')
@@ -96,7 +96,6 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
 
         <div className="mb-6 text-center">
           <h1 className="mb-2 text-xl font-bold text-gray-900">비밀번호를 잊으셨나요?</h1>
-          <p className="mb-2 text-xs text-amber-800/80">데모 · 인증번호는 6자리면 통과합니다.</p>
           <p className="text-sm leading-relaxed text-gray-500">
             {step === 'email' && '이메일로 재설정 인증번호를 보냅니다.'}
             {step === 'code' && '메일(또는 안내)에 온 인증번호를 입력하세요.'}

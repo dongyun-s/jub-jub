@@ -5,13 +5,16 @@
  * - 하단 네비로 장바구니/주문내역/지도/내정보 이동
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
 import SearchBar from '../../components/SearchBar'
+import { fetchStores } from '../../api/store'
+import type { FeaturedRestaurant } from '../../constants'
 import { FEATURED_RESTAURANTS, HOME_CATEGORIES } from '../../constants'
+import { mapStoreListItemToFeatured } from '../../lib/storeUi'
 import styles from './HomePage.module.css'
 
 interface HomePageProps {
@@ -22,19 +25,46 @@ interface HomePageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  /** 매장 카드 선택 시 storeId 전달 */
+  onStoreSelect?: (storeId: number) => void
   /** 진행 중 주문이 있으면 상단 배너 표시 */
   hasActiveOrder?: boolean
   cartCount?: number
 }
 
-/** 홈 추천 맛집 목록 (데모용) */
-const restaurants = FEATURED_RESTAURANTS
-
 // 홈 상단 카드용 오늘 출석 여부 (디자인 확인용 데모 플래그)
 const isTodayCheckedInHome = false
 
-function HomePage({ onCategoryClick, onCartClick, onOrdersClick, onOrderStatusClick, onMapClick, onMypageClick, onFavoritesClick, hasActiveOrder, cartCount = 0 }: HomePageProps) {
+function HomePage({
+  onCategoryClick,
+  onCartClick,
+  onOrdersClick,
+  onOrderStatusClick,
+  onMapClick,
+  onMypageClick,
+  onFavoritesClick,
+  onStoreSelect,
+  hasActiveOrder,
+  cartCount = 0,
+}: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchStores()
+      .then((list) => {
+        if (!cancelled && list.length > 0) {
+          setRestaurants(list.map(mapStoreListItemToFeatured))
+        }
+      })
+      .catch(() => {
+        /* 토큰/네트워크 실패 시 기존 데모 목록 유지 */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleGoMypage = () => {
     onMypageClick?.()
@@ -232,7 +262,10 @@ function HomePage({ onCategoryClick, onCartClick, onOrdersClick, onOrderStatusCl
             </button>
           </div>
 
-          <FeaturedRestaurantList restaurants={restaurants} />
+          <FeaturedRestaurantList
+            restaurants={restaurants}
+            onCardClick={(id) => onStoreSelect?.(id)}
+          />
         </div>
       </main>
 
