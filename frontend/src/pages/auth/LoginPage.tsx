@@ -1,11 +1,11 @@
 /**
  * LoginPage.tsx
- * 로그인 (데모: mocks/authMock)
+ * 로그인 — POST /api/v1/auth/login
  */
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
-import { mockLogin } from '../../mocks/authMock'
+import { login } from '../../api/auth'
 import { setTokens } from '../../lib/authStorage'
 
 interface LoginPageProps {
@@ -27,7 +27,7 @@ function LoginPage({ onLogin, onSignUp, onForgotId, onForgotPassword }: LoginPag
     setError(null)
     setLoading(true)
     try {
-      const res = await mockLogin(email.trim(), password)
+      const res = await login(email.trim(), password)
       setTokens(res.accessToken, res.refreshToken)
       onLogin()
     } catch (err) {
@@ -51,7 +51,6 @@ function LoginPage({ onLogin, onSignUp, onForgotId, onForgotPassword }: LoginPag
         <div className="text-center mb-8">
           <h1 className="text-title leading-tight">Jub-Jub 에 오신 것을 환영합니다!</h1>
           <p className="text-subtitle mt-2">맛있는 탐험을 위해 지금 바로 합류하세요!</p>
-          <p className="mt-3 text-xs text-amber-800/80">데모 모드 · 백엔드 없이 동작합니다.</p>
         </div>
 
         {error && (
