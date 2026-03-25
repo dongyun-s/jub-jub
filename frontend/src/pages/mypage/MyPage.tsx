@@ -18,6 +18,7 @@ interface MyPageProps {
   onMapClick?: () => void
   onReviewsClick?: () => void
   onFavoritesClick?: () => void
+  onLogout?: () => void
   cartCount?: number
 }
 
@@ -37,7 +38,7 @@ const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 /** 오늘 요일 인덱스 (0=월 … 6=일) */
 const todayIndex = 3
 
-function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, cartCount = 0 }: MyPageProps) {
+function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onLogout, cartCount = 0 }: MyPageProps) {
   /** 요일별 출석 체크 여부 */
   const [checkedDays, setCheckedDays] = useState([true, true, true, false, false, false, false])
   /** 출석 완료 모달 표시 여부 */
@@ -223,12 +224,12 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                 </div>
                 <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
               </button>
-              <button type="button" className={styles.menuItem}>
+              <button type="button" className={styles.menuItem} onClick={() => onLogout?.()}>
                 <div className={styles.menuLeft}>
                   <div className={`${styles.menuIconWrap} ${styles.menuIconGray}`}>
-                    <span className="material-symbols-outlined">help_outline</span>
+                    <span className="material-symbols-outlined">logout</span>
                   </div>
-                  <span className={styles.menuLabel}>고객센터</span>
+                  <span className={styles.menuLabel}>로그아웃</span>
                 </div>
                 <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
               </button>

@@ -3,12 +3,11 @@
  * 앱 루트 컴포넌트
  * - 현재 페이지 상태 관리 및 라우팅(페이지 전환)
  * - 전역 상태: 장바구니, 적용 쿠폰, 진행 중 주문 여부, 리뷰 작성 대상 매장명
- * - 로딩 → 로그인 → 각 페이지로 이동 처리
+ * - 로그인 여부에 따라 홈 또는 로그인에서 시작
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
-  LoadingPage,
   LoginPage,
   SignUpPage,
   FindIdPage,
@@ -28,9 +27,10 @@ import {
   FavoritesPage,
 } from './pages'
 import { FEATURED_RESTAURANTS } from './constants'
+import { clearTokens, getAccessToken } from './lib/authStorage'
 
 /** 앱에서 사용하는 모든 페이지 식별자 */
-type Page = 'loading' | 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites'
+type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites'
 
 /** 장바구니에 적용된 쿠폰 정보 */
 interface AppliedCoupon {
@@ -63,7 +63,7 @@ const initialCartItems: CartItem[] = [
 
 function App() {
   /** 현재 화면에 표시할 페이지 */
-  const [currentPage, setCurrentPage] = useState<Page>('loading')
+  const [currentPage, setCurrentPage] = useState<Page>(() => (getAccessToken() ? 'home' : 'login'))
   /** 직전에 보고 있던 페이지 (뒤로가기용) */
   const [lastPage, setLastPage] = useState<Page | null>(null)
   /** 장바구니에서 사용 중인 쿠폰 (미사용 시 null) */
@@ -74,17 +74,16 @@ function App() {
   const [reviewStoreName, setReviewStoreName] = useState('')
   /** 장바구니 상품 목록 (CartPage에서 수정 가능) */
   const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems)
+  const [selectedStoreId, setSelectedStoreId] = useState(FEATURED_RESTAURANTS[0].id)
 
   /** 장바구니 총 수량 (하단 네비 뱃지 등에 사용) */
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
 
-  /** 로딩 페이지 3초 후 로그인 페이지로 자동 전환 */
-  useEffect(() => {
-    if (currentPage === 'loading') {
-      const timer = setTimeout(() => setCurrentPage('login'), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [currentPage])
+  const openStoreById = (storeId: number) => {
+    setSelectedStoreId(storeId)
+    setLastPage(currentPage)
+    setCurrentPage('store')
+  }
 
   /** 특정 페이지로 이동하는 핸들러 생성 (이벤트 핸들러에 바인딩용) */
   const goTo = (page: Page) => () => {
@@ -95,8 +94,6 @@ function App() {
   /** currentPage 값에 따라 해당 페이지 컴포넌트 반환 */
   const renderPage = () => {
     switch (currentPage) {
-      case 'loading':
-        return <LoadingPage />
       case 'login':
         return (
           <LoginPage 
@@ -122,14 +119,40 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onStoreSelect={openStoreById}
             hasActiveOrder={hasActiveOrder}
             cartCount={cartCount}
           />
         )
       case 'category':
-        return <CategoryDetailPage onBack={goTo('home')} onGoHome={goTo('home')} onStoreClick={goTo('store')} onCartClick={goTo('cart')} onOrdersClick={goTo('orders')} onMapClick={goTo('map')} onMypageClick={goTo('mypage')} onFavoritesClick={goTo('favorites')} cartCount={cartCount} />
+        return (
+          <CategoryDetailPage
+            onBack={goTo('home')}
+            onGoHome={goTo('home')}
+            onStoreSelect={openStoreById}
+            onCartClick={goTo('cart')}
+            onOrdersClick={goTo('orders')}
+            onMapClick={goTo('map')}
+            onMypageClick={goTo('mypage')}
+            onFavoritesClick={goTo('favorites')}
+            cartCount={cartCount}
+          />
+        )
       case 'store':
-        return <StoreDetailPage onBack={goTo('category')} onGoHome={goTo('home')} onMenuClick={goTo('menu')} onCartClick={goTo('cart')} onOrdersClick={goTo('orders')} onMapClick={goTo('map')} onMypageClick={goTo('mypage')} onFavoritesClick={goTo('favorites')} cartCount={cartCount} />
+        return (
+          <StoreDetailPage
+            storeId={selectedStoreId}
+            onBack={goTo('category')}
+            onGoHome={goTo('home')}
+            onMenuClick={goTo('menu')}
+            onCartClick={goTo('cart')}
+            onOrdersClick={goTo('orders')}
+            onMapClick={goTo('map')}
+            onMypageClick={goTo('mypage')}
+            onFavoritesClick={goTo('favorites')}
+            cartCount={cartCount}
+          />
+        )
       case 'menu':
         return <MenuDetailPage onBack={goTo('store')} onAddToCart={goTo('cart')} />
       case 'cart':
@@ -211,7 +234,7 @@ function App() {
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
             onOrderStatusClick={goTo('orderStatus')}
-            onStoreClick={goTo('store')}
+            onStoreClick={() => openStoreById(1)}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             hasActiveOrder={hasActiveOrder}
@@ -228,6 +251,10 @@ function App() {
             onMapClick={goTo('map')}
             onReviewsClick={goTo('myReviews')}
             onFavoritesClick={goTo('favorites')}
+            onLogout={() => {
+              clearTokens()
+              setCurrentPage('login')
+            }}
             cartCount={cartCount}
           />
         )
@@ -271,7 +298,7 @@ function App() {
             onOrdersClick={goTo('orders')}
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
-            onStoreClick={goTo('store')}
+            onStoreClick={() => openStoreById(1)}
             cartCount={cartCount}
           />
         )
