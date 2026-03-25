@@ -109,7 +109,7 @@ export function findId(name: string, phone: string) {
 }
 
 /** POST /find-password/send?email= */
-export function findPasswordSend(email: string) {
+export function findPasswordSend(email: string): Promise<number> {
   const q = new URLSearchParams({ email })
   return authFetch<number>(`/find-password/send?${q.toString()}`, {
     method: 'POST',
