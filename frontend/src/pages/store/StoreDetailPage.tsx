@@ -156,7 +156,7 @@ function StoreDetailPage({
 
   const heroImage =
     STORE_LIST_CARD_IMAGES[Math.abs(Number(storeId)) % STORE_LIST_CARD_IMAGES.length]
-  const storeName = detail?.name ?? '매장'
+  const storeName = (detail?.name ?? '매장').trim()
   const addressLine = detail?.address ?? '서울시 강남구 역삼동'
   const minOrderLabel = detail ? `${detail.minOrderAmount.toLocaleString()}원` : '12,000원'
   const cookTimeLabel = detail ? `약 ${detail.cookingTimeMinutes}분` : '10-15분'
