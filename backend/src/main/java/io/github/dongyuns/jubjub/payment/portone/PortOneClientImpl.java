@@ -4,14 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
-import java.nio.charset.StandardCharsets;
+import io.portone.sdk.server.errors.WebhookVerificationException;
+import io.portone.sdk.server.webhook.WebhookVerifier;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
-import java.util.Base64;
 import java.util.UUID;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -28,6 +26,7 @@ public class PortOneClientImpl implements PortOneClient {
     private final String apiSecret;
     private final String webhookSecret;
     private final ObjectMapper objectMapper;
+    private final WebhookVerifier webhookVerifier;
 
     public PortOneClientImpl(
             RestClient.Builder restClientBuilder,
@@ -40,6 +39,9 @@ public class PortOneClientImpl implements PortOneClient {
         this.objectMapper = objectMapper;
         this.apiSecret = apiSecret;
         this.webhookSecret = webhookSecret;
+        this.webhookVerifier = webhookSecret == null || webhookSecret.isBlank()
+                ? null
+                : new WebhookVerifier(webhookSecret);
     }
 
     @Override
@@ -96,34 +98,34 @@ public class PortOneClientImpl implements PortOneClient {
     }
 
     @Override
-    public boolean verifyWebhookSignature(String signature, String payloadJson) {
+    public boolean verifyWebhookSignature(
+            String payloadJson,
+            String webhookId,
+            String webhookSignature,
+            String webhookTimestamp
+    ) {
         log.info("Verify PortOne webhook signature");
 
-        if (signature == null || signature.isBlank()) {
+        if (webhookId == null || webhookId.isBlank()) {
             return false;
         }
-
-        if (webhookSecret == null || webhookSecret.isBlank()) {
+        if (webhookSignature == null || webhookSignature.isBlank()) {
+            return false;
+        }
+        if (webhookTimestamp == null || webhookTimestamp.isBlank()) {
+            return false;
+        }
+        if (webhookVerifier == null) {
             return true;
         }
 
-        // PortOne V2 공식 방식은 Standard Webhooks 전체 헤더 검증이다.
-        // 현재 컨트롤러는 단일 서명 헤더만 전달하므로 payload 기반 단순 HMAC만 우선 지원한다.
-        String[] candidates = signature.trim().split(",");
-        String hexDigest = hmac("HmacSHA256", webhookSecret, payloadJson, false);
-        String base64Digest = hmac("HmacSHA256", webhookSecret, payloadJson, true);
-
-        for (String candidate : candidates) {
-            String token = candidate.trim();
-            int separator = token.lastIndexOf('=');
-            if (separator >= 0) {
-                token = token.substring(separator + 1).trim();
-            }
-            if (token.equalsIgnoreCase(hexDigest) || token.equals(base64Digest)) {
-                return true;
-            }
+        try {
+            webhookVerifier.verify(payloadJson, webhookId, webhookSignature, webhookTimestamp);
+            return true;
+        } catch (WebhookVerificationException exception) {
+            log.warn("PortOne webhook signature verification failed. message={}", exception.getMessage());
+            return false;
         }
-        return false;
     }
 
     RestClient restClient() {
@@ -259,28 +261,6 @@ public class PortOneClientImpl implements PortOneClient {
             }
         }
         return null;
-    }
-
-    private String hmac(String algorithm, String secret, String value, boolean base64) {
-        try {
-            Mac mac = Mac.getInstance(algorithm);
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), algorithm));
-            byte[] digest = mac.doFinal(value.getBytes(StandardCharsets.UTF_8));
-            if (base64) {
-                return Base64.getEncoder().encodeToString(digest);
-            }
-            return toHex(digest);
-        } catch (Exception exception) {
-            throw new BusinessException("WEBHOOK_SIGNATURE_VERIFICATION_FAILED", "웹훅 서명 검증에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private String toHex(byte[] bytes) {
-        StringBuilder builder = new StringBuilder(bytes.length * 2);
-        for (byte aByte : bytes) {
-            builder.append(String.format("%02x", aByte));
-        }
-        return builder.toString();
     }
 
     private record CancelPaymentBody(

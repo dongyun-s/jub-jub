@@ -1,6 +1,7 @@
 package io.github.dongyuns.jubjub.payment.domain;
 
 public enum WebhookEventType {
+    TRANSACTION_READY("Transaction.Ready"),
     TRANSACTION_PAID("Transaction.Paid"),
     TRANSACTION_FAILED("Transaction.Failed"),
     TRANSACTION_CANCELLED("Transaction.Cancelled"),

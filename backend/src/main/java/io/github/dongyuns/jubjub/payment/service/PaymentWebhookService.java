@@ -24,9 +24,14 @@ public class PaymentWebhookService {
     private final PortOneClient portOneClient;
     private final ObjectMapper objectMapper;
 
-    public WebhookResponse process(String signature, String payload) {
+    public WebhookResponse process(
+            String payload,
+            String webhookId,
+            String webhookSignature,
+            String webhookTimestamp
+    ) {
         // 웹훅은 외부 요청이라 가장 먼저 서명을 확인한다.
-        if (!portOneClient.verifyWebhookSignature(signature, payload)) {
+        if (!portOneClient.verifyWebhookSignature(payload, webhookId, webhookSignature, webhookTimestamp)) {
             throw new BusinessException("INVALID_WEBHOOK_SIGNATURE", "웹훅 서명 검증에 실패했습니다.", HttpStatus.UNAUTHORIZED);
         }
 
@@ -53,6 +58,9 @@ public class PaymentWebhookService {
         try {
             // V2 이벤트 타입에 맞춰 내부 결제 상태를 동기화한다.
             switch (eventType) {
+                case TRANSACTION_READY -> {
+                    // READY 이벤트는 내부에서도 이미 준비 상태를 만들기 때문에 기록만 남긴다.
+                }
                 case TRANSACTION_PAID -> paymentService.confirmPaymentByWebhook(request.data().paymentId(), request.data().transactionId());
                 case TRANSACTION_FAILED -> paymentService.markPaymentFailed(request.data().paymentId(), request.data().transactionId());
                 case TRANSACTION_CANCELLED, TRANSACTION_PARTIAL_CANCELLED ->

@@ -6,5 +6,10 @@ public interface PortOneClient {
 
     PortOneRefundResult refund(String paymentId, PortOneRefundCommand command);
 
-    boolean verifyWebhookSignature(String signature, String payloadJson);
+    boolean verifyWebhookSignature(
+            String payloadJson,
+            String webhookId,
+            String webhookSignature,
+            String webhookTimestamp
+    );
 }

@@ -38,10 +38,12 @@ public class PaymentController {
 
     @PostMapping("/webhook")
     public WebhookResponse webhook(
-            @RequestHeader(name = "X-Portone-Signature", required = false) String signature,
+            @RequestHeader(name = "webhook-id", required = false) String webhookId,
+            @RequestHeader(name = "webhook-signature", required = false) String webhookSignature,
+            @RequestHeader(name = "webhook-timestamp", required = false) String webhookTimestamp,
             @RequestBody String payload
     ) {
-        return paymentWebhookService.process(signature, payload);
+        return paymentWebhookService.process(payload, webhookId, webhookSignature, webhookTimestamp);
     }
 
     @PostMapping("/{paymentId}/refund")
