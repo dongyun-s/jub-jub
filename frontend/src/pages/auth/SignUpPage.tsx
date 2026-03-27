@@ -1,16 +1,16 @@
 /**
  * SignUpPage.tsx
- * 회원가입 (데모: mocks/authMock)
+ * 회원가입 — /api/v1/auth/verify/*, /signup
  */
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
 import {
-  mockSignup,
-  mockVerifyConfirm,
-  mockVerifySend,
-  type MockVerificationType,
-} from '../../mocks/authMock'
+  signup,
+  verifyConfirm,
+  verifySend,
+  type VerificationType,
+} from '../../api/auth'
 
 interface SignUpPageProps {
   onSignUp: () => void
@@ -29,7 +29,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
 
-  const [verifyChannel, setVerifyChannel] = useState<MockVerificationType>('SMS')
+  const [verifyChannel, setVerifyChannel] = useState<VerificationType>('SMS')
   const [logId, setLogId] = useState<number | null>(null)
   const [verified, setVerified] = useState(false)
 
@@ -48,7 +48,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
     }
     setLoading(true)
     try {
-      const res = await mockVerifySend(verifyChannel, targetForSend)
+      const res = await verifySend(verifyChannel, targetForSend)
       setLogId(res.logId)
       setVerified(false)
       setInfo(`인증번호를 발송했습니다. (만료: ${res.expiresAt})`)
@@ -72,7 +72,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
     }
     setLoading(true)
     try {
-      const res = await mockVerifyConfirm(logId, verifyCode.trim())
+      const res = await verifyConfirm(logId, verifyCode.trim())
       if (res.isVerified) {
         setVerified(true)
         setInfo('인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.')
@@ -104,7 +104,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
     }
     setLoading(true)
     try {
-      await mockSignup({
+      await signup({
         email: email.trim(),
         password,
         name: name.trim(),
@@ -137,8 +137,6 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
         <p className="mb-4 text-center text-xs text-gray-500">
           ① 인증번호 발송 → ② 인증 확인 → ③ 정보 입력 후 가입
         </p>
-        <p className="mb-3 text-center text-xs text-amber-800/80">데모: 인증번호는 아무 6자리나 입력하면 통과합니다.</p>
-
         {error && (
           <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
             {error}

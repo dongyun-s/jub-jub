@@ -26,8 +26,30 @@ export const FILTER_OPTIONS = [
   { id: 'sort', label: '정렬', icon: 'tune' },
 ]
 
-/** 홈/카테고리 공통 맛집 던전 카드 데이터 */
-export const FEATURED_RESTAURANTS = [
+/** API 매장 카드용 이미지 순환 */
+export const STORE_LIST_CARD_IMAGES = [
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
+  'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&h=300&fit=crop',
+  'https://images.unsplash.com/photo-1550547660-d9450f859349?w=400&h=300&fit=crop',
+]
+
+export interface FeaturedRestaurant {
+  id: number
+  image: string
+  tags: string[]
+  title: string
+  delivery: string
+  minOrder: string
+  rating: number
+  reviews: number
+  points: string
+  hashtags: string[]
+  categoryId?: number
+}
+
+/** 홈/카테고리 공통 맛집 던전 카드 데이터(API 실패 시 폴백) */
+export const FEATURED_RESTAURANTS: FeaturedRestaurant[] = [
   {
     id: 1,
     image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
@@ -39,6 +61,7 @@ export const FEATURED_RESTAURANTS = [
     reviews: 2500,
     points: '+120',
     hashtags: ['#음폭맛집', '#치즈폭탄'],
+    categoryId: 2,
   },
   {
     id: 2,
@@ -51,5 +74,6 @@ export const FEATURED_RESTAURANTS = [
     reviews: 1200,
     points: '+150',
     hashtags: ['#한식', '#포근한맛집'],
+    categoryId: 1,
   },
 ]
