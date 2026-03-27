@@ -71,6 +71,7 @@ public class Order extends BaseTimeEntity {
     }
 
     public static Order ready(CustomerProfile customerProfile, Store store, String orderNo, Integer finalAmount) {
+        // 주문 생성 시점에는 결제 전 상태와 최종 결제 금액을 같이 고정한다.
         return Order.builder()
                 .customerProfile(customerProfile)
                 .store(store)
@@ -82,6 +83,7 @@ public class Order extends BaseTimeEntity {
     }
 
     public void markPaid(LocalDateTime paidAt) {
+        // 주문은 결제가 실제 승인된 뒤에만 PAID로 바뀐다.
         this.status = OrderStatus.PAID;
         this.paidAt = paidAt;
     }

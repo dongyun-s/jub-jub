@@ -28,11 +28,13 @@ public class PaymentController {
 
     @PostMapping("/prepare")
     public PreparePaymentResponse prepare(@Valid @RequestBody PreparePaymentRequest request) {
+        // PortOne 결제창 호출 전에 내부 결제 레코드를 READY 상태로 만들어 둔다.
         return paymentService.preparePayment(request);
     }
 
     @PostMapping("/confirm")
     public PaymentResponse confirm(@Valid @RequestBody ConfirmPaymentRequest request) {
+        // 결제창 응답값만 믿지 않고 서버에서 PortOne 조회 후 다시 승인 처리한다.
         return paymentService.confirmPayment(request);
     }
 
@@ -43,6 +45,7 @@ public class PaymentController {
             @RequestHeader(name = "webhook-timestamp", required = false) String webhookTimestamp,
             @RequestBody String payload
     ) {
+        // 비동기 웹훅은 서명 검증과 중복 방지를 거쳐 내부 상태를 맞춘다.
         return paymentWebhookService.process(payload, webhookId, webhookSignature, webhookTimestamp);
     }
 
@@ -51,6 +54,7 @@ public class PaymentController {
             @PathVariable Long paymentId,
             @Valid @RequestBody RefundPaymentRequest request
     ) {
+        // 환불은 내부 결제 건을 기준으로 PortOne 환불 API를 호출한다.
         return paymentService.refundPayment(paymentId, request);
     }
 }

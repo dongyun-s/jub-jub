@@ -77,6 +77,7 @@ public class SettlementItem extends BaseTimeEntity {
     }
 
     public static SettlementItem payment(Settlement settlement, Long orderId, Long paymentId, Integer amount, Long sourceId) {
+        // 승인 거래는 정산서에 매출 항목으로 반영된다.
         return SettlementItem.builder()
                 .settlement(settlement)
                 .orderId(orderId)
@@ -89,6 +90,7 @@ public class SettlementItem extends BaseTimeEntity {
     }
 
     public static SettlementItem refund(Settlement settlement, Long orderId, Long paymentId, Integer amount, Long sourceId) {
+        // 환불 거래는 정산서에 차감 항목으로 반영된다.
         return SettlementItem.builder()
                 .settlement(settlement)
                 .orderId(orderId)

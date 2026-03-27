@@ -43,6 +43,7 @@ public class SettlementBatchService {
 
     @Transactional
     public RunSettlementBatchResponse run(RunSettlementBatchRequest request) {
+        // 정산 기간에 포함되는 승인/환불 원장을 먼저 조회해 매장별로 묶는다.
         validatePeriod(request.periodStart(), request.periodEnd());
 
         LocalDateTime startAt = request.periodStart().atStartOfDay();
@@ -82,6 +83,7 @@ public class SettlementBatchService {
             LocalDate periodStart,
             LocalDate periodEnd
     ) {
+        // 같은 매장/기간 정산서는 한 번만 만들고, 원장 항목만 추가 적재한다.
         Settlement settlement = settlementRepository.findByStoreIdAndPeriodStartAndPeriodEnd(accumulator.storeId(), periodStart, periodEnd)
                 .orElseGet(() -> createSettlement(accumulator, periodStart, periodEnd));
 
@@ -133,6 +135,7 @@ public class SettlementBatchService {
         int pgFeeAmount = percentage(grossAmount, PG_FEE_RATE_PERCENT);
         int netPayoutAmount = grossAmount - refundAmount - platformFeeAmount - pgFeeAmount;
 
+        // 실제 송금 전이라도 정산 예상 금액을 먼저 만들어 추후 지급 처리의 기준으로 사용한다.
         Settlement settlement = Settlement.create(
                 accumulator.storeId(),
                 settlementAccount,

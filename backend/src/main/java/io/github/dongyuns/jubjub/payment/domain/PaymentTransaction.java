@@ -56,6 +56,7 @@ public class PaymentTransaction extends BaseTimeEntity {
             Integer amount,
             String rawJson
     ) {
+        // 정산/추적용 원장 역할을 하므로 승인 응답 원본까지 같이 남긴다.
         return PaymentTransaction.builder()
                 .payment(payment)
                 .portoneTransactionId(portoneTransactionId)

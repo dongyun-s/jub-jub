@@ -99,6 +99,7 @@ public class WebhookEvent extends BaseTimeEntity {
             String portoneCancellationId,
             String payloadJson
     ) {
+        // 웹훅은 처리 전에 먼저 저장해 두어 중복 수신과 실패 이력을 추적할 수 있게 한다.
         return WebhookEvent.builder()
                 .provider(provider)
                 .eventType(eventType)
@@ -114,6 +115,7 @@ public class WebhookEvent extends BaseTimeEntity {
     }
 
     public void markProcessed() {
+        // 실제 상태 동기화까지 끝난 웹훅만 PROCESSED로 남긴다.
         this.processStatus = WebhookProcessStatus.PROCESSED;
         this.processedAt = LocalDateTime.now();
     }

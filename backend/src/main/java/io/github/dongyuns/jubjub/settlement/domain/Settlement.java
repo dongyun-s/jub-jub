@@ -110,6 +110,7 @@ public class Settlement extends BaseTimeEntity {
             Integer netPayoutAmount,
             LocalDateTime payoutExpectedAt
     ) {
+        // 정산서는 한 기간의 총매출, 환불, 수수료, 실지급액을 한 번에 들고 있는 집계 단위다.
         return Settlement.builder()
                 .storeId(storeId)
                 .settlementAccount(settlementAccount)

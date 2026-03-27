@@ -19,6 +19,7 @@ public class SettlementController {
 
     @PostMapping("/batch")
     public RunSettlementBatchResponse runBatch(@Valid @RequestBody RunSettlementBatchRequest request) {
+        // 기간별 결제/환불 내역을 모아 매장 정산서를 생성한다.
         return settlementBatchService.run(request);
     }
 }

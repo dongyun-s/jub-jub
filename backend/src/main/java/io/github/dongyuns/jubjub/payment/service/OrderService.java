@@ -25,12 +25,14 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
+        // 주문은 기존 고객/매장 데이터에 매달려 생성되므로 선행 데이터가 필요하다.
         CustomerProfile customerProfile = customerProfileRepository.findById(request.customerProfileId())
                 .orElseThrow(() -> new BusinessException("CUSTOMER_PROFILE_NOT_FOUND", "고객 프로필을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         Store store = storeRepository.findById(request.storeId())
                 .orElseThrow(() -> new BusinessException("STORE_NOT_FOUND", "매장을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
+        // 외부 PG와 직접 연결되지 않는 내부 주문번호를 따로 만들어 관리한다.
         String orderNo = "ORD-" + request.storeId() + "-" + LocalDateTime.now().toString().replace(":", "").replace(".", "");
         Order order = Order.ready(customerProfile, store, orderNo, request.totalAmount());
         return OrderResponse.from(orderRepository.save(order));

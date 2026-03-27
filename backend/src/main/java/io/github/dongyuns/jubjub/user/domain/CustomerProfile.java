@@ -48,4 +48,6 @@ public class CustomerProfile extends BaseTimeEntity {
         this.totalWalkM = totalWalkM;
         this.pointBalance = pointBalance;
     }
+
+    // 주문 생성 시 고객 식별자로 참조하는 엔티티다.
 }

@@ -62,4 +62,6 @@ public class Store extends BaseTimeEntity {
         this.lng = lng;
         this.status = status;
     }
+
+    // 주문, 결제, 정산이 모두 매장 단위로 연결되는 기준 엔티티다.
 }

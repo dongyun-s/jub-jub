@@ -10,6 +10,7 @@ public class RestClientConfig {
 
     @Bean
     RestClient.Builder restClientBuilder() {
+        // 외부 API 클라이언트는 서비스별 baseUrl만 얹어서 재사용한다.
         return RestClient.builder();
     }
 

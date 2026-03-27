@@ -81,6 +81,7 @@ public class PaymentCancellation extends BaseTimeEntity {
             LocalDateTime requestedAt,
             LocalDateTime cancelledAt
     ) {
+        // 현재 구현은 전체 환불만 지원하지만, 기록 구조는 환불 이력 확장에 대비해 둔다.
         return PaymentCancellation.builder()
                 .payment(payment)
                 .portoneCancellationId(portoneCancellationId)

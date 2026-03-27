@@ -45,4 +45,6 @@ public class Account extends BaseTimeEntity {
         this.role = role;
         this.status = status;
     }
+
+    // 로그인/권한 부여의 기준이 되는 가장 바깥 사용자 엔티티다.
 }

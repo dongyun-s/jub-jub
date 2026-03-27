@@ -35,4 +35,6 @@ public class SettlementAccount extends BaseTimeEntity {
 
     @Column(nullable = false)
     private Boolean active;
+
+    // 정산 배치가 지급 대상을 찾을 때 사용하는 매장별 활성 계좌 정보다.
 }

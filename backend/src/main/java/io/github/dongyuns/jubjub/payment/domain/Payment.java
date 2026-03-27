@@ -45,6 +45,7 @@ public class Payment extends BaseTimeEntity {
     @Column(nullable = false, length = 100)
     private String merchantUid;
 
+    // PortOne V2에서는 실제 승인 건 식별자를 transactionId로 저장한다.
     @Column(unique = true, length = 120)
     private String portonePaymentId;
 
@@ -86,6 +87,7 @@ public class Payment extends BaseTimeEntity {
     }
 
     public static Payment ready(Order order, String merchantUid, PaymentMethod method) {
+        // paymentId는 결제창 호출 전부터 고정해두고 이후 모든 서버 검증의 기준으로 사용한다.
         return Payment.builder()
                 .order(order)
                 .status(PaymentStatus.READY)
@@ -98,6 +100,7 @@ public class Payment extends BaseTimeEntity {
     }
 
     public void markPaid(String portonePaymentId, Integer paidAmount, LocalDateTime paidAt) {
+        // 서버 검증이 끝나면 승인 transactionId와 실제 승인 금액을 확정한다.
         this.portonePaymentId = portonePaymentId;
         this.paidAmount = paidAmount;
         this.status = PaymentStatus.PAID;

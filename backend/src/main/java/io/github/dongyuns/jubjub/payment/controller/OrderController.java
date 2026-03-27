@@ -22,6 +22,7 @@ public class OrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderResponse createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        // 결제 전 단계에서 주문만 먼저 만들어 내부 기준 금액을 확정한다.
         return orderService.createOrder(request);
     }
 }
