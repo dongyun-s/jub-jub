@@ -153,4 +153,21 @@ public class CartService {
                 .totalCartPrice(totalCartPrice)
                 .build();
     }
+    
+    /**
+     * 장바구니 특정 아이템 삭제
+     */
+    public void removeCartItem(Long cartId) {
+        cartRepository.deleteById(cartId);
+    }
+
+    /**
+     * 장바구니 전체 비우기
+     */
+    public void clearCart(Long memberProfileId) {
+        // 내 장바구니 아이템들을 싹 찾아와서
+        List<Cart> myCarts = cartRepository.findAllByMemberProfileId(memberProfileId);
+        // 한 번에 삭제!
+        cartRepository.deleteAll(myCarts);
+    }
 }

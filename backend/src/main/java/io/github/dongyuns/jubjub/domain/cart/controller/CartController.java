@@ -53,4 +53,27 @@ public class CartController {
 
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * 장바구니 아이템 개별 삭제
+     * [DELETE] /api/v1/carts/{cartId}
+     */
+    @DeleteMapping("/{cartId}")
+    @Operation(summary = "장바구니 메뉴 개별 삭제", description = "장바구 de 아이템 하나를 삭제합니다.")
+    public ResponseEntity<String> removeCartItem(@PathVariable Long cartId) {
+        cartService.removeCartItem(cartId);
+        return ResponseEntity.ok("장바구니에서 메뉴가 삭제되었습니다.");
+    }
+
+    /**
+     * 장바구니 전체 비우기
+     * [DELETE] /api/v1/carts
+     */
+    @DeleteMapping
+    @Operation(summary = "장바구니 전체 비우기", description = "내 장바구니를 싹 비웁니다.")
+    public ResponseEntity<String> clearCart() {
+        Long currentMemberProfileId = 1L; // 임시 ID
+        cartService.clearCart(currentMemberProfileId);
+        return ResponseEntity.ok("장바구니가 비워졌습니다.");
+    }
 }
