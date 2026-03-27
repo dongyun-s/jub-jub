@@ -1,6 +1,7 @@
 package io.github.dongyuns.jubjub.domain.cart.controller;
 
 import io.github.dongyuns.jubjub.domain.cart.dto.CartAddRequest;
+import io.github.dongyuns.jubjub.domain.cart.dto.CartListResponse;
 import io.github.dongyuns.jubjub.domain.cart.service.CartService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,5 +36,21 @@ public class CartController {
 
         // 프론트엔드에게 성공했다고 200 OK와 함께 메시지 보내주기
         return ResponseEntity.ok("장바구니에 메뉴가 성공적으로 담겼습니다! 🛒");
+    }
+
+    /**
+     * 장바구니 조회 API
+     * [GET] /api/v1/carts
+     */
+    @GetMapping
+    @Operation(summary = "내 장바구니 조회", description = "장바구니에 담긴 메뉴 목록과 계산된 총 결제 금액을 조회합니다.")
+    public ResponseEntity<CartListResponse> getMyCart() {
+
+        // 🚨 아까 담기(POST) 할 때처럼, 유저 ID는 일단 1번으로 고정! (나중에 로그인 연동 시 수정)
+        Long currentMemberProfileId = 1L;
+
+        CartListResponse response = cartService.getMyCart(currentMemberProfileId);
+
+        return ResponseEntity.ok(response);
     }
 }

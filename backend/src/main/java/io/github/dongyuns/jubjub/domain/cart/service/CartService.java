@@ -1,6 +1,9 @@
 package io.github.dongyuns.jubjub.domain.cart.service;
 
 import io.github.dongyuns.jubjub.domain.cart.dto.CartAddRequest;
+import io.github.dongyuns.jubjub.domain.cart.dto.CartItemResponse;
+import io.github.dongyuns.jubjub.domain.cart.dto.CartListResponse;
+import io.github.dongyuns.jubjub.domain.cart.dto.CartOptionResponse;
 import io.github.dongyuns.jubjub.domain.cart.entity.Cart;
 import io.github.dongyuns.jubjub.domain.cart.entity.CartOption;
 import io.github.dongyuns.jubjub.domain.cart.repository.CartRepository;
@@ -16,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -80,5 +84,73 @@ public class CartService {
 
         // 4. DB에 최종 저장! (Cart만 저장해도 CartOption까지 알아서 묶여서 저장됩니다)
         cartRepository.save(cart);
+    }
+
+    /**
+     * 장바구니 조회 로직 (백엔드 계산기 🧮)
+     */
+    @Transactional(readOnly = true) // 🌟 조회만 할 때는 readOnly=true 를 붙이면 성능이 훨씬 빨라집니다!
+    public CartListResponse getMyCart(Long memberProfileId) {
+
+        // 1. 내 장바구니 데이터 다 가져오기
+        List<Cart> carts = cartRepository.findAllByMemberProfileId(memberProfileId);
+
+        // 🚨 장바구니가 텅텅 비어있다면? 에러 내지 말고 '빈 상자'를 예쁘게 반환!
+        if (carts.isEmpty()) {
+            return CartListResponse.builder()
+                    .cartItems(List.of()) // 빈 리스트
+                    .totalCartPrice(0) // 결제 금액 0원
+                    .build();
+        }
+
+        // 우리 장바구니는 무조건 '1개 매장'만 담기니까, 첫 번째 아이템에서 가게 정보를 뽑아옵니다.
+        Store store = carts.get(0).getStore();
+        int totalCartPrice = 0; // 💰 프론트엔드에게 넘겨줄 장바구니 전체 결제 금액
+
+        List<CartItemResponse> cartItemResponses = new ArrayList<>();
+
+        // 2. 장바구니에 담긴 메뉴들을 하나씩 꺼내서 계산하고 예쁘게 포장하기
+        for (Cart cart : carts) {
+            int menuPrice = cart.getMenu().getPrice(); // 메뉴 기본가
+            int optionTotalPrice = 0; // 이 메뉴의 옵션들 가격 합계
+
+            List<CartOptionResponse> optionResponses = new ArrayList<>();
+
+            // 2-1. 이 메뉴에 달린 옵션들 포장 및 가격 계산
+            for (CartOption cartOption : cart.getCartOptions()) {
+                MenuOption menuOption = cartOption.getMenuOption();
+                optionTotalPrice += menuOption.getAdditionalPrice(); // 옵션 가격 더하기
+
+                optionResponses.add(CartOptionResponse.builder()
+                        .optionId(menuOption.getId())
+                        .optionName(menuOption.getName())
+                        .additionalPrice(menuOption.getAdditionalPrice())
+                        .build());
+            }
+
+            // 2-2. 💰 이 메뉴 1세트의 총 가격 = (메뉴 기본가 + 옵션 총합) * 수량
+            int itemTotalPrice = (menuPrice + optionTotalPrice) * cart.getQuantity();
+            totalCartPrice += itemTotalPrice; // 장바구니 전체 금액 금고에 누적!
+
+            // 2-3. 메뉴 1개 단위(중간 상자) 포장 완료
+            cartItemResponses.add(CartItemResponse.builder()
+                    .cartId(cart.getId())
+                    .menuId(cart.getMenu().getId())
+                    .menuName(cart.getMenu().getName())
+                    .menuPrice(menuPrice)
+                    .quantity(cart.getQuantity())
+                    .requestMemo(cart.getRequestMemo())
+                    .options(optionResponses)
+                    .itemTotalPrice(itemTotalPrice)
+                    .build());
+        }
+
+        // 3. 제일 큰 상자에 가게 이름이랑 총액까지 싹 담아서 프론트엔드로 배송 출발! 📦
+        return CartListResponse.builder()
+                .storeId(store.getId())
+                .storeName(store.getName())
+                .cartItems(cartItemResponses)
+                .totalCartPrice(totalCartPrice)
+                .build();
     }
 }
