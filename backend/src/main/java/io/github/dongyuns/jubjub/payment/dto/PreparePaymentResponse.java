@@ -8,6 +8,7 @@ import io.github.dongyuns.jubjub.payment.domain.PgProvider;
 public record PreparePaymentResponse(
         Long paymentRecordId,
         Long orderId,
+        String merchantUid,
         String paymentId,
         PgProvider pgProvider,
         PaymentMethod method,
@@ -18,6 +19,7 @@ public record PreparePaymentResponse(
         return new PreparePaymentResponse(
                 payment.getId(),
                 payment.getOrder().getId(),
+                payment.getMerchantUid(),
                 payment.getMerchantUid(),
                 payment.getPgProvider(),
                 payment.getMethod(),

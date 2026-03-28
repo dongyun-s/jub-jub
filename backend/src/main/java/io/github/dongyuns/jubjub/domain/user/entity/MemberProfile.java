@@ -26,15 +26,17 @@ public class MemberProfile {
 
     private String nickname;
 
+    private int pointBalance = 0;         // 포인트 잔액
     private int totalWalkingDistance = 0; // 누적 도보 거리
     private int orderCount = 0;           // 누적 주문 횟수
     private boolean pushAgree = true;     // 푸시 알림 동의 여부
 
     @Builder
-    public MemberProfile(Account account, String name, String phone, String nickname) {
+    public MemberProfile(Account account, String name, String phone, String nickname, int pointBalance) {
         this.account = account;
         this.name = name;
         this.phone = phone;
         this.nickname = nickname;
+        this.pointBalance = pointBalance;
     }
 }

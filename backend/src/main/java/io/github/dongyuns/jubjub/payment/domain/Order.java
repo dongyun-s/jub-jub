@@ -1,5 +1,7 @@
 package io.github.dongyuns.jubjub.payment.domain;
 
+import io.github.dongyuns.jubjub.domain.store.entity.Store;
+import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,8 +19,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import io.github.dongyuns.jubjub.user.domain.CustomerProfile;
-import io.github.dongyuns.jubjub.user.domain.Store;
 
 @Getter
 @Entity
@@ -31,8 +31,8 @@ public class Order extends BaseTimeEntity {
     private Long id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "customer_profile_id", nullable = false)
-    private CustomerProfile customerProfile;
+    @JoinColumn(name = "member_profile_id", nullable = false)
+    private MemberProfile memberProfile;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "store_id", nullable = false)
@@ -61,8 +61,8 @@ public class Order extends BaseTimeEntity {
     private Payment payment;
 
     @Builder
-    private Order(CustomerProfile customerProfile, Store store, String orderNo, OrderStatus status, Integer finalAmount, LocalDateTime requestedAt) {
-        this.customerProfile = customerProfile;
+    private Order(MemberProfile memberProfile, Store store, String orderNo, OrderStatus status, Integer finalAmount, LocalDateTime requestedAt) {
+        this.memberProfile = memberProfile;
         this.store = store;
         this.orderNo = orderNo;
         this.status = status;
@@ -70,10 +70,10 @@ public class Order extends BaseTimeEntity {
         this.requestedAt = requestedAt;
     }
 
-    public static Order ready(CustomerProfile customerProfile, Store store, String orderNo, Integer finalAmount) {
+    public static Order ready(MemberProfile memberProfile, Store store, String orderNo, Integer finalAmount) {
         // 주문 생성 시점에는 결제 전 상태와 최종 결제 금액을 같이 고정한다.
         return Order.builder()
-                .customerProfile(customerProfile)
+                .memberProfile(memberProfile)
                 .store(store)
                 .orderNo(orderNo)
                 .status(OrderStatus.READY)
@@ -96,8 +96,8 @@ public class Order extends BaseTimeEntity {
         this.status = OrderStatus.REFUNDED;
     }
 
-    public Long getCustomerProfileId() {
-        return customerProfile.getId();
+    public Long getMemberProfileId() {
+        return memberProfile.getId();
     }
 
     public Long getStoreId() {

@@ -6,7 +6,7 @@ import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 public record OrderResponse(
         Long orderId,
         String orderNo,
-        Long customerProfileId,
+        Long memberProfileId,
         Long storeId,
         OrderStatus orderStatus,
         Integer finalAmount,
@@ -16,7 +16,7 @@ public record OrderResponse(
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNo(),
-                order.getCustomerProfileId(),
+                order.getMemberProfileId(),
                 order.getStoreId(),
                 order.getStatus(),
                 order.getFinalAmount(),

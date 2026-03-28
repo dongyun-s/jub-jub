@@ -61,7 +61,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/reissue",
                                 "/api/v1/auth/find-id",
                                 "/api/v1/auth/reset-password",
-                                "/api/v1/auth/find-password/send"
+                                "/api/v1/auth/find-password/send",
+                                "/payments/webhook"
                         ).permitAll()
 
                         // 🌟 [추가됨: 매장 조회 패스] 프론트엔드 테스트를 위해 로그인 없이 매장/메뉴 구경은 가능하도록 허용!

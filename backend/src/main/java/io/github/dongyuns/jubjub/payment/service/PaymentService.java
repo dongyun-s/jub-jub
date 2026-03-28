@@ -70,9 +70,12 @@ public class PaymentService {
 
     @Transactional(noRollbackFor = BusinessException.class)
     public PaymentResponse confirmPayment(ConfirmPaymentRequest request) {
-        Payment payment = paymentRepository.findByMerchantUid(request.paymentId())
+        String merchantUid = request.resolvedMerchantUid();
+        validateMerchantUid(merchantUid);
+
+        Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
-        PortOnePaymentDetails paymentDetails = portOneClient.getPayment(request.paymentId());
+        PortOnePaymentDetails paymentDetails = portOneClient.getPayment(merchantUid);
         return confirmPaymentInternal(payment.getOrder().getId(), request.transactionId(), paymentDetails);
     }
 
@@ -214,6 +217,19 @@ public class PaymentService {
 
     private static String merchantUidOf(Long orderId) {
         return MERCHANT_UID_PREFIX + orderId;
+    }
+
+    private void validateMerchantUid(String merchantUid) {
+        if (merchantUid == null || merchantUid.isBlank()) {
+            throw new BusinessException("PAYMENT_ID_REQUIRED", "merchantUid가 필요합니다.", HttpStatus.BAD_REQUEST);
+        }
+        if (!merchantUid.startsWith(MERCHANT_UID_PREFIX)) {
+            throw new BusinessException(
+                    "INVALID_MERCHANT_UID",
+                    "결제 확인에는 prepare 응답의 merchantUid(예: ORDER-2)를 사용해야 합니다.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
     }
 
     private Long parseOrderId(String paymentId) {

@@ -9,7 +9,9 @@ import java.time.LocalDateTime;
 public record PaymentResponse(
         Long paymentRecordId,
         Long orderId,
+        String merchantUid,
         String paymentId,
+        String portoneTransactionId,
         String transactionId,
         PgProvider pgProvider,
         PaymentMethod method,
@@ -23,6 +25,8 @@ public record PaymentResponse(
                 payment.getId(),
                 payment.getOrder().getId(),
                 payment.getMerchantUid(),
+                payment.getMerchantUid(),
+                payment.getPortonePaymentId(),
                 payment.getPortonePaymentId(),
                 payment.getPgProvider(),
                 payment.getMethod(),
