@@ -1,6 +1,8 @@
 package io.github.dongyuns.jubjub.payment.service;
 
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
+import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
+import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import io.github.dongyuns.jubjub.payment.domain.Payment;
@@ -39,12 +41,14 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentCancellationRepository paymentCancellationRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final MemberProfileRepository memberProfileRepository;
     private final PortOneClient portOneClient;
 
     @Transactional
-    public PreparePaymentResponse preparePayment(PreparePaymentRequest request) {
+    public PreparePaymentResponse preparePayment(String accountEmail, PreparePaymentRequest request) {
         Order order = orderRepository.findById(request.orderId())
                 .orElseThrow(() -> new BusinessException("ORDER_NOT_FOUND", "주문을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        validateOrderOwnership(accountEmail, order);
 
         if (order.getStatus() != OrderStatus.READY) {
             throw new BusinessException("ORDER_NOT_READY", "READY 상태 주문만 결제를 준비할 수 있습니다.", HttpStatus.CONFLICT);
@@ -69,12 +73,13 @@ public class PaymentService {
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
-    public PaymentResponse confirmPayment(ConfirmPaymentRequest request) {
+    public PaymentResponse confirmPayment(String accountEmail, ConfirmPaymentRequest request) {
         String merchantUid = request.resolvedMerchantUid();
         validateMerchantUid(merchantUid);
 
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
+        validateOrderOwnership(accountEmail, payment.getOrder());
         PortOnePaymentDetails paymentDetails = portOneClient.getPayment(merchantUid);
         return confirmPaymentInternal(payment.getOrder().getId(), request.transactionId(), paymentDetails);
     }
@@ -111,9 +116,10 @@ public class PaymentService {
     }
 
     @Transactional
-    public RefundResponse refundPayment(Long paymentId, RefundPaymentRequest request) {
+    public RefundResponse refundPayment(String accountEmail, Long paymentId, RefundPaymentRequest request) {
         Payment payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        validateOrderOwnership(accountEmail, payment.getOrder());
 
         if (payment.getStatus() == PaymentStatus.REFUNDED) {
             PaymentCancellation existingRefund = paymentCancellationRepository.findTopByPaymentIdOrderByCreatedAtDesc(paymentId)
@@ -217,6 +223,15 @@ public class PaymentService {
 
     private static String merchantUidOf(Long orderId) {
         return MERCHANT_UID_PREFIX + orderId;
+    }
+
+    private void validateOrderOwnership(String accountEmail, Order order) {
+        MemberProfile memberProfile = memberProfileRepository.findByAccountEmail(accountEmail)
+                .orElseThrow(() -> new BusinessException("MEMBER_PROFILE_NOT_FOUND", "회원 프로필을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        if (!order.getMemberProfileId().equals(memberProfile.getId())) {
+            throw new BusinessException("ORDER_FORBIDDEN", "본인 주문/결제 건만 처리할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
     }
 
     private void validateMerchantUid(String merchantUid) {

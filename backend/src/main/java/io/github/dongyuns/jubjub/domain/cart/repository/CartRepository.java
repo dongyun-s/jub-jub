@@ -14,4 +14,6 @@ public interface CartRepository extends JpaRepository<Cart, Long> {
 
     // 특정 회원의 장바구니 전체 조회
     List<Cart> findAllByMemberProfileId(Long memberProfileId);
+
+    java.util.Optional<Cart> findByIdAndMemberProfileId(Long cartId, Long memberProfileId);
 }

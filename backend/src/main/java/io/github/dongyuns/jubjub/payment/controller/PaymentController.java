@@ -11,6 +11,7 @@ import io.github.dongyuns.jubjub.payment.service.PaymentService;
 import io.github.dongyuns.jubjub.payment.service.PaymentWebhookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,15 +28,15 @@ public class PaymentController {
     private final PaymentWebhookService paymentWebhookService;
 
     @PostMapping("/prepare")
-    public PreparePaymentResponse prepare(@Valid @RequestBody PreparePaymentRequest request) {
+    public PreparePaymentResponse prepare(Authentication authentication, @Valid @RequestBody PreparePaymentRequest request) {
         // PortOne 결제창 호출 전에 내부 결제 레코드를 READY 상태로 만들어 둔다.
-        return paymentService.preparePayment(request);
+        return paymentService.preparePayment(authentication.getName(), request);
     }
 
     @PostMapping("/confirm")
-    public PaymentResponse confirm(@Valid @RequestBody ConfirmPaymentRequest request) {
+    public PaymentResponse confirm(Authentication authentication, @Valid @RequestBody ConfirmPaymentRequest request) {
         // 결제창 응답값만 믿지 않고 서버에서 PortOne 조회 후 다시 승인 처리한다.
-        return paymentService.confirmPayment(request);
+        return paymentService.confirmPayment(authentication.getName(), request);
     }
 
     @PostMapping("/webhook")
@@ -51,10 +52,11 @@ public class PaymentController {
 
     @PostMapping("/{paymentId}/refund")
     public RefundResponse refund(
+            Authentication authentication,
             @PathVariable Long paymentId,
             @Valid @RequestBody RefundPaymentRequest request
     ) {
         // 환불은 내부 결제 건을 기준으로 PortOne 환불 API를 호출한다.
-        return paymentService.refundPayment(paymentId, request);
+        return paymentService.refundPayment(authentication.getName(), paymentId, request);
     }
 }
