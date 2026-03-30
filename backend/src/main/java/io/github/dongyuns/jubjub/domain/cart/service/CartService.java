@@ -1,5 +1,6 @@
 package io.github.dongyuns.jubjub.domain.cart.service;
 
+import io.github.dongyuns.jubjub.common.exception.BusinessException;
 import io.github.dongyuns.jubjub.domain.cart.dto.CartAddRequest;
 import io.github.dongyuns.jubjub.domain.cart.dto.CartItemResponse;
 import io.github.dongyuns.jubjub.domain.cart.dto.CartListResponse;
@@ -16,6 +17,7 @@ import io.github.dongyuns.jubjub.domain.store.repository.MenuOptionRepository;
 import io.github.dongyuns.jubjub.domain.store.repository.MenuRepository;
 import io.github.dongyuns.jubjub.domain.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +41,9 @@ public class CartService {
     /**
      * 장바구니 담기 로직
      */
-    public void addCartItem(Long memberProfileId, CartAddRequest request) {
+    public void addCartItem(String accountEmail, CartAddRequest request) {
+        MemberProfile memberProfile = resolveMemberProfile(accountEmail);
+        Long memberProfileId = memberProfile.getId();
 
         // 다른 매장 메뉴 담기 금지!
         List<Cart> existingCarts = cartRepository.findAllByMemberProfileId(memberProfileId);
@@ -53,8 +57,6 @@ public class CartService {
         }
 
         // 1. DB에서 유저, 가게, 메뉴 정보 찾아오기
-        MemberProfile memberProfile = memberProfileRepository.findById(memberProfileId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
         Store store = storeRepository.findById(request.getStoreId())
                 .orElseThrow(() -> new IllegalArgumentException("가게를 찾을 수 없습니다."));
         Menu menu = menuRepository.findById(request.getMenuId())
@@ -90,7 +92,8 @@ public class CartService {
      * 장바구니 조회 로직 (백엔드 계산기 🧮)
      */
     @Transactional(readOnly = true) // 🌟 조회만 할 때는 readOnly=true 를 붙이면 성능이 훨씬 빨라집니다!
-    public CartListResponse getMyCart(Long memberProfileId) {
+    public CartListResponse getMyCart(String accountEmail) {
+        Long memberProfileId = resolveMemberProfile(accountEmail).getId();
 
         // 1. 내 장바구니 데이터 다 가져오기
         List<Cart> carts = cartRepository.findAllByMemberProfileId(memberProfileId);
@@ -157,17 +160,26 @@ public class CartService {
     /**
      * 장바구니 특정 아이템 삭제
      */
-    public void removeCartItem(Long cartId) {
-        cartRepository.deleteById(cartId);
+    public void removeCartItem(String accountEmail, Long cartId) {
+        Long memberProfileId = resolveMemberProfile(accountEmail).getId();
+        Cart cart = cartRepository.findByIdAndMemberProfileId(cartId, memberProfileId)
+                .orElseThrow(() -> new BusinessException("CART_ITEM_NOT_FOUND", "해당 장바구니 항목을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        cartRepository.delete(cart);
     }
 
     /**
      * 장바구니 전체 비우기
      */
-    public void clearCart(Long memberProfileId) {
+    public void clearCart(String accountEmail) {
+        Long memberProfileId = resolveMemberProfile(accountEmail).getId();
         // 내 장바구니 아이템들을 싹 찾아와서
         List<Cart> myCarts = cartRepository.findAllByMemberProfileId(memberProfileId);
         // 한 번에 삭제!
         cartRepository.deleteAll(myCarts);
+    }
+
+    private MemberProfile resolveMemberProfile(String accountEmail) {
+        return memberProfileRepository.findByAccountEmail(accountEmail)
+                .orElseThrow(() -> new BusinessException("MEMBER_PROFILE_NOT_FOUND", "회원 프로필을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
     }
 }
