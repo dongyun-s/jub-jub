@@ -6,6 +6,8 @@
 
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
+import { FEATURED_RESTAURANTS } from '../../constants'
+import { MapTmapCanvas } from '../map/MapPage'
 import styles from './OrderStatusPage.module.css'
 
 interface OrderStatusPageProps {
@@ -21,15 +23,16 @@ interface OrderStatusPageProps {
 
 type OrderStep = 'received' | 'cooking' | 'ready' | 'completed'
 
-/** 현재 주문 정보 (데모) */
+/** 현재 주문 정보 (데모) — 픽업 매장 id는 FEATURED_RESTAURANTS 와 맞춤 */
 const orderData = {
   orderNumber: '20231024-001',
   pickupTime: '15:15',
-  menuName: '더 바삭 돈카츠 외 1건',
-  storeName: '바삭카츠 강남점',
-  storeAddress: '서울특별시 강남구 테헤란로 123',
-  distance: '180m',
-  estimatedTime: '약 3분',
+  menuName: '예시 주문 1건',
+  storeId: FEATURED_RESTAURANTS[0].id,
+  storeName: FEATURED_RESTAURANTS[0].title,
+  storeAddress: '서울 강남구 테헤란로 123 (데모)',
+  distance: '지도·경로 탭',
+  estimatedTime: '에서 확인',
   currentStep: 'cooking' as OrderStep,
 }
 
@@ -42,6 +45,11 @@ const steps: { key: OrderStep; label: string; icon: string }[] = [
 
 function OrderStatusPage({ onBack, onGoHome, onCartClick, onOrdersClick, onMapClick, onMypageClick, onFavoritesClick: _onFavoritesClick, cartCount = 0 }: OrderStatusPageProps) {
   const currentStepIndex = steps.findIndex((s) => s.key === orderData.currentStep)
+
+  const pickupStore =
+    FEATURED_RESTAURANTS.find((r) => r.id === orderData.storeId) ?? FEATURED_RESTAURANTS[0]
+  const storeMapLat = pickupStore.lat
+  const storeMapLng = pickupStore.lng
 
   /** 단계별 상태: 완료 / 진행중 / 대기 */
   const getStepStatus = (index: number) => {
@@ -63,17 +71,19 @@ function OrderStatusPage({ onBack, onGoHome, onCartClick, onOrdersClick, onMapCl
 
         <div className={styles.scrollArea}>
           <div className={styles.mapWrap}>
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3165.2!2d127.0276!3d37.4979!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzfCsDI5JzUyLjQiTiAxMjfCsDAxJzM5LjQiRQ!5e0!3m2!1sko!2skr!4v1"
-              width="100%"
-              height="100%"
-              className={styles.mapIframe}
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title="픽업 위치"
-            />
+            {storeMapLat != null && storeMapLng != null ? (
+              <MapTmapCanvas
+                className={styles.mapIframe}
+                center={{ lat: storeMapLat, lng: storeMapLng }}
+                zoom={17}
+                markers={[{ lat: storeMapLat, lng: storeMapLng, title: orderData.storeName }]}
+                fitMarkers={false}
+              />
+            ) : (
+              <div className={styles.mapIframe} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgb(243 244 246)', color: 'rgb(107 114 128)', fontSize: '0.875rem' }}>
+                매장 좌표가 없습니다.
+              </div>
+            )}
             <div className={styles.distanceCard}>
               <div className={styles.distanceCardInner}>
                 <div className={styles.distanceIconWrap}>
