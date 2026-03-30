@@ -1,0 +1,294 @@
+/**
+ * MyReviewsPage.module.css
+ * 내 리뷰 관리 페이지
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: rgb(249 250 251);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  height: 3.5rem;
+  padding: 0 1rem;
+  background-color: #ffffff;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.backButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: -0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backIcon {
+  color: rgb(55 65 81);
+}
+
+.headerTitle {
+  flex: 1;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(17 24 39);
+  margin-left: -2.5rem;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 5rem;
+}
+
+.listSection {
+  padding: 1rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card {
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(243 244 246);
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.cardImage {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
+.cardInfo {
+  flex: 1;
+}
+
+.cardStoreName {
+  font-weight: 700;
+  color: rgb(17 24 39);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.125rem;
+}
+
+.starsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.starIcon {
+  font-size: 0.875rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.starOn {
+  color: var(--color-primary);
+}
+
+.starOff {
+  color: rgb(229 231 235);
+}
+
+.cardDate {
+  font-size: 0.75rem;
+  color: rgb(156 163 175);
+}
+
+.cardContent {
+  font-size: 0.875rem;
+  color: rgb(55 65 81);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.cardPhotos {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cardPhoto {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
+.cardKeywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.keyword {
+  font-size: 0.625rem;
+  color: var(--color-primary);
+  background-color: rgba(246, 49, 154, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgb(249 250 251);
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(107 114 128);
+  padding: 0.25rem 0.5rem;
+  transition: color 150ms ease;
+}
+
+.actionButton:hover {
+  color: var(--color-primary);
+}
+
+.actionButtonDelete:hover {
+  color: rgb(239 68 68);
+}
+
+.actionIcon {
+  font-size: 1rem;
+}
+
+.emptySection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 0;
+}
+
+.emptyIcon {
+  font-size: 3.75rem;
+  color: rgb(229 231 235);
+  margin-bottom: 1rem;
+}
+
+.emptyTitle {
+  color: rgb(107 114 128);
+  margin-bottom: 0.25rem;
+}
+
+.emptyDesc {
+  font-size: 0.875rem;
+  color: rgb(156 163 175);
+}
+
+.emptyCta {
+  margin-top: 1.5rem;
+  padding: 0.625rem 1.5rem;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 9999px;
+  transition: background-color 150ms ease;
+}
+
+.emptyCta:hover {
+  background-color: rgba(246, 49, 154, 0.9);
+}
+
+/* 삭제 모달 */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modalBox {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin: 0 1rem;
+  width: 100%;
+  max-width: 24rem;
+}
+
+.modalTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(17 24 39);
+  margin-bottom: 0.5rem;
+}
+
+.modalDesc {
+  font-size: 0.875rem;
+  color: rgb(107 114 128);
+  margin-bottom: 1.5rem;
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.modalCancel {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: rgb(243 244 246);
+  color: rgb(55 65 81);
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: background-color 150ms ease;
+}
+
+.modalCancel:hover {
+  background-color: rgb(229 231 235);
+}
+
+.modalConfirm {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: rgb(239 68 68);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: background-color 150ms ease;
+}
+
+.modalConfirm:hover {
+  background-color: rgb(220 38 38);
+}

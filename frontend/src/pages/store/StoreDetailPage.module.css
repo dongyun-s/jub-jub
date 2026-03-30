@@ -1,0 +1,848 @@
+/**
+ * StoreDetailPage.module.css
+ * 가게 상세 페이지 - 메뉴, 리뷰, 매장 정보
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: linear-gradient(to bottom, #fdf2f8, #ffffff, #ffffff);
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.headerIconButton {
+  display: flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  color: rgb(55 65 81);
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 11rem;
+}
+
+.hero {
+  width: 100%;
+  height: 16rem;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  position: relative;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #ffffff, transparent, transparent);
+}
+
+.heroOverlay2 {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom right, rgba(246, 49, 154, 0.1), transparent, rgba(236, 72, 153, 0.1));
+}
+
+.profileCardWrap {
+  padding: 0 1rem;
+  margin-top: -4rem;
+  position: relative;
+  z-index: 10;
+}
+
+.profileCard {
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 20px 25px -5px rgba(246, 49, 154, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.profileCardBg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8rem;
+  height: 8rem;
+  background: linear-gradient(to bottom left, rgba(246, 49, 154, 0.1), transparent);
+  border-radius: 0 0 0 9999px;
+}
+
+.profileRow {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.profileTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.storeName {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-align: left;
+  text-indent: 0;
+}
+
+.verifiedBadge {
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  color: #ffffff;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.profileMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: rgb(71 85 105);
+}
+
+.starIcon {
+  color: rgb(234 179 8);
+  font-size: 1.125rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.profileRating {
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.profileMetaDot {
+  margin: 0 0.25rem;
+}
+
+.statsRow {
+  position: relative;
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.statBox {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  background: linear-gradient(to bottom right, rgb(248 250 252), rgba(253, 242, 248, 0.5));
+  border-radius: 0.75rem;
+  border: 1px solid rgba(246, 49, 154, 0.05);
+}
+
+.statBoxHighlight {
+  background: linear-gradient(to bottom right, rgba(246, 49, 154, 0.1), rgba(253, 242, 248, 0.5));
+  border-color: rgba(246, 49, 154, 0.1);
+}
+
+.statLabel {
+  font-size: 0.625rem;
+  color: rgb(100 116 139);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.statLabelPrimary {
+  color: var(--color-primary);
+}
+
+.statValue {
+  font-weight: 700;
+  color: rgb(30 41 59);
+}
+
+.statValueGradient {
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.questBannerWrap {
+  padding: 0 1rem;
+  margin-top: 1rem;
+}
+
+.questBanner {
+  width: 100%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  text-align: left;
+  
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 15px -3px rgba(246, 49, 154, 0.2);
+}
+
+.questBannerContent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.questIcon {
+  color: #ffffff;
+  font-size: 1.875rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.questTitle {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.questSub {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+}
+
+.questChevron {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.navTabs {
+  margin-top: 1.5rem;
+  background-color: #f8f5f7;
+  border-bottom: 1px solid rgba(246, 49, 154, 0.1);
+}
+
+.tabRow {
+  display: flex;
+  padding: 0 1rem;
+}
+
+.tabButton {
+  flex: 1;
+  text-align: center;
+  padding: 1rem 0;
+  border-bottom: 2px solid transparent;
+  font-weight: 700;
+  font-size: 0.875rem;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.tabButtonActive {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.tabButtonInactive {
+  color: rgb(100 116 139);
+}
+
+.menuPanel {
+  background-color: #ffffff;
+}
+
+.categoryBar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: #ffffff;
+  border-bottom: 1px solid rgb(241 245 249);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.categoryScroll {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  overflow-x: auto;
+}
+
+.searchButton {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 0.5rem;
+  color: rgb(100 116 139);
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.searchButtonActive {
+  border-color: var(--color-primary);
+  background-color: rgba(246, 49, 154, 0.1);
+  color: var(--color-primary);
+}
+
+.categoryButton {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+
+.categoryButtonActive {
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  color: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(246, 49, 154, 0.2);
+}
+
+.categoryButtonInactive {
+  background-color: rgb(241 245 249);
+  color: rgb(71 85 105);
+}
+
+.categoryButtonInactive:hover {
+  background-image: linear-gradient(to right, rgba(246, 49, 154, 0.1), rgba(253, 242, 248, 1));
+  color: var(--color-primary);
+}
+
+.searchWrap {
+  padding: 0 1rem 0.5rem;
+}
+
+.searchInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: rgb(241 245 249);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.searchInputIcon {
+  color: rgb(100 116 139);
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: rgb(100 116 139);
+}
+
+.searchResultsWrap {
+  padding: 1rem;
+}
+
+.searchResultsTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 0.75rem;
+}
+
+.searchResultsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.searchEmpty {
+  padding: 3rem 0;
+  text-align: center;
+}
+
+.searchEmptyIcon {
+  font-size: 2.25rem;
+  color: rgb(203 213 225);
+  margin-bottom: 0.5rem;
+}
+
+.searchEmptyText {
+  color: rgb(100 116 139);
+}
+
+.menuDivide {
+  border-top: 2rem solid rgb(248 250 252);
+}
+
+.categorySection {
+  background-color: #ffffff;
+}
+
+.categoryHeader {
+  padding: 1rem 1rem 0.5rem;
+}
+
+.categoryHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.categoryIcon {
+  color: var(--color-primary);
+}
+
+.categoryTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.categoryDesc {
+  font-size: 0.875rem;
+  color: rgb(100 116 139);
+}
+
+.menuList {
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* 메뉴 아이템 카드 */
+.menuCard {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(to bottom right, #ffffff, rgba(253, 242, 248, 0.3));
+  border-radius: 1rem;
+  border: 1px solid rgba(246, 49, 154, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 150ms ease;
+}
+
+.menuCard:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.menuCardBg {
+  position: absolute;
+  top: -2.5rem;
+  right: -2.5rem;
+  width: 6rem;
+  height: 6rem;
+  background: linear-gradient(to bottom left, rgba(246, 49, 154, 0.05), transparent);
+  border-radius: 9999px;
+}
+
+.menuCardTags {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end;
+  z-index: 10;
+}
+
+.menuCardTagRow {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.menuCardRank {
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  color: #ffffff;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.menuCardTagBest {
+  background-image: linear-gradient(to right, rgba(246, 49, 154, 0.9), rgba(236, 72, 153, 0.9));
+  color: #ffffff;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.menuCardTagLoot {
+  background-image: linear-gradient(to right, rgb(251 191 36), rgb(251 146 60));
+  color: #ffffff;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.menuCardImage {
+  width: 6rem;
+  height: 6rem;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.menuCardInfo {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  padding: 0.125rem 0;
+  position: relative;
+}
+
+.menuCardName {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  color: rgb(30 41 59);
+}
+
+.menuCardDesc {
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+.menuCardBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.menuCardPriceWrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.menuCardPrice {
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.menuCardXp {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.menuCardXpIcon {
+  font-size: 0.75rem;
+  color: rgb(245 158 11);
+  font-variation-settings: 'FILL' 1;
+}
+
+.menuCardXpText {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: rgb(245 158 11);
+}
+
+.menuCardAddBtn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-image: linear-gradient(to bottom right, var(--color-primary), #ec4899);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 15px -3px rgba(246, 49, 154, 0.3);
+}
+
+.reviewTab {
+  padding: 1rem 1rem 5rem;
+  background-color: #ffffff;
+}
+
+.reviewSummary {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: rgb(248 250 252);
+  margin-bottom: 1rem;
+}
+
+.reviewSummaryLeft {
+  min-width: 6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.reviewScore {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
+}
+
+.reviewStars {
+  display: flex;
+  gap: 0.125rem;
+  color: rgb(234 179 8);
+  font-variation-settings: 'FILL' 1;
+}
+
+.reviewCountText {
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+}
+
+.reviewBars {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.reviewBarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reviewBarLabel {
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+  width: 2rem;
+}
+
+.reviewBarTrack {
+  flex: 1;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background-color: rgb(229 231 235);
+  overflow: hidden;
+}
+
+.reviewBarFill {
+  height: 100%;
+  border-radius: inherit;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+}
+
+.reviewList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.reviewItem {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.reviewItemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.reviewUser {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(15 23 42);
+}
+
+.reviewMeta {
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+}
+
+.reviewItemStar {
+  color: rgb(234 179 8);
+}
+
+.reviewItemStars {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.reviewItemStarIcon {
+  font-size: 1rem;
+}
+
+.reviewItemStarOn {
+  color: rgb(234 179 8);
+  font-variation-settings: 'FILL' 1;
+}
+
+.reviewItemStarOff {
+  color: rgb(209 213 219);
+}
+
+.reviewText {
+  font-size: 0.875rem;
+  color: rgb(55 65 81);
+  line-height: 1.5;
+  margin-top: 0.25rem;
+}
+
+.reviewTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.reviewTag {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  background-color: rgb(243 244 246);
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+}
+
+.infoTab {
+  padding: 1rem 1rem 5rem;
+  background-color: #ffffff;
+}
+
+.infoSection {
+  margin-bottom: 1.25rem;
+}
+
+.infoTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 0.25rem;
+}
+
+.infoText {
+  font-size: 0.875rem;
+  color: rgb(55 65 81);
+  line-height: 1.6;
+}
+
+.infoSubText {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+}
+
+.infoList {
+  margin-top: 0.25rem;
+  padding-left: 0;
+  margin-left: 0;
+  font-size: 0.875rem;
+  color: rgb(55 65 81);
+  line-height: 1.5;
+  list-style-position: inside;
+}
+
+.cartFloating {
+  position: fixed;
+  bottom: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 28rem;
+  padding: 0 1rem;
+  z-index: 40;
+}
+
+.cartButton {
+  width: 100%;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899, var(--color-primary));
+  background-size: 200% auto;
+  padding: 1rem 1.5rem;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.125rem;
+  box-shadow: 0 20px 25px -5px rgba(246, 49, 154, 0.4);
+  transition: transform 150ms ease;
+}
+
+.cartButton:active {
+  transform: scale(0.98);
+}
+
+.cartButtonLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cartIconWrap {
+  position: relative;
+}
+
+.cartBadge {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  background-color: #ffffff;
+  color: var(--color-primary);
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 800;
+}
+
+.cartTotalWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cartTotalLabel {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-right: 0.25rem;
+}

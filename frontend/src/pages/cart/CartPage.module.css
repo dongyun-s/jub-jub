@@ -1,0 +1,413 @@
+/* CartPage.module.css
+ * 장바구니 페이지 스타일
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background-color: #ffffff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid rgb(226 232 240); /* slate-100 */
+}
+
+.headerLogo {
+  height: 2rem;
+  width: auto;
+}
+
+.headerTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.headerButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 13rem; /* 결제버튼 + nav 여유 */
+}
+
+.pickupSection {
+  padding: 0.75rem 1rem;
+}
+
+.pickupCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background-image: linear-gradient(to right, rgba(246, 49, 154, 0.1), #ffe4f0);
+}
+
+.pickupIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(148, 163, 184, 0.3);
+}
+
+.pickupInfo {
+  flex: 1;
+}
+
+.pickupLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.pickupName {
+  font-weight: 700;
+  color: rgb(30 64 175); /* slate-800-ish */
+}
+
+.pickupAddress {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: rgb(107 114 128);
+}
+
+.pickupChevron {
+  color: var(--color-primary);
+}
+
+.orderSection {
+  padding: 0 1rem;
+}
+
+.orderTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 1rem;
+}
+
+.orderList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.orderItemCard {
+  position: relative;
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background-color: #ffffff;
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.orderItemRemoveBtn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  color: rgb(203 213 225);
+}
+
+.orderItemImage {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.orderItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.orderItemName {
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 0.125rem;
+}
+
+.orderItemOptions {
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+  margin-bottom: 0.5rem;
+}
+
+.orderItemBottomRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.orderItemPrice {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.quantityControl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quantityButton {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(226 232 240);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(100 116 139);
+  transition: all 150ms ease;
+}
+
+.quantityButton:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.quantityValue {
+  width: 1.5rem;
+  text-align: center;
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.emptyState {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  color: rgb(226 232 240);
+  margin-bottom: 0.5rem;
+}
+
+.emptyText {
+  color: rgb(148 163 184);
+}
+
+.couponSection {
+  padding: 1.5rem 1rem 0;
+}
+
+.couponAppliedCard,
+.couponCard {
+  border-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(246, 49, 154, 0.1);
+  background-image: linear-gradient(to right, #fdf2f8, #f5f3ff);
+}
+
+.couponAppliedHeader,
+.couponHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.couponChip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.couponTitle {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.couponSubtitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(55 65 81);
+}
+
+.couponDiscount {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.couponRemoveBtn {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background-color: rgb(226 232 240);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.couponActionBtn {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(246, 49, 154, 0.3);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.couponPrimaryBtn {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 8px 16px rgba(236, 72, 153, 0.4);
+}
+
+.summarySection {
+  padding: 1.5rem 1rem 0;
+}
+
+.summaryTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  margin-bottom: 1rem;
+}
+
+.summaryCard {
+  background-color: rgb(248 250 252); /* slate-50 */
+  border-radius: 1rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.summaryLabel {
+  color: rgb(75 85 99);
+}
+
+.summaryValue {
+  font-weight: 500;
+  color: rgb(15 23 42);
+}
+
+.summaryDiscountLabel {
+  color: var(--color-primary);
+}
+
+.summaryDiscountValue {
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.summaryTotalRow {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgb(226 232 240);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summaryTotalLabel {
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.summaryTotalValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.pickupInfoSection {
+  padding: 1.5rem 1rem 0;
+}
+
+.pickupInfoRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: rgb(75 85 99);
+}
+
+.pickupInfoHighlight {
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.payBar {
+  position: fixed;
+  bottom: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 28rem;
+  padding: 1rem;
+  background-color: #ffffff;
+  border-top: 1px solid rgb(226 232 240);
+}
+
+.payButton {
+  width: 100%;
+  padding: 1rem 0;
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #ffffff;
+  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  box-shadow: 0 15px 30px rgba(236, 72, 153, 0.7);
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.payButton:active {
+  transform: scale(0.98);
+}
+
+.payButtonDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.payButtonMain {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+}
+
+.payButtonSub {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.08em;
+}
+
