@@ -8,6 +8,7 @@ import { useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
+import { FEATURED_RESTAURANTS } from '../../constants'
 import styles from './OrderHistoryPage.module.css'
 
 interface OrderHistoryPageProps {
@@ -152,8 +153,8 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
                     <span className={styles.activeOrderStatusBadge}>조리중</span>
                     <span className={styles.activeOrderStatusTime}>픽업 15:15 예정</span>
                   </div>
-                  <p className={styles.activeOrderStoreName}>바삭카츠 강남점</p>
-                  <p className={styles.activeOrderSubtitle}>더 바삭 돈카츠 외 1건</p>
+                  <p className={styles.activeOrderStoreName}>{FEATURED_RESTAURANTS[0].title}</p>
+                  <p className={styles.activeOrderSubtitle}>예시 주문 1건</p>
                 </div>
                 <span className="material-symbols-outlined text-primary">chevron_right</span>
               </button>

@@ -6,7 +6,9 @@
 .root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* Layout flex 자식이 남는 높이를 쓰도록 (지도 영역 높이 0 방지) */
+  flex: 1 1 0;
+  min-height: 0;
   background-color: #ffffff;
 }
 
@@ -99,16 +101,144 @@
 }
 
 .mapWrap {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   position: relative;
+}
+
+/* 주변 매장 패널: bottomCard 안 storesPanel — 전체 지도 위 오버레이, max-height 만 전환 */
+.bottomCard .storesPanel.nearbySheetCollapsed,
+.bottomCard .storesPanel.nearbySheetExpanded {
+  transition: max-height 0.32s ease;
+}
+
+.bottomCard .storesPanel.nearbySheetCollapsed {
+  max-height: 5.25rem;
+}
+
+.bottomCard .storesPanel.nearbySheetExpanded {
+  max-height: min(46vh, 21rem);
+}
+
+.sheetHandle {
+  display: block;
+  width: 100%;
+  padding: 0 0.75rem 0.5rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheetHandle:active {
+  background-color: rgb(249 250 251);
+}
+
+.sheetHandleBar {
+  display: block;
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background-color: rgb(229 231 235);
+  margin: 0.5rem auto 0.5rem;
+}
+
+.sheetHandleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.sheetChevron {
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  color: rgb(156 163 175);
+  transition: transform 0.32s ease;
+}
+
+.sheetChevronOpen {
+  transform: rotate(180deg);
+}
+
+.storesPanelBody {
+  border-top: 1px solid rgb(243 244 246);
+  overflow: hidden;
+}
+
+.bottomCard .storesPanel.nearbySheetCollapsed .storesPanelBody {
+  opacity: 0;
+  visibility: hidden;
+  max-height: 0;
+  border-top: none;
+  pointer-events: none;
+}
+
+.bottomCard .storesPanel.nearbySheetExpanded .storesPanelBody {
+  opacity: 1;
+  visibility: visible;
+  max-height: min(38vh, 17rem);
+  transition: opacity 0.2s ease 0.05s;
 }
 
 .mapIframe {
   border: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 12rem;
+  /* 모바일에서 스크롤 제스처가 페이지로 전달되면 지도를 못 움직이는 느낌이 나서,
+     지도 영역은 브라우저 기본 터치 제스처를 막고 맵이 터치를 받도록 한다. */
+  touch-action: none;
+  -ms-touch-action: none;
+}
+
+/* 티맵 기본 줌 슬라이더(오른쪽 검은 바) 숨김 — SDK/DOM 버전 차이를 대비해 폭넓게 처리 */
+.mapWrap :global(.tmap-zoom),
+.mapWrap :global(.tmap-control-zoom),
+.mapWrap :global(.tmapcontrol_zoom),
+.mapWrap :global(.tmap-control),
+.mapWrap :global(.tmap-control-container),
+.mapWrap :global(.tmapv2-control),
+.mapWrap :global(.tmapv2-control-container) {
+  display: none !important;
+}
+
+.zoomGroup {
+  position: absolute;
+  z-index: 2;
+  right: 1rem;
+  top: 5.25rem; /* 위치 버튼(1rem) 아래로 살짝 */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.zoomButton {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.zoomButton:active {
+  transform: scale(0.95);
+}
+
+.zoomIcon {
+  color: rgb(31 41 55);
 }
 
 .locationButton {
   position: absolute;
+  z-index: 2;
   right: 1rem;
   top: 1rem;
   width: 3rem;
@@ -144,35 +274,6 @@
   to { transform: rotate(360deg); }
 }
 
-.zoomGroup {
-  position: absolute;
-  right: 1rem;
-  top: 5rem;
-  display: flex;
-  flex-direction: column;
-  background-color: #ffffff;
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.zoomButton {
-  width: 2.5rem;
-  height: 2.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid rgb(243 244 246);
-}
-
-.zoomButton:last-child {
-  border-bottom: none;
-}
-
-.zoomIcon {
-  color: rgb(75 85 99);
-}
-
 .locationError {
   position: absolute;
   top: 1rem;
@@ -191,10 +292,58 @@
 
 .bottomCard {
   position: absolute;
+  z-index: 3;
   bottom: 5rem;
   left: 0;
   right: 0;
   padding: 0 1rem;
+}
+
+.pickupSheet {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.pickupSheetExpanded {
+  max-height: 18rem;
+  transition: max-height 0.32s ease;
+}
+
+.pickupSheetCollapsed {
+  max-height: 3.75rem;
+  transition: max-height 0.32s ease;
+}
+
+.pickupSheetBody {
+  border-top: 1px solid rgb(243 244 246);
+}
+
+.pickupSheetCollapsed .pickupSheetBody {
+  opacity: 0;
+  visibility: hidden;
+  max-height: 0;
+  border-top: none;
+  pointer-events: none;
+}
+
+.pickupSheetExpanded .pickupSheetBody {
+  opacity: 1;
+  visibility: visible;
+  max-height: 14.5rem;
+  transition: opacity 0.2s ease 0.05s;
+}
+
+.pickupSheetTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pickupSheetTitle {
+  font-weight: 700;
+  color: rgb(31 41 55);
 }
 
 .destCard {
@@ -231,6 +380,29 @@
 .destMeta {
   font-size: 0.875rem;
   color: rgb(107 114 128);
+}
+
+/* 나침반·방위 배지 (위치 버튼 왼쪽) */
+.headingBadge {
+  position: absolute;
+  z-index: 2;
+  right: 5rem;
+  top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: rgb(37 99 235);
+}
+
+.headingBadgeIcon {
+  font-size: 1.125rem;
+  color: var(--color-primary);
 }
 
 .locationOk {
@@ -349,7 +521,7 @@
 }
 
 .storesList {
-  max-height: 12rem;
+  max-height: min(38vh, 17rem);
   overflow-y: auto;
 }
 

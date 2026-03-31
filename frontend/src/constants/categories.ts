@@ -46,6 +46,9 @@ export interface FeaturedRestaurant {
   points: string
   hashtags: string[]
   categoryId?: number
+  /** 픽업/매장 지도 마커용 WGS84 (없으면 별도 폴백) */
+  lat?: number
+  lng?: number
 }
 
 /** 홈/카테고리 공통 맛집 던전 카드 데이터(API 실패 시 폴백) */
@@ -62,6 +65,8 @@ export const FEATURED_RESTAURANTS: FeaturedRestaurant[] = [
     points: '+120',
     hashtags: ['#음폭맛집', '#치즈폭탄'],
     categoryId: 2,
+    lat: 37.4979,
+    lng: 127.0276,
   },
   {
     id: 2,
@@ -75,5 +80,7 @@ export const FEATURED_RESTAURANTS: FeaturedRestaurant[] = [
     points: '+150',
     hashtags: ['#한식', '#포근한맛집'],
     categoryId: 1,
+    lat: 37.5012,
+    lng: 127.0396,
   },
 ]

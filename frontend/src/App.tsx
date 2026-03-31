@@ -4,6 +4,12 @@
  * - 현재 페이지 상태 관리 및 라우팅(페이지 전환)
  * - 전역 상태: 장바구니, 적용 쿠폰, 진행 중 주문 여부, 리뷰 작성 대상 매장명
  * - 로그인 여부에 따라 홈 또는 로그인에서 시작
+ *
+ * 미리보기(쿼리는 로드 후 주소에서 제거됨):
+ * - 지도: ?map=1
+ * - 진행 중 주문 UI(홈 배너·지도 픽업 경로·주문내역 카드): ?activeOrder=1
+ * - 예: 픽업 지도만 바로: ?map=1&activeOrder=1
+ * - 주문 현황 페이지까지: ?orderStatus=1&activeOrder=1
  */
 
 import { useState } from 'react'
@@ -61,15 +67,36 @@ const initialCartItems: CartItem[] = [
   },
 ]
 
+/**
+ * 개발·데모용 URL 쿼리: 초기 페이지·진행 중 주문 여부만 설정하고 쿼리스트링은 제거.
+ */
+function readLaunchQuery(): { page: Page | null; activeOrder: boolean } {
+  if (typeof window === 'undefined') return { page: null, activeOrder: false }
+  const q = new URLSearchParams(window.location.search)
+  let page: Page | null = null
+  if (q.get('orderStatus') === '1') page = 'orderStatus'
+  else if (q.get('map') === '1') page = 'map'
+  const activeOrder = q.get('activeOrder') === '1' || q.get('orderStatus') === '1'
+  if (page !== null || activeOrder) {
+    const clean = `${window.location.pathname}${window.location.hash}`
+    window.history.replaceState({}, '', clean)
+  }
+  return { page, activeOrder }
+}
+
 function App() {
+  const launch = readLaunchQuery()
+
   /** 현재 화면에 표시할 페이지 */
-  const [currentPage, setCurrentPage] = useState<Page>(() => (getAccessToken() ? 'home' : 'login'))
+  const [currentPage, setCurrentPage] = useState<Page>(
+    () => launch.page ?? (getAccessToken() ? 'home' : 'login')
+  )
   /** 직전에 보고 있던 페이지 (뒤로가기용) */
   const [lastPage, setLastPage] = useState<Page | null>(null)
   /** 장바구니에서 사용 중인 쿠폰 (미사용 시 null) */
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   /** 진행 중인 주문이 있는지 (지도/주문현황 연동) */
-  const [hasActiveOrder, setHasActiveOrder] = useState(false)
+  const [hasActiveOrder, setHasActiveOrder] = useState(() => launch.activeOrder)
   /** 리뷰 작성 페이지로 넘길 매장명 (주문내역 → 리뷰쓰기) */
   const [reviewStoreName, setReviewStoreName] = useState('')
   /** 장바구니 상품 목록 (CartPage에서 수정 가능) */
@@ -234,7 +261,8 @@ function App() {
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
             onOrderStatusClick={goTo('orderStatus')}
-            onStoreClick={() => openStoreById(1)}
+            onPickupStoreDetail={() => openStoreById(FEATURED_RESTAURANTS[0].id)}
+            onStoreClick={() => openStoreById(FEATURED_RESTAURANTS[0].id)}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             hasActiveOrder={hasActiveOrder}
