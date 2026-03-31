@@ -10,7 +10,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-    Optional<Payment> findByOrderId(Long orderId);
+    Optional<Payment> findTopByOrderIdOrderByIdDesc(Long orderId);
+
+    boolean existsByOrderIdAndStatus(Long orderId, io.github.dongyuns.jubjub.payment.domain.PaymentStatus status);
 
     Optional<Payment> findByMerchantUid(String merchantUid);
 

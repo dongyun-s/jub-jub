@@ -9,7 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
@@ -23,7 +23,6 @@ import lombok.NoArgsConstructor;
 @Table(
         name = "payments",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_payment_order_id", columnNames = "order_id"),
                 @UniqueConstraint(name = "uk_payment_merchant_uid", columnNames = "merchant_uid")
         }
 )
@@ -34,7 +33,7 @@ public class Payment extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 

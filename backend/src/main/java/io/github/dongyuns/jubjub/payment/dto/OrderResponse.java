@@ -13,6 +13,10 @@ public record OrderResponse(
         Long paymentId
 ) {
     public static OrderResponse from(Order order) {
+        return from(order, null);
+    }
+
+    public static OrderResponse from(Order order, Long paymentId) {
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNo(),
@@ -20,7 +24,7 @@ public record OrderResponse(
                 order.getStoreId(),
                 order.getStatus(),
                 order.getFinalAmount(),
-                order.getPayment() != null ? order.getPayment().getId() : null
+                paymentId
         );
     }
 }
