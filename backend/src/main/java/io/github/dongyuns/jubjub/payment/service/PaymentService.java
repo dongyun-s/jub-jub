@@ -25,9 +25,7 @@ import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentTransactionRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,51 +54,40 @@ public class PaymentService {
             throw new BusinessException("ORDER_NOT_READY", "READY 상태 주문만 결제를 준비할 수 있습니다.", HttpStatus.CONFLICT);
         }
 
-        Optional<Payment> existingPayment = paymentRepository.findByOrderId(order.getId());
-        if (existingPayment.isPresent()) {
-            return PreparePaymentResponse.from(existingPayment.get());
+        if (paymentRepository.existsByOrderIdAndStatus(order.getId(), PaymentStatus.PAID)) {
+            throw new BusinessException("ORDER_ALREADY_PAID", "이미 결제가 완료된 주문입니다.", HttpStatus.CONFLICT);
         }
 
-        // paymentId는 PortOne V2에서 다시 조회할 식별자라 주문 단위로 고정한다.
+        // 각 결제 시도마다 고유 merchantUid를 발급해 PortOne 중복 결제를 방지한다.
         Payment payment = Payment.ready(order, merchantUidOf(order.getId()), request.method());
-
-        try {
-            return PreparePaymentResponse.from(paymentRepository.save(payment));
-        } catch (DataIntegrityViolationException exception) {
-            // 동시에 같은 주문을 준비해도 기존 결제 건을 재사용하도록 처리한다.
-            Payment duplicated = paymentRepository.findByOrderId(order.getId())
-                    .orElseThrow(() -> exception);
-            return PreparePaymentResponse.from(duplicated);
-        }
+        return PreparePaymentResponse.from(paymentRepository.save(payment));
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
     public PaymentResponse confirmPayment(String accountEmail, ConfirmPaymentRequest request) {
-        String merchantUid = request.resolvedMerchantUid();
+        String merchantUid = request.merchantUid();
         validateMerchantUid(merchantUid);
 
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
         validateOrderOwnership(accountEmail, payment.getOrder());
         PortOnePaymentDetails paymentDetails = portOneClient.getPayment(merchantUid);
-        return confirmPaymentInternal(payment.getOrder().getId(), request.transactionId(), paymentDetails);
+        return confirmPaymentInternal(payment, request.transactionId(), paymentDetails);
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
     public PaymentResponse confirmPaymentByWebhook(String paymentId, String transactionId) {
+        Payment payment = paymentRepository.findByMerchantUid(paymentId)
+                .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
         PortOnePaymentDetails paymentDetails = portOneClient.getPayment(paymentId);
-        Long orderId = parseOrderId(paymentDetails.paymentId());
-        return confirmPaymentInternal(orderId, transactionId, paymentDetails);
+        return confirmPaymentInternal(payment, transactionId, paymentDetails);
     }
 
     @Transactional
     public void markPaymentFailed(String paymentId, String transactionId) {
         paymentRepository.findByPortonePaymentId(transactionId)
                 .or(() -> paymentRepository.findByMerchantUid(paymentId))
-                .ifPresent(payment -> {
-                    payment.markFailed(transactionId);
-                    payment.getOrder().markFailed();
-                });
+                .ifPresent(payment -> payment.markFailed(transactionId));
     }
 
     @Transactional
@@ -118,13 +105,13 @@ public class PaymentService {
     }
 
     @Transactional
-    public RefundResponse refundPayment(String accountEmail, Long paymentId, RefundPaymentRequest request) {
-        Payment payment = paymentRepository.findByIdForUpdate(paymentId)
+    public RefundResponse refundPayment(String accountEmail, Long paymentRecordId, RefundPaymentRequest request) {
+        Payment payment = paymentRepository.findByIdForUpdate(paymentRecordId)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         validateOrderOwnership(accountEmail, payment.getOrder());
 
         if (payment.getStatus() == PaymentStatus.REFUNDED) {
-            PaymentCancellation existingRefund = paymentCancellationRepository.findTopByPaymentIdOrderByCreatedAtDesc(paymentId)
+            PaymentCancellation existingRefund = paymentCancellationRepository.findTopByPaymentIdOrderByCreatedAtDesc(paymentRecordId)
                     .orElseThrow(() -> new BusinessException("REFUND_NOT_FOUND", "환불 내역을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
             return RefundResponse.from(existingRefund);
         }
@@ -157,12 +144,8 @@ public class PaymentService {
         return RefundResponse.from(paymentCancellationRepository.save(refund));
     }
 
-    private PaymentResponse confirmPaymentInternal(Long orderId, String transactionId, PortOnePaymentDetails paymentDetails) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new BusinessException("ORDER_NOT_FOUND", "주문을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
-
-        Payment payment = paymentRepository.findByOrderId(order.getId())
-                .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
+    private PaymentResponse confirmPaymentInternal(Payment payment, String transactionId, PortOnePaymentDetails paymentDetails) {
+        Order order = payment.getOrder();
 
         if (payment.getStatus() == PaymentStatus.PAID && order.getStatus() == OrderStatus.PAID) {
             if (transactionId != null && !transactionId.equals(payment.getPortonePaymentId())) {
@@ -243,22 +226,9 @@ public class PaymentService {
         if (!merchantUid.startsWith(MERCHANT_UID_PREFIX)) {
             throw new BusinessException(
                     "INVALID_MERCHANT_UID",
-                    "결제 확인에는 prepare 응답의 merchantUid(예: ORDER-2)를 사용해야 합니다.",
+                    "결제 확인에는 prepare 응답의 merchantUid를 사용해야 합니다.",
                     HttpStatus.BAD_REQUEST
             );
-        }
-    }
-
-    private Long parseOrderId(String paymentId) {
-        if (paymentId == null || !paymentId.startsWith(MERCHANT_UID_PREFIX)) {
-            throw new BusinessException("INVALID_PAYMENT_ID", "paymentId에서 주문번호를 추출할 수 없습니다.", HttpStatus.BAD_REQUEST);
-        }
-
-        try {
-            String orderIdPart = paymentId.substring(MERCHANT_UID_PREFIX.length()).split("-", 2)[0];
-            return Long.parseLong(orderIdPart);
-        } catch (NumberFormatException exception) {
-            throw new BusinessException("INVALID_PAYMENT_ID", "paymentId 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
     }
 }

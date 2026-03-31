@@ -50,13 +50,13 @@ public class PaymentController {
         return paymentWebhookService.process(payload, webhookId, webhookSignature, webhookTimestamp);
     }
 
-    @PostMapping("/{paymentId}/refund")
+    @PostMapping("/{paymentRecordId}/refund")
     public RefundResponse refund(
             Authentication authentication,
-            @PathVariable Long paymentId,
+            @PathVariable Long paymentRecordId,
             @Valid @RequestBody RefundPaymentRequest request
     ) {
         // 환불은 내부 결제 건을 기준으로 PortOne 환불 API를 호출한다.
-        return paymentService.refundPayment(authentication.getName(), paymentId, request);
+        return paymentService.refundPayment(authentication.getName(), paymentRecordId, request);
     }
 }

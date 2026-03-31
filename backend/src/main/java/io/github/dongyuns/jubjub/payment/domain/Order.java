@@ -11,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.LocalDateTime;
@@ -57,9 +56,6 @@ public class Order extends BaseTimeEntity {
     @Column(nullable = false)
     private Long version;
 
-    @OneToOne(mappedBy = "order")
-    private Payment payment;
-
     @Builder
     private Order(MemberProfile memberProfile, Store store, String orderNo, OrderStatus status, Integer finalAmount, LocalDateTime requestedAt) {
         this.memberProfile = memberProfile;
@@ -86,10 +82,6 @@ public class Order extends BaseTimeEntity {
         // 주문은 결제가 실제 승인된 뒤에만 PAID로 바뀐다.
         this.status = OrderStatus.PAID;
         this.paidAt = paidAt;
-    }
-
-    public void markFailed() {
-        this.status = OrderStatus.FAILED;
     }
 
     public void markRefunded() {
