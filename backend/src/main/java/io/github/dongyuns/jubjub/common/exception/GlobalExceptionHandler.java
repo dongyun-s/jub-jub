@@ -1,5 +1,6 @@
 package io.github.dongyuns.jubjub.common.exception;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,6 +26,18 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.badRequest()
                 .body(ApiErrorResponse.of("VALIDATION_ERROR", message));
+    }
+
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleEntityNotFoundException(EntityNotFoundException exception) {
+        return ResponseEntity.status(404)
+                .body(ApiErrorResponse.of("ENTITY_NOT_FOUND", exception.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalStateException(IllegalStateException exception) {
+        return ResponseEntity.status(502)
+                .body(ApiErrorResponse.of("ILLEGAL_STATE", exception.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

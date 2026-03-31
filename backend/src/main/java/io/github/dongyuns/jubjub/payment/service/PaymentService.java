@@ -24,6 +24,7 @@ import io.github.dongyuns.jubjub.payment.repository.PaymentCancellationRepositor
 import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentTransactionRepository;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -36,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentService {
 
     private static final String MERCHANT_UID_PREFIX = "ORDER-";
+    private static final DateTimeFormatter MERCHANT_UID_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
@@ -222,7 +224,7 @@ public class PaymentService {
     }
 
     private static String merchantUidOf(Long orderId) {
-        return MERCHANT_UID_PREFIX + orderId;
+        return MERCHANT_UID_PREFIX + orderId + "-" + LocalDateTime.now().format(MERCHANT_UID_TIME_FORMAT);
     }
 
     private void validateOrderOwnership(String accountEmail, Order order) {
@@ -253,7 +255,8 @@ public class PaymentService {
         }
 
         try {
-            return Long.parseLong(paymentId.substring(MERCHANT_UID_PREFIX.length()));
+            String orderIdPart = paymentId.substring(MERCHANT_UID_PREFIX.length()).split("-", 2)[0];
+            return Long.parseLong(orderIdPart);
         } catch (NumberFormatException exception) {
             throw new BusinessException("INVALID_PAYMENT_ID", "paymentId 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
