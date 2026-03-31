@@ -1,6 +1,6 @@
 package io.github.dongyuns.jubjub;
 
-import io.github.dongyuns.jubjub.config.TmapProperties;
+import io.github.dongyuns.jubjub.domain.route.config.TmapProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
