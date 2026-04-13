@@ -88,7 +88,7 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="010-0000-0000"
+              placeholder="전화번호를 입력해 주세요"
               className="input-field"
               required
             />
