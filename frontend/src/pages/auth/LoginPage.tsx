@@ -5,7 +5,9 @@
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { login } from '../../api/auth'
+import { ApiError } from '../../api/authClient'
 import { setTokens } from '../../lib/authStorage'
 
 interface LoginPageProps {
@@ -31,7 +33,13 @@ function LoginPage({ onLogin, onSignUp, onForgotId, onForgotPassword }: LoginPag
       setTokens(res.accessToken, res.refreshToken)
       onLogin()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '로그인에 실패했습니다.')
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '로그인에 실패했습니다.'
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -52,12 +60,6 @@ function LoginPage({ onLogin, onSignUp, onForgotId, onForgotPassword }: LoginPag
           <h1 className="text-title leading-tight">Jub-Jub 에 오신 것을 환영합니다!</h1>
           <p className="text-subtitle mt-2">맛있는 탐험을 위해 지금 바로 합류하세요!</p>
         </div>
-
-        {error && (
-          <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -119,6 +121,13 @@ function LoginPage({ onLogin, onSignUp, onForgotId, onForgotPassword }: LoginPag
           </button>
         </p>
       </main>
+
+      <SimpleAlertModal
+        open={Boolean(error)}
+        title="로그인 실패"
+        message={error ?? ''}
+        onClose={() => setError(null)}
+      />
     </Layout>
   )
 }

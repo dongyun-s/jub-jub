@@ -11,6 +11,9 @@ import BottomNav from '../../components/BottomNav'
 import { fetchStoreDetail } from '../../api/store'
 import type { StoreDetailDto } from '../../api/store'
 import { ApiError } from '../../api/authClient'
+import { toggleStoreFavorite } from '../../api/favorites'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
+import { getAccessToken } from '../../lib/authStorage'
 import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import {
   buildMenuCategoriesFromApi,
@@ -24,13 +27,16 @@ interface StoreDetailPageProps {
   storeId: number
   onBack: () => void
   onGoHome: () => void
-  onMenuClick?: () => void
+  /** 메뉴 카드에서 넘기는 `menuId` (서버 메뉴 ID) */
+  onMenuClick?: (menuId: number) => void
   onCartClick?: () => void
   onOrdersClick?: () => void
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
   cartCount?: number
+  /** 장바구니 합계 금액 (API 또는 로컬 합산) */
+  cartTotalPrice?: number
 }
 
 /** 메뉴 아이템 카드 컴포넌트 */
@@ -100,6 +106,7 @@ function StoreDetailPage({
   onMypageClick,
   onFavoritesClick: _onFavoritesClick,
   cartCount = 0,
+  cartTotalPrice = 0,
 }: StoreDetailPageProps) {
   const [detail, setDetail] = useState<StoreDetailDto | null>(null)
   const [storeLoading, setStoreLoading] = useState(true)
@@ -109,8 +116,8 @@ function StoreDetailPage({
   const [activeCategory, setActiveCategory] = useState('popular')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [cartTotal] = useState(27400)
   const [isFavorite, setIsFavorite] = useState(false)
+  const [favError, setFavError] = useState<string | null>(null)
 
   const categoryScrollRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -258,6 +265,12 @@ function StoreDetailPage({
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
+        <SimpleAlertModal
+          open={favError != null}
+          title="안내"
+          message={favError ?? ''}
+          onClose={() => setFavError(null)}
+        />
         {storeError && (
           <p className="mx-4 mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
             {storeError} · 데모 메뉴를 표시합니다.
@@ -294,7 +307,23 @@ function StoreDetailPage({
                 type="button"
                 className={styles.headerIconButton}
                 onClick={() => {
-                  setIsFavorite((prev) => !prev)
+                  if (!getAccessToken()) {
+                    setFavError('로그인 후 찜할 수 있습니다.')
+                    return
+                  }
+                  void (async () => {
+                    try {
+                      const msg = await toggleStoreFavorite(storeId)
+                      // 서버 메시지 기반으로 UI 상태 동기화 (해제/등록)
+                      if (msg.includes('해제')) setIsFavorite(false)
+                      else if (msg.includes('찜')) setIsFavorite(true)
+                      else setIsFavorite((prev) => !prev)
+                    } catch (e) {
+                      setFavError(
+                        e instanceof ApiError ? e.message : '찜을 변경하지 못했습니다.',
+                      )
+                    }
+                  })()
                 }}
               >
                 <span
@@ -442,7 +471,12 @@ function StoreDetailPage({
                   <h3 className={styles.searchResultsTitle}>검색 결과 ({filteredItems.length})</h3>
                   <div className={styles.searchResultsList}>
                     {filteredItems.map((item) => (
-                      <MenuItemCard key={item.id} item={item} formatPrice={formatPrice} onClick={onMenuClick} />
+                      <MenuItemCard
+                        key={item.id}
+                        item={item}
+                        formatPrice={formatPrice}
+                        onClick={() => onMenuClick?.(item.id)}
+                      />
                     ))}
                     {filteredItems.length === 0 && (
                       <div className={styles.searchEmpty}>
@@ -479,7 +513,13 @@ function StoreDetailPage({
                       </div>
                       <div className={styles.menuList}>
                         {category.items.map((item) => (
-                          <MenuItemCard key={item.id} item={item} formatPrice={formatPrice} showRank={category.id === 'popular'} onClick={onMenuClick} />
+                          <MenuItemCard
+                            key={item.id}
+                            item={item}
+                            formatPrice={formatPrice}
+                            showRank={category.id === 'popular'}
+                            onClick={() => onMenuClick?.(item.id)}
+                          />
                         ))}
                       </div>
                     </div>
@@ -632,7 +672,7 @@ function StoreDetailPage({
             </div>
             <div className={styles.cartTotalWrap}>
               <span className={styles.cartTotalLabel}>합계</span>
-              <span>{cartTotal.toLocaleString()}원</span>
+              <span>{cartTotalPrice.toLocaleString()}원</span>
             </div>
           </button>
         </div>

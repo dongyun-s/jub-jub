@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
+import AppModal from '../../components/AppModal/AppModal'
 import styles from './MyReviewsPage.module.css'
 
 interface MyReviewsPageProps {
@@ -174,24 +175,20 @@ function MyReviewsPage({
           )}
         </div>
 
-        {showDeleteModal && (
-          <div className={styles.modalOverlay}>
-            <div className={styles.modalBox}>
-              <h3 className={styles.modalTitle}>리뷰 삭제</h3>
-              <p className={styles.modalDesc}>
-                정말 이 리뷰를 삭제하시겠어요?<br />삭제된 리뷰는 복구할 수 없습니다.
-              </p>
-              <div className={styles.modalActions}>
-                <button type="button" onClick={() => setShowDeleteModal(false)} className={styles.modalCancel}>
-                  취소
-                </button>
-                <button type="button" onClick={handleDeleteConfirm} className={styles.modalConfirm}>
-                  삭제
-                </button>
-              </div>
-            </div>
+        <AppModal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="md">
+          <h3 className={styles.modalTitle}>리뷰 삭제</h3>
+          <p className={styles.modalDesc}>
+            정말 이 리뷰를 삭제하시겠어요?<br />삭제된 리뷰는 복구할 수 없습니다.
+          </p>
+          <div className={styles.modalActions}>
+            <button type="button" onClick={() => setShowDeleteModal(false)} className={styles.modalCancel}>
+              취소
+            </button>
+            <button type="button" onClick={handleDeleteConfirm} className={styles.modalConfirm}>
+              삭제
+            </button>
           </div>
-        )}
+        </AppModal>
 
         {/* 하단 네비게이션 */}
         <BottomNav 

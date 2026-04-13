@@ -8,6 +8,8 @@ import { useEffect, useRef, useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
+import { useProfile } from '../../hooks/useProfile'
+import AppModal from '../../components/AppModal/AppModal'
 import styles from './MyPage.module.css'
 
 interface MyPageProps {
@@ -22,9 +24,11 @@ interface MyPageProps {
   cartCount?: number
 }
 
-/** 사용자 정보 (데모용) */
-const userData = {
-  nickname: '전설의 미식가',
+/**
+ * 등급·이동거리·주문 카운트는 백엔드 미연동 — 리워드 UI 자리용 데모 값
+ * 프로필 상단: 닉네임·이메일만 (GET /api/v1/auth/me)
+ */
+const rewardDemoStats = {
   grade: 'GOLD',
   gradeKr: '골드 등급',
   totalDistance: 42.5,
@@ -39,6 +43,8 @@ const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const todayIndex = 3
 
 function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onLogout, cartCount = 0 }: MyPageProps) {
+  const { profile, loading: profileLoading } = useProfile()
+
   /** 요일별 출석 체크 여부 */
   const [checkedDays, setCheckedDays] = useState([true, true, true, false, false, false, false])
   /** 출석 완료 모달 표시 여부 */
@@ -46,7 +52,13 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
 
   const questSectionRef = useRef<HTMLDivElement | null>(null)
 
-  const progressPercent = (userData.orderCount / userData.nextGradeCount) * 100
+  const displayNickname =
+    profile?.nickname?.trim() || (profileLoading ? '불러오는 중…' : '회원')
+  /** 프로필 아바타 뱃지 — 등급 (리워드 데모; API 연동 시 교체) */
+  const profileGradeBadge =
+    rewardDemoStats.gradeKr.replace(/\s*등급\s*$/, '').trim() || rewardDemoStats.grade
+
+  const progressPercent = (rewardDemoStats.orderCount / rewardDemoStats.nextGradeCount) * 100
   const remainingDistance = 1.2
   const distanceProgress = ((5 - remainingDistance) / 5) * 100
 
@@ -87,30 +99,35 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
               <div className={styles.avatarCircle}>
                 <span className={`material-symbols-outlined ${styles.avatarIcon}`}>face_6</span>
               </div>
-              <div className={styles.gradeBadge}>{userData.grade}</div>
+              <div className={styles.gradeBadge}>{profileGradeBadge}</div>
             </div>
-            <h2 className={styles.profileName}>{userData.nickname}</h2>
-            <p className={styles.profileGrade}>{userData.gradeKr}</p>
+            <h2 className={styles.profileName}>{displayNickname}</h2>
+            {profile?.email && <p className={styles.profileMeta}>{profile.email}</p>}
+            {!profile && !profileLoading && (
+              <p className={styles.profileMeta}>프로필을 불러오지 못했습니다.</p>
+            )}
           </section>
 
           <section className={styles.statsSection}>
             <div className={styles.statsGrid}>
               <div className={styles.statCard}>
                 <p className={styles.statLabel}>이동 거리</p>
-                <p className={`${styles.statValue} ${styles.statValuePrimary}`}>{userData.totalDistance} KM</p>
+                <p className={`${styles.statValue} ${styles.statValuePrimary}`}>{rewardDemoStats.totalDistance} KM</p>
                 <div className={styles.statSub}>
                   <span className={`material-symbols-outlined ${styles.statTrendIcon}`}>trending_up</span>
-                  지난주 대비 {userData.distanceChange}
+                  지난주 대비 {rewardDemoStats.distanceChange}
                 </div>
               </div>
               <div className={styles.statCard}>
                 <p className={styles.statLabel}>현재 등급</p>
-                <p className={`${styles.statValue} ${styles.statValueDark}`}>{userData.gradeKr}</p>
+                <p className={`${styles.statValue} ${styles.statValueDark}`}>{rewardDemoStats.gradeKr}</p>
                 <div className={styles.progressBarWrap}>
                   <div className={styles.progressBar}>
                     <div className={styles.progressBarFill} style={{ width: `${progressPercent}%` }} />
                   </div>
-                  <p className={styles.progressLabel}>{userData.orderCount}/{userData.nextGradeCount} 회</p>
+                  <p className={styles.progressLabel}>
+                    {rewardDemoStats.orderCount}/{rewardDemoStats.nextGradeCount} 회
+                  </p>
                 </div>
               </div>
             </div>
@@ -249,21 +266,19 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
         />
 
         {/* 출석 완료 시 표시되는 모달 */}
-        {showAttendanceModal && (
-          <div className={styles.modalOverlay}>
-            <div className={styles.modalBox}>
-              <div className={styles.modalIconWrap}>
-                <span className={`material-symbols-outlined ${styles.modalIcon}`}>check_circle</span>
-              </div>
-              <h3 className={styles.modalTitle}>출석 완료!</h3>
-              <p className={styles.modalDesc}>오늘의 출석체크가 완료되었습니다.</p>
-              <p className={styles.modalSub}>🔥 {consecutiveDays}일 연속 출석 중!</p>
-              <button onClick={() => setShowAttendanceModal(false)} className={styles.modalButton}>
-                확인
-              </button>
+        <AppModal open={showAttendanceModal} onClose={() => setShowAttendanceModal(false)} size="sm">
+          <div className={styles.attendanceModalInner}>
+            <div className={styles.modalIconWrap}>
+              <span className={`material-symbols-outlined ${styles.modalIcon}`}>check_circle</span>
             </div>
+            <h3 className={styles.modalTitle}>출석 완료!</h3>
+            <p className={styles.modalDesc}>오늘의 출석체크가 완료되었습니다.</p>
+            <p className={styles.modalSub}>🔥 {consecutiveDays}일 연속 출석 중!</p>
+            <button type="button" onClick={() => setShowAttendanceModal(false)} className={styles.modalButton}>
+              확인
+            </button>
           </div>
-        )}
+        </AppModal>
       </div>
     </Layout>
   )

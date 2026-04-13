@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
+import AppModal from '../../components/AppModal/AppModal'
 import styles from './ReviewWritePage.module.css'
 
 interface ReviewWritePageProps {
@@ -232,9 +233,13 @@ function ReviewWritePage({
           }}
         />
 
-        {showAIModal && (
-          <div className={styles.modalOverlay}>
-            <div className={styles.modalBox}>
+        <AppModal
+          open={showAIModal}
+          onClose={() => setShowAIModal(false)}
+          size="lg"
+          flush
+          panelClassName={styles.modalShell}
+        >
               <div className={styles.modalHeader}>
                 <h3 className={styles.modalTitle}>
                   <span className={`material-symbols-outlined ${styles.modalTitleIcon}`}>auto_awesome</span>
@@ -291,9 +296,7 @@ function ReviewWritePage({
                 </button>
                 <p className={styles.modalHint}>선택하신 평점을 기반으로 정성스러운 리뷰를 생성합니다.</p>
               </div>
-            </div>
-          </div>
-        )}
+        </AppModal>
       </div>
     </Layout>
   )

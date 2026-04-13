@@ -12,7 +12,7 @@
  * - 주문 현황 페이지까지: ?orderStatus=1&activeOrder=1
  */
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   LoginPage,
   SignUpPage,
@@ -34,6 +34,7 @@ import {
 } from './pages'
 import { FEATURED_RESTAURANTS } from './constants'
 import { clearTokens, getAccessToken } from './lib/authStorage'
+import { fetchMyCart, mapCartListToUiLines, type ServerCartLineUi } from './api/cart'
 
 /** 앱에서 사용하는 모든 페이지 식별자 */
 type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites'
@@ -45,27 +46,8 @@ interface AppliedCoupon {
   discount: number
 }
 
-/** 장바구니에 담긴 단일 상품 */
-interface CartItem {
-  id: number
-  name: string
-  options: string
-  price: number
-  quantity: number
-  image?: string
-}
-
-/** 개발/데모용 초기 장바구니 데이터 (홈 카드와 통일) */
-const initialCartItems: CartItem[] = [
-  {
-    id: FEATURED_RESTAURANTS[0].id,
-    name: FEATURED_RESTAURANTS[0].title,
-    options: '기본 선택 / 소스 추가',
-    price: 100,
-    quantity: 1,
-    image: FEATURED_RESTAURANTS[0].image,
-  },
-]
+/** 장바구니 줄 — 서버 GET /carts 매핑 결과와 동일 구조 */
+type CartItem = ServerCartLineUi
 
 /**
  * 개발·데모용 URL 쿼리: 초기 페이지·진행 중 주문 여부만 설정하고 쿼리스트링은 제거.
@@ -99,12 +81,45 @@ function App() {
   const [hasActiveOrder, setHasActiveOrder] = useState(() => launch.activeOrder)
   /** 리뷰 작성 페이지로 넘길 매장명 (주문내역 → 리뷰쓰기) */
   const [reviewStoreName, setReviewStoreName] = useState('')
-  /** 장바구니 상품 목록 (CartPage에서 수정 가능) */
-  const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems)
+  /** 장바구니 상품 목록 (로그인 시 GET /api/v1/carts) */
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cartStoreId, setCartStoreId] = useState<number | null>(null)
+  const [cartStoreName, setCartStoreName] = useState<string | null>(null)
   const [selectedStoreId, setSelectedStoreId] = useState(FEATURED_RESTAURANTS[0].id)
+  const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null)
+
+  const refreshCart = useCallback(async () => {
+    if (!getAccessToken()) {
+      setCartItems([])
+      setCartStoreId(null)
+      setCartStoreName(null)
+      return
+    }
+    try {
+      const data = await fetchMyCart()
+      setCartStoreId(data.storeId ?? null)
+      setCartStoreName(data.storeName ?? null)
+      setCartItems(mapCartListToUiLines(data))
+    } catch {
+      setCartItems([])
+      setCartStoreId(null)
+      setCartStoreName(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshCart()
+  }, [refreshCart])
+
+  useEffect(() => {
+    if (currentPage === 'menu' && selectedMenuId === null) {
+      setCurrentPage('store')
+    }
+  }, [currentPage, selectedMenuId])
 
   /** 장바구니 총 수량 (하단 네비 뱃지 등에 사용) */
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const cartTotalPrice = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   const openStoreById = (storeId: number) => {
     setSelectedStoreId(storeId)
@@ -123,9 +138,13 @@ function App() {
     switch (currentPage) {
       case 'login':
         return (
-          <LoginPage 
-            onLogin={goTo('home')} 
-            onSignUp={goTo('signup')} 
+          <LoginPage
+            onLogin={() => {
+              void refreshCart()
+              setLastPage(currentPage)
+              setCurrentPage('home')
+            }}
+            onSignUp={goTo('signup')}
             onForgotId={goTo('findId')}
             onForgotPassword={goTo('findPassword')}
           />
@@ -171,26 +190,43 @@ function App() {
             storeId={selectedStoreId}
             onBack={goTo('category')}
             onGoHome={goTo('home')}
-            onMenuClick={goTo('menu')}
+            onMenuClick={(menuId) => {
+              setSelectedMenuId(menuId)
+              goTo('menu')()
+            }}
             onCartClick={goTo('cart')}
             onOrdersClick={goTo('orders')}
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             cartCount={cartCount}
+            cartTotalPrice={cartTotalPrice}
           />
         )
       case 'menu':
-        return <MenuDetailPage onBack={goTo('store')} onAddToCart={goTo('cart')} />
+        return selectedMenuId != null ? (
+          <MenuDetailPage
+            storeId={selectedStoreId}
+            menuId={selectedMenuId}
+            onBack={() => {
+              setSelectedMenuId(null)
+              goTo('store')()
+            }}
+            onAfterAddToCart={refreshCart}
+            onGoToCart={goTo('cart')}
+          />
+        ) : null
       case 'cart':
         return (
-          <CartPage 
-            onBack={goTo('store')} 
+          <CartPage
+            onBack={goTo('store')}
             onCheckout={() => {
               setHasActiveOrder(true)
               setCartItems([])
+              setCartStoreId(null)
+              setCartStoreName(null)
               setCurrentPage('orderStatus')
-            }} 
+            }}
             onCouponClick={goTo('coupon')}
             appliedCoupon={appliedCoupon}
             onRemoveCoupon={() => setAppliedCoupon(null)}
@@ -201,7 +237,11 @@ function App() {
             onFavoritesClick={goTo('favorites')}
             cartCount={cartCount}
             cartItems={cartItems}
-            onCartItemsChange={setCartItems}
+            onCartItemsChange={(lines) => setCartItems(lines)}
+            useApiCart={Boolean(getAccessToken())}
+            cartStoreId={cartStoreId}
+            onRefreshCart={refreshCart}
+            pickupStoreName={cartStoreName}
           />
         )
       case 'coupon':
@@ -250,6 +290,11 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onReviewWriteClick={(storeName) => {
+              setReviewStoreName(storeName)
+              setCurrentPage('reviewWrite')
+            }}
+            onPickupComplete={() => setHasActiveOrder(false)}
             cartCount={cartCount}
           />
         )
@@ -281,6 +326,9 @@ function App() {
             onFavoritesClick={goTo('favorites')}
             onLogout={() => {
               clearTokens()
+              setCartItems([])
+              setCartStoreId(null)
+              setCartStoreName(null)
               setCurrentPage('login')
             }}
             cartCount={cartCount}
@@ -326,7 +374,7 @@ function App() {
             onOrdersClick={goTo('orders')}
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
-            onStoreClick={() => openStoreById(1)}
+            onStoreClick={(storeId) => openStoreById(storeId)}
             cartCount={cartCount}
           />
         )

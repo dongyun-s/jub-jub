@@ -4,8 +4,10 @@
  * - 픽업 매장 지도, 주문접수→조리중→픽업준비→픽업완료 단계 표시, 주문 요약
  */
 
+import { useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
+import PickupRewardModal from '../../components/PickupRewardModal/PickupRewardModal'
 import { FEATURED_RESTAURANTS } from '../../constants'
 import { MapTmapCanvas } from '../map/MapPage'
 import styles from './OrderStatusPage.module.css'
@@ -18,10 +20,19 @@ interface OrderStatusPageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  /** 픽업 리워드 모달에서 리뷰 작성으로 이동 */
+  onReviewWriteClick?: (storeName: string) => void
+  /**
+   * 매장에서 픽업 완료 처리 시 — App에서 진행 주문 플래그 해제(홈·지도·주문내역 등)
+   */
+  onPickupComplete?: () => void
   cartCount?: number
 }
 
 type OrderStep = 'received' | 'cooking' | 'ready' | 'completed'
+
+/** 조리중 → 픽업준비(조리 완료) 자동 전환 대기 시간 (ms) */
+const COOKING_TO_READY_MS = 15_000
 
 /** 현재 주문 정보 (데모) — 픽업 매장 id는 FEATURED_RESTAURANTS 와 맞춤 */
 const orderData = {
@@ -33,6 +44,7 @@ const orderData = {
   storeAddress: '서울 강남구 테헤란로 123 (데모)',
   distance: '지도·경로 탭',
   estimatedTime: '에서 확인',
+  /** 진입 시 조리중 → COOKING_TO_READY_MS 후 픽업준비, 그때 픽업 완료 버튼 표시 */
   currentStep: 'cooking' as OrderStep,
 }
 
@@ -43,8 +55,56 @@ const steps: { key: OrderStep; label: string; icon: string }[] = [
   { key: 'completed', label: '픽업완료', icon: 'celebration' },
 ]
 
-function OrderStatusPage({ onBack, onGoHome, onCartClick, onOrdersClick, onMapClick, onMypageClick, onFavoritesClick: _onFavoritesClick, cartCount = 0 }: OrderStatusPageProps) {
-  const currentStepIndex = steps.findIndex((s) => s.key === orderData.currentStep)
+function OrderStatusPage({
+  onBack,
+  onGoHome,
+  onCartClick,
+  onOrdersClick,
+  onMapClick,
+  onMypageClick,
+  onFavoritesClick: _onFavoritesClick,
+  onReviewWriteClick,
+  onPickupComplete,
+  cartCount = 0,
+}: OrderStatusPageProps) {
+  const [orderStep, setOrderStep] = useState<OrderStep>(orderData.currentStep)
+  const [rewardModalOpen, setRewardModalOpen] = useState(false)
+  const [cookingSecondsLeft, setCookingSecondsLeft] = useState(
+    Math.ceil(COOKING_TO_READY_MS / 1000),
+  )
+
+  useEffect(() => {
+    if (orderStep !== 'cooking') return
+    setCookingSecondsLeft(Math.ceil(COOKING_TO_READY_MS / 1000))
+    const intervalId = window.setInterval(() => {
+      setCookingSecondsLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(intervalId)
+          setOrderStep('ready')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [orderStep])
+
+  const currentStepIndex = steps.findIndex((s) => s.key === orderStep)
+
+  const completePickup = () => {
+    setOrderStep('completed')
+    setRewardModalOpen(true)
+    onPickupComplete?.()
+  }
+
+  const handleRewardClose = () => {
+    setRewardModalOpen(false)
+  }
+
+  const handleReviewFromModal = () => {
+    setRewardModalOpen(false)
+    onReviewWriteClick?.(orderData.storeName)
+  }
 
   const pickupStore =
     FEATURED_RESTAURANTS.find((r) => r.id === orderData.storeId) ?? FEATURED_RESTAURANTS[0]
@@ -102,7 +162,9 @@ function OrderStatusPage({ onBack, onGoHome, onCartClick, onOrdersClick, onMapCl
           <div className={styles.orderSection}>
             <div className={styles.orderRow}>
               <p className={styles.orderNumber}>주문 번호: {orderData.orderNumber}</p>
-              <span className={styles.pickupBadge}>픽업 {orderData.pickupTime} 예정</span>
+              <span className={styles.pickupBadge}>
+                {orderStep === 'completed' ? '픽업 완료' : `픽업 ${orderData.pickupTime} 예정`}
+              </span>
             </div>
             <h2 className={styles.orderTitle}>{orderData.menuName}</h2>
           </div>
@@ -140,6 +202,28 @@ function OrderStatusPage({ onBack, onGoHome, onCartClick, onOrdersClick, onMapCl
                 )
               })}
             </div>
+            {orderStep === 'cooking' && (
+              <div className={styles.cookingWaitBox}>
+                <div className={styles.cookingWaitIcon}>
+                  <span className={`material-symbols-outlined ${styles.cookingWaitIconSpan}`}>skillet</span>
+                </div>
+                <p className={styles.cookingWaitTitle}>조리 중이에요</p>
+                <p className={styles.cookingWaitDesc}>조리가 끝나면 픽업완료 버튼을 눌러주세요.</p>
+                <p className={styles.cookingCountdown}>
+                  <span className="material-symbols-outlined">timer</span>
+                  픽업 준비까지 약 <strong>{cookingSecondsLeft}</strong>초
+                </p>
+              </div>
+            )}
+            {orderStep === 'ready' && (
+              <div className={styles.pickupDoneWrap}>
+                <button type="button" className={styles.pickupDoneButton} onClick={completePickup}>
+                  <span className="material-symbols-outlined">verified</span>
+                  매장에서 픽업을 완료했어요
+                </button>
+                <p className={styles.pickupDoneHint}>버튼을 눌러 리워드를 지급받으세요.</p>
+              </div>
+            )}
           </div>
 
           <div className={styles.storeSection}>
@@ -175,6 +259,13 @@ function OrderStatusPage({ onBack, onGoHome, onCartClick, onOrdersClick, onMapCl
             if (page === 'map') onMapClick?.()
             if (page === 'mypage') onMypageClick?.()
           }}
+        />
+
+        <PickupRewardModal
+          open={rewardModalOpen}
+          onClose={handleRewardClose}
+          storeName={orderData.storeName}
+          onWriteReview={onReviewWriteClick ? handleReviewFromModal : undefined}
         />
       </div>
     </Layout>

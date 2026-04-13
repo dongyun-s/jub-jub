@@ -5,12 +5,14 @@
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import {
   signup,
   verifyConfirm,
   verifySend,
   type VerificationType,
 } from '../../api/auth'
+import { ApiError } from '../../api/authClient'
 
 interface SignUpPageProps {
   onSignUp: () => void
@@ -53,7 +55,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
       setVerified(false)
       setInfo(`인증번호를 발송했습니다. (만료: ${res.expiresAt})`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '인증번호 발송에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '인증번호 발송에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -80,7 +88,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
         setError('인증번호가 올바르지 않습니다.')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '인증 확인에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '인증 확인에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -113,7 +127,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
       })
       onSignUp()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '회원가입에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '회원가입에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -137,11 +157,6 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
         <p className="mb-4 text-center text-xs text-gray-500">
           ① 인증번호 발송 → ② 인증 확인 → ③ 정보 입력 후 가입
         </p>
-        {error && (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
         {info && (
           <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{info}</p>
         )}
@@ -333,6 +348,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
           동의하는 것으로 간주됩니다.
         </p>
       </main>
+
+      <SimpleAlertModal
+        open={Boolean(error)}
+        title="회원가입"
+        message={error ?? ''}
+        onClose={() => setError(null)}
+      />
     </Layout>
   )
 }
