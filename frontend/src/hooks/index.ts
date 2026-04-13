@@ -4,3 +4,4 @@
  */
 
 export { useDragScroll } from './useDragScroll'
+export { useProfile } from './useProfile'

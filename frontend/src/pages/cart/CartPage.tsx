@@ -8,35 +8,17 @@ import { useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
+import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
 import { FEATURED_RESTAURANTS } from '../../constants'
+import {
+  addCartItem,
+  clearCart,
+  deleteCartItem,
+  type ServerCartLineUi,
+} from '../../api/cart'
+import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
+import { ApiError } from '../../api/authClient'
 import styles from './CartPage.module.css'
-
-/** 포트원(아임포트) 결제 SDK 전역 타입 */
-declare global {
-  interface Window {
-    IMP?: {
-      init: (merchantId: string) => void
-      request_pay: (
-        params: {
-          pg: string
-          pay_method: string
-          merchant_uid: string
-          name: string
-          amount: number
-          buyer_email?: string
-          buyer_name?: string
-          buyer_tel?: string
-        },
-        callback: (response: {
-          success: boolean
-          imp_uid?: string
-          merchant_uid?: string
-          error_msg?: string
-        }) => void
-      ) => void
-    }
-  }
-}
 
 interface AppliedCoupon {
   id: number
@@ -44,14 +26,7 @@ interface AppliedCoupon {
   discount: number
 }
 
-interface CartItem {
-  id: number
-  name: string
-  options: string
-  price: number
-  quantity: number
-  image?: string
-}
+type CartItem = ServerCartLineUi
 
 interface CartPageProps {
   onBack: () => void
@@ -67,17 +42,26 @@ interface CartPageProps {
   cartCount?: number
   cartItems?: CartItem[]
   onCartItemsChange?: (items: CartItem[]) => void
+  /** 로그인 후 서버 장바구니와 동기화 */
+  useApiCart?: boolean
+  cartStoreId?: number | null
+  onRefreshCart?: () => Promise<void>
+  /** GET /carts 의 storeName */
+  pickupStoreName?: string | null
 }
 
 /** App에서 장바구니를 관리하지 않을 때 사용하는 기본 데이터 (홈 카드와 통일) */
 const defaultCartItems: CartItem[] = [
   {
     id: FEATURED_RESTAURANTS[0].id,
+    menuId: FEATURED_RESTAURANTS[0].id,
     name: FEATURED_RESTAURANTS[0].title,
     options: '기본 선택 / 소스 추가',
     price: 100,
     quantity: 1,
     image: FEATURED_RESTAURANTS[0].image,
+    optionIds: [],
+    requestMemo: '',
   },
 ]
 
@@ -94,7 +78,11 @@ function CartPage({
   onFavoritesClick,
   cartCount = 0,
   cartItems: externalCartItems,
-  onCartItemsChange
+  onCartItemsChange,
+  useApiCart = false,
+  cartStoreId = null,
+  onRefreshCart,
+  pickupStoreName = null,
 }: CartPageProps) {
   const [internalCartItems, setInternalCartItems] = useState<CartItem[]>(defaultCartItems)
 
@@ -110,61 +98,196 @@ function CartPage({
   }
 
   const [isProcessing, setIsProcessing] = useState(false)
+  const [cartSyncing, setCartSyncing] = useState(false)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
 
-  // 포트원 결제 요청
+  const handleClearCart = () => {
+    if (cartItems.length === 0) return
+    if (!useApiCart || !onRefreshCart) {
+      applyCartItems(() => [])
+      return
+    }
+    setClearConfirmOpen(true)
+  }
+
+  const confirmClearCart = () => {
+    setClearConfirmOpen(false)
+    if (!useApiCart || !onRefreshCart) return
+
+    setCartSyncing(true)
+    void (async () => {
+      try {
+        await clearCart()
+        await onRefreshCart()
+      } catch (e) {
+        alert(
+          e instanceof ApiError ? e.message : '장바구니를 비우지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        )
+      } finally {
+        setCartSyncing(false)
+      }
+    })()
+  }
+
+  // PortOne V2 결제 요청
   const handlePayment = () => {
-    if (!window.IMP) {
-      alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+    if (!useApiCart || !onRefreshCart) {
+      alert('로그인 후 결제를 진행해 주세요.')
+      return
+    }
+    if (cartStoreId == null) {
+      alert('픽업 매장을 확인할 수 없습니다. 메뉴를 다시 담아주세요.')
       return
     }
 
-    // 포트원 가맹점 식별코드 (테스트용)
-    window.IMP.init('imp19424728')
+    const storeId = (import.meta.env.VITE_PORTONE_STORE_ID as string | undefined)?.trim()
+    const channelKey = (import.meta.env.VITE_PORTONE_CHANNEL_KEY as string | undefined)?.trim()
+    if (!storeId || !channelKey) {
+      alert('PortOne 설정값이 없습니다. frontend/.env에 VITE_PORTONE_STORE_ID / VITE_PORTONE_CHANNEL_KEY를 넣어주세요.')
+      return
+    }
 
     setIsProcessing(true)
 
-    const merchantUid = `order_${Date.now()}`
-    const orderName = cartItems.map(item => item.name).join(', ')
+    const orderName = cartItems.map((item) => item.name).join(', ')
 
-    window.IMP.request_pay(
-      {
-        pg: 'html5_inicis.INIpayTest', // 테스트용 PG사
-        pay_method: 'card',
-        merchant_uid: merchantUid,
-        name: orderName.length > 40 ? orderName.substring(0, 40) + '...' : orderName,
-        amount: total,
-        buyer_name: '홍길동',
-        buyer_tel: '010-1234-5678',
-        buyer_email: 'test@jubjub.com',
-      },
-      (response) => {
-        setIsProcessing(false)
+    void (async () => {
+      try {
+        const PortOne = await import(
+          /* @vite-ignore */ 'https://cdn.portone.io/v2/browser-sdk.esm.js'
+        )
 
-        if (response.success) {
-          alert(`결제가 완료되었습니다!\n주문번호: ${response.merchant_uid}`)
-          onCheckout?.()
-        } else {
-          alert(`결제에 실패했습니다.\n${response.error_msg}`)
+        // 1) 주문 생성 (서버가 장바구니 금액 검증)
+        const order = await createOrder({
+          storeId: cartStoreId,
+          totalAmount: subtotal,
+        })
+
+        // 2) 결제 준비 (merchantUid 발급/READY 레코드 생성)
+        const prepared = await preparePayment({
+          orderId: order.orderId,
+          method: 'CARD',
+        })
+
+        // 3) 결제창 호출 (V2 browser-sdk)
+        const paymentResult = await PortOne.requestPayment({
+          storeId,
+          channelKey,
+          paymentId: prepared.paymentId, // = prepared.merchantUid
+          orderName: orderName.length > 40 ? `${orderName.substring(0, 40)}...` : orderName,
+          customer: {
+            email: 'test@jubjub.com',
+            fullName: '홍길동',
+            phoneNumber: '01012345678',
+          },
+          totalAmount: prepared.requestedAmount,
+          currency: 'CURRENCY_KRW',
+          payMethod: 'CARD',
+        })
+
+        // 결제창이 닫혔거나 실패한 경우 (transactionId 없을 수 있음)
+        const txId = paymentResult?.transactionId ?? null
+        if (!txId) {
+          alert('결제가 취소되었습니다.')
+          setIsProcessing(false)
+          return
         }
+
+        // 4) 결제 확정 (PortOne 서버 조회로 재검증)
+        await confirmPayment({
+          merchantUid: prepared.merchantUid,
+          transactionId: txId,
+        })
+
+        // 5) 장바구니 비우기 + 화면 진행
+        try {
+          await clearCart()
+        } catch {
+          /* ignore */
+        }
+        await onRefreshCart()
+
+        alert(`결제가 완료되었습니다!\n주문번호: ${prepared.merchantUid}`)
+        onCheckout?.()
+        setIsProcessing(false)
+      } catch (e) {
+        setIsProcessing(false)
+        alert(
+          e instanceof ApiError
+            ? e.message
+            : '결제를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        )
       }
-    )
+    })()
   }
 
   // 수량 변경
   const updateQuantity = (id: number, delta: number) => {
+    const item = cartItems.find((i) => i.id === id)
+    if (!item) return
+    const newQty = item.quantity + delta
+    if (newQty < 1) return
+
+    if (
+      useApiCart &&
+      onRefreshCart &&
+      cartStoreId != null &&
+      item.menuId != null
+    ) {
+      setCartSyncing(true)
+      void (async () => {
+        try {
+          await deleteCartItem(id)
+          await addCartItem({
+            storeId: cartStoreId,
+            menuId: item.menuId!,
+            quantity: newQty,
+            requestMemo: item.requestMemo || '',
+            optionIds: item.optionIds ?? [],
+          })
+          await onRefreshCart()
+        } catch (e) {
+          alert(
+            e instanceof ApiError
+              ? e.message
+              : '수량을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          )
+        } finally {
+          setCartSyncing(false)
+        }
+      })()
+      return
+    }
+
     applyCartItems((items) =>
-      items.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
+      items.map((i) =>
+        i.id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i
       )
     )
   }
 
   // 아이템 삭제
   const removeItem = (id: number) => {
+    if (useApiCart && onRefreshCart) {
+      setCartSyncing(true)
+      void (async () => {
+        try {
+          await deleteCartItem(id)
+          await onRefreshCart()
+        } catch (e) {
+          alert(
+            e instanceof ApiError
+              ? e.message
+              : '삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          )
+        } finally {
+          setCartSyncing(false)
+        }
+      })()
+      return
+    }
     applyCartItems((items) => items.filter((item) => item.id !== id))
   }
 
@@ -176,6 +299,15 @@ function CartPage({
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
+        <ConfirmModal
+          open={clearConfirmOpen}
+          title="장바구니 비우기"
+          message="장바구니를 모두 비울까요?"
+          cancelLabel="취소"
+          confirmLabel="비우기"
+          onCancel={() => setClearConfirmOpen(false)}
+          onConfirm={confirmClearCart}
+        />
         <Header title="장바구니" onFavoriteClick={onFavoritesClick} />
 
         {/* 스크롤 영역 */}
@@ -188,8 +320,14 @@ function CartPage({
               </div>
               <div className={styles.pickupInfo}>
                 <p className={styles.pickupLabel}>픽업 매장</p>
-                <p className={styles.pickupName}>줍줍 강남점</p>
-                <p className={styles.pickupAddress}>서울시 강남구 테헤란로 123</p>
+                <p className={styles.pickupName}>
+                  {pickupStoreName?.trim() || '매장을 선택해 주세요'}
+                </p>
+                <p className={styles.pickupAddress}>
+                  {pickupStoreName
+                    ? '포장 픽업은 이 매장에서 진행돼요.'
+                    : '메뉴를 담으면 픽업 매장이 표시됩니다.'}
+                </p>
               </div>
               <button className={styles.pickupChevron}>
                 <span className="material-symbols-outlined">chevron_right</span>
@@ -199,7 +337,17 @@ function CartPage({
 
           {/* 주문 내역 */}
           <section className={styles.orderSection}>
-            <h2 className={styles.orderTitle}>주문 내역</h2>
+            <div className="flex items-center justify-between">
+              <h2 className={styles.orderTitle}>주문 내역</h2>
+              <button
+                type="button"
+                onClick={handleClearCart}
+                disabled={cartItems.length === 0 || cartSyncing}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                전체 비우기
+              </button>
+            </div>
             
             <div className={styles.orderList}>
               {cartItems.map((item) => (
@@ -210,6 +358,7 @@ function CartPage({
                   {/* 삭제 버튼 */}
                   <button
                     onClick={() => removeItem(item.id)}
+                    disabled={cartSyncing}
                     className={styles.orderItemRemoveBtn}
                   >
                     <span className="material-symbols-outlined text-lg">close</span>
@@ -217,7 +366,10 @@ function CartPage({
 
                   {/* 이미지 */}
                   <img
-                    src={item.image}
+                    src={
+                      item.image ??
+                      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
+                    }
                     alt={item.name}
                     className={styles.orderItemImage}
                   />
@@ -233,6 +385,7 @@ function CartPage({
                       <div className={styles.quantityControl}>
                         <button
                           onClick={() => updateQuantity(item.id, -1)}
+                          disabled={cartSyncing}
                           className={styles.quantityButton}
                         >
                           <span className="material-symbols-outlined text-lg">remove</span>
@@ -240,6 +393,7 @@ function CartPage({
                         <span className={styles.quantityValue}>{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.id, 1)}
+                          disabled={cartSyncing}
                           className={styles.quantityButton}
                         >
                           <span className="material-symbols-outlined text-lg">add</span>
@@ -357,9 +511,11 @@ function CartPage({
         <div className={styles.payBar}>
           <button
             onClick={handlePayment}
-            disabled={cartItems.length === 0 || isProcessing}
+            disabled={cartItems.length === 0 || isProcessing || cartSyncing}
             className={`${styles.payButton} ${
-              cartItems.length === 0 || isProcessing ? styles.payButtonDisabled : ''
+              cartItems.length === 0 || isProcessing || cartSyncing
+                ? styles.payButtonDisabled
+                : ''
             }`}
           >
             {isProcessing ? (

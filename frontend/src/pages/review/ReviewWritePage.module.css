@@ -354,24 +354,14 @@
   transform: scale(0.98);
 }
 
-/* AI 모달 */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-.modalBox {
+/* AI 모달 — AppModal flush + 카드 스타일 */
+.modalShell {
   background-color: #ffffff;
-  border-radius: 1rem;
-  margin: 0 1rem;
-  width: 100%;
-  max-width: 24rem;
+  border-radius: 1.25rem;
   overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(246, 49, 154, 0.1),
+    0 20px 40px -12px rgba(0, 0, 0, 0.18);
 }
 
 .modalHeader {
@@ -468,16 +458,17 @@
 .modalSubmit {
   width: 100%;
   padding: 1rem;
-  background-color: var(--color-primary);
   color: #ffffff;
   font-weight: 700;
   font-size: 1rem;
   border-radius: 9999px;
-  transition: background-color 150ms ease, transform 150ms ease;
+  background: linear-gradient(135deg, #ec4899 0%, var(--color-primary) 50%, #db2777 100%);
+  box-shadow: 0 4px 14px rgba(246, 49, 154, 0.35);
+  transition: filter 150ms ease, transform 150ms ease;
 }
 
 .modalSubmit:hover {
-  background-color: rgba(246, 49, 154, 0.9);
+  filter: brightness(1.05);
 }
 
 .modalSubmit:active {

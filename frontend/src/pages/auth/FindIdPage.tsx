@@ -5,7 +5,9 @@
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { findId } from '../../api/auth'
+import { ApiError } from '../../api/authClient'
 
 interface FindIdPageProps {
   onBack: () => void
@@ -28,7 +30,13 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
       const masked = await findId(name.trim(), phone.trim())
       setResult(masked)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '아이디 찾기에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '아이디 찾기에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -54,11 +62,6 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
           <p className="text-sm text-gray-500">가입 시 등록한 이름과 휴대폰 번호로 조회합니다.</p>
         </div>
 
-        {error && (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
         {result && (
           <div className="mb-4 rounded-lg bg-primary/5 px-4 py-3 text-center">
             <p className="text-sm text-gray-600">가입된 이메일(마스킹)</p>
@@ -85,7 +88,7 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="010-0000-0000"
+              placeholder="전화번호를 입력해 주세요"
               className="input-field"
               required
             />
@@ -115,6 +118,13 @@ function FindIdPage({ onBack, onGoToFindPassword }: FindIdPageProps) {
           </button>
         </p>
       </main>
+
+      <SimpleAlertModal
+        open={Boolean(error)}
+        title="아이디 찾기"
+        message={error ?? ''}
+        onClose={() => setError(null)}
+      />
     </Layout>
   )
 }

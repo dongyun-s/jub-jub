@@ -5,7 +5,9 @@
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { findPasswordSend, resetPassword, verifyConfirm } from '../../api/auth'
+import { ApiError } from '../../api/authClient'
 
 interface FindPasswordPageProps {
   onBack: () => void
@@ -34,7 +36,13 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
       setLogId(id)
       setStep('code')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '인증번호 발송에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '인증번호 발송에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -50,7 +58,13 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
       if (res.isVerified) setStep('newPassword')
       else setError('인증번호가 올바르지 않습니다.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '인증 확인에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '인증 확인에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -69,7 +83,13 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
       await resetPassword(email.trim(), logId, newPassword)
       setStep('done')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '비밀번호 재설정에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '비밀번호 재설정에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -99,12 +119,6 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
             {step === 'done' && '비밀번호가 변경되었습니다. 로그인해 주세요.'}
           </p>
         </div>
-
-        {error && (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
 
         {step === 'email' && (
           <form onSubmit={handleSend} className="space-y-4">
@@ -207,6 +221,13 @@ function FindPasswordPage({ onBack, onGoToFindId }: FindPasswordPageProps) {
           </button>
         </p>
       </main>
+
+      <SimpleAlertModal
+        open={Boolean(error)}
+        title="비밀번호 찾기"
+        message={error ?? ''}
+        onClose={() => setError(null)}
+      />
     </Layout>
   )
 }

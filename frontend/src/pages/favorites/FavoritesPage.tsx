@@ -4,9 +4,12 @@
  * - 찜한 매장 카드 리스트, 찜 해제, 매장 클릭 시 매장 상세로 이동
  */
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
+import { ApiError } from '../../api/authClient'
+import { fetchMyFavorites, toggleStoreFavorite, type FavoriteStoreDto } from '../../api/favorites'
 import styles from './FavoritesPage.module.css'
 
 interface FavoritesPageProps {
@@ -16,69 +19,11 @@ interface FavoritesPageProps {
   onOrdersClick?: () => void
   onMapClick?: () => void
   onMypageClick?: () => void
-  onStoreClick?: () => void
+  onStoreClick?: (storeId: number) => void
   cartCount?: number
 }
 
-interface FavoriteStore {
-  id: number
-  name: string
-  category: string
-  rating: number
-  reviewCount: number
-  distance: string
-  image: string
-  tags: string[]
-  isFavorite: boolean
-}
-
-/** 찜한 매장 목록 (데모) */
-const mockFavorites: FavoriteStore[] = [
-  {
-    id: 1,
-    name: '카페 네온 하이브',
-    category: '카페',
-    rating: 4.8,
-    reviewCount: 324,
-    distance: '350m',
-    image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=200&h=200&fit=crop',
-    tags: ['분위기 좋음', '디저트 맛집'],
-    isFavorite: true,
-  },
-  {
-    id: 2,
-    name: '스타벅스 강남점',
-    category: '카페',
-    rating: 4.5,
-    reviewCount: 1250,
-    distance: '500m',
-    image: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop',
-    tags: ['커피 맛집'],
-    isFavorite: true,
-  },
-  {
-    id: 3,
-    name: '맛있는 치킨집',
-    category: '치킨',
-    rating: 4.7,
-    reviewCount: 567,
-    distance: '1.2km',
-    image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=200&h=200&fit=crop',
-    tags: ['바삭바삭', '양많음'],
-    isFavorite: true,
-  },
-  {
-    id: 4,
-    name: '건강한 샐러드',
-    category: '샐러드',
-    rating: 4.6,
-    reviewCount: 189,
-    distance: '800m',
-    image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop',
-    tags: ['신선함', '다이어트'],
-    isFavorite: true,
-  },
-]
+type FavoriteStore = FavoriteStoreDto
 
 function FavoritesPage({ 
   onBack, 
@@ -90,23 +35,53 @@ function FavoritesPage({
   onStoreClick,
   cartCount = 0
 }: FavoritesPageProps) {
-  const [favorites, setFavorites] = useState<FavoriteStore[]>(mockFavorites)
+  const [favorites, setFavorites] = useState<FavoriteStore[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleToggleFavorite = (id: number) => {
-    setFavorites(prev => 
-      prev.map(store => 
-        store.id === id 
-          ? { ...store, isFavorite: !store.isFavorite }
-          : store
-      )
-    )
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const list = await fetchMyFavorites()
+      setFavorites(list)
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : '찜 목록을 불러오지 못했습니다.'
+      setError(msg)
+      setFavorites([])
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const activeFavorites = favorites.filter(store => store.isFavorite)
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  const handleToggleFavorite = (storeId: number) => {
+    void (async () => {
+      try {
+        await toggleStoreFavorite(storeId)
+        await refresh()
+      } catch (e) {
+        const msg =
+          e instanceof ApiError ? e.message : '찜을 변경하지 못했습니다.'
+        setError(msg)
+      }
+    })()
+  }
+
+  const activeFavorites = useMemo(() => favorites, [favorites])
 
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
+        <SimpleAlertModal
+          open={error != null}
+          title="안내"
+          message={error ?? ''}
+          onClose={() => setError(null)}
+        />
         {/* 헤더 */}
         <header className={styles.header}>
           <button
@@ -127,26 +102,28 @@ function FavoritesPage({
             </p>
           </div>
 
-          {activeFavorites.length > 0 ? (
+          {loading ? (
+            <p className="px-4 py-8 text-center text-sm text-slate-500">찜 목록을 불러오는 중…</p>
+          ) : activeFavorites.length > 0 ? (
             <div className={styles.list}>
               {activeFavorites.map((store) => (
-                <div key={store.id} className={styles.card}>
+                <div key={store.favoriteId} className={styles.card}>
                   <div className={styles.cardInner}>
-                    <button onClick={onStoreClick} className={styles.imageButton}>
+                    <button onClick={() => onStoreClick?.(store.storeId)} className={styles.imageButton}>
                       <img
-                        src={store.image}
-                        alt={store.name}
+                        src={store.storeImageUrl}
+                        alt={store.storeName}
                         className={styles.storeImage}
                       />
                     </button>
                     <div className={styles.info}>
                       <div className={styles.infoHeader}>
-                        <button onClick={onStoreClick} className={styles.nameButton}>
-                          <h3 className={styles.storeName}>{store.name}</h3>
-                          <p className={styles.category}>{store.category}</p>
+                        <button onClick={() => onStoreClick?.(store.storeId)} className={styles.nameButton}>
+                          <h3 className={styles.storeName}>{store.storeName}</h3>
+                          <p className={styles.category}>{store.categoryName}</p>
                         </button>
                         <button
-                          onClick={() => handleToggleFavorite(store.id)}
+                          onClick={() => handleToggleFavorite(store.storeId)}
                           className={styles.favButton}
                         >
                           <span className={`material-symbols-outlined ${styles.favIcon}`}>favorite</span>
@@ -160,7 +137,7 @@ function FavoritesPage({
                         </span>
                         <span className={styles.distanceWrap}>
                           <span className={`material-symbols-outlined ${styles.distanceIcon}`}>near_me</span>
-                          {store.distance}
+                          {store.distance}m
                         </span>
                       </div>
                       <div className={styles.tagsRow}>
@@ -171,7 +148,7 @@ function FavoritesPage({
                     </div>
                   </div>
                   <div className={styles.actions}>
-                    <button onClick={onStoreClick} className={styles.orderButton}>
+                    <button onClick={() => onStoreClick?.(store.storeId)} className={styles.orderButton}>
                       주문하기
                     </button>
                     <button onClick={onMapClick} className={styles.mapButton}>

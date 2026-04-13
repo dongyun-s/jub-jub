@@ -5,12 +5,14 @@
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import {
   signup,
   verifyConfirm,
   verifySend,
   type VerificationType,
 } from '../../api/auth'
+import { ApiError } from '../../api/authClient'
 
 interface SignUpPageProps {
   onSignUp: () => void
@@ -20,7 +22,6 @@ interface SignUpPageProps {
 function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [emailConfirm, setEmailConfirm] = useState('')
   const [phone, setPhone] = useState('')
   const [nickname, setNickname] = useState('')
   const [verifyCode, setVerifyCode] = useState('')
@@ -42,8 +43,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
   const handleSendCode = async () => {
     setError(null)
     setInfo(null)
-    if (!targetForSend) {
-      setError(verifyChannel === 'EMAIL' ? '이메일을 입력해 주세요.' : '휴대폰 번호를 입력해 주세요.')
+    if (verifyChannel === 'EMAIL') {
+      if (!email.trim()) {
+        setError('이메일을 입력해 주세요.')
+        return
+      }
+    } else if (!phone.trim()) {
+      setError('휴대폰 번호를 입력해 주세요.')
       return
     }
     setLoading(true)
@@ -51,9 +57,21 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
       const res = await verifySend(verifyChannel, targetForSend)
       setLogId(res.logId)
       setVerified(false)
-      setInfo(`인증번호를 발송했습니다. (만료: ${res.expiresAt})`)
+      if (verifyChannel === 'EMAIL') {
+        setInfo(
+          `입력하신 이메일로 인증번호를 보냈습니다. 메일함·스팸함을 확인해 주세요. (만료: ${res.expiresAt})`,
+        )
+      } else {
+        setInfo(`문자(SMS)로 인증번호를 보냈습니다. (만료: ${res.expiresAt})`)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '인증번호 발송에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '인증번호 발송에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -75,12 +93,26 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
       const res = await verifyConfirm(logId, verifyCode.trim())
       if (res.isVerified) {
         setVerified(true)
-        setInfo('인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.')
+        setInfo(
+          verifyChannel === 'EMAIL'
+            ? '이메일 인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.'
+            : '휴대폰 인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.',
+        )
       } else {
-        setError('인증번호가 올바르지 않습니다.')
+        setError(
+          verifyChannel === 'EMAIL'
+            ? '이메일로 받은 인증번호가 올바르지 않습니다.'
+            : '문자로 받은 인증번호가 올바르지 않습니다.',
+        )
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '인증 확인에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '인증 확인에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -91,11 +123,11 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
     setError(null)
     setInfo(null)
     if (!verified) {
-      setError('휴대폰 또는 이메일 인증을 완료해 주세요.')
-      return
-    }
-    if (email.trim() !== emailConfirm.trim()) {
-      setError('이메일과 이메일 확인이 일치하지 않습니다.')
+      setError(
+        verifyChannel === 'EMAIL'
+          ? '이메일 인증을 완료해 주세요.'
+          : '휴대폰(SMS) 인증을 완료해 주세요.',
+      )
       return
     }
     if (password !== passwordConfirm) {
@@ -113,7 +145,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
       })
       onSignUp()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '회원가입에 실패했습니다.')
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '회원가입에 실패했습니다.',
+      )
     } finally {
       setLoading(false)
     }
@@ -135,13 +173,10 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
         </div>
 
         <p className="mb-4 text-center text-xs text-gray-500">
-          ① 인증번호 발송 → ② 인증 확인 → ③ 정보 입력 후 가입
+          {verifyChannel === 'EMAIL'
+            ? '① 인증 메일 발송 → ② 메일의 인증번호 입력 → ③ 나머지 정보 입력 후 가입'
+            : '① 인증 문자 발송 → ② 문자의 인증번호 입력 → ③ 나머지 정보 입력 후 가입'}
         </p>
-        {error && (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
         {info && (
           <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{info}</p>
         )}
@@ -154,6 +189,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
                 setVerifyChannel('SMS')
                 setLogId(null)
                 setVerified(false)
+                setVerifyCode('')
               }}
               className={`flex-1 rounded-full py-2.5 text-sm font-medium transition-colors ${
                 verifyChannel === 'SMS' ? 'bg-primary/10 text-primary' : 'text-gray-500'
@@ -167,6 +203,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
                 setVerifyChannel('EMAIL')
                 setLogId(null)
                 setVerified(false)
+                setVerifyCode('')
               }}
               className={`flex-1 rounded-full py-2.5 text-sm font-medium transition-colors ${
                 verifyChannel === 'EMAIL' ? 'bg-primary/10 text-primary' : 'text-gray-500'
@@ -211,68 +248,121 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
             />
           </div>
 
-          <div>
-            <label className="input-label">이메일 확인</label>
-            <input
-              type="email"
-              value={emailConfirm}
-              onChange={(e) => setEmailConfirm(e.target.value)}
-              placeholder="이메일을 다시 입력하세요"
-              className="input-field"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="input-label">휴대폰 번호</label>
-            <div className="flex gap-2">
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="01012345678 또는 010-0000-0000"
-                className="input-field flex-1"
-                required
-              />
+          {verifyChannel === 'EMAIL' ? (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <p className="text-sm font-medium text-gray-800">이메일 인증</p>
+              <p className="text-xs leading-relaxed text-gray-600">
+                위에 입력한 이메일로 인증번호가 발송됩니다. 메일 제목·발신자를 확인하고, 도착하지 않으면 스팸함을
+                살펴보세요.
+              </p>
               <button
                 type="button"
                 onClick={handleSendCode}
                 disabled={loading}
-                className="whitespace-nowrap rounded-full bg-primary px-4 text-sm font-medium text-white"
+                className="w-full rounded-full bg-primary py-2.5 text-sm font-medium text-white"
               >
-                인증번호 전송
+                인증 메일 발송
               </button>
+              <div>
+                <label className="input-label">이메일 인증번호</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={verifyCode}
+                    onChange={(e) => setVerifyCode(e.target.value)}
+                    placeholder="메일 본문의 6자리"
+                    className="input-field flex-1"
+                    maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={loading}
+                    className="rounded-full bg-primary px-5 text-sm font-medium text-white"
+                  >
+                    확인
+                  </button>
+                </div>
+                {verified && (
+                  <p className="mt-1 text-xs text-emerald-600">✓ 이메일 인증 완료</p>
+                )}
+              </div>
             </div>
-            <p className="mt-1 text-xs text-gray-400">
-              {verifyChannel === 'SMS'
-                ? 'SMS는 위 휴대폰 번호로 발송됩니다.'
-                : '이메일 인증은 위 이메일 주소로 발송됩니다.'}
-            </p>
-          </div>
+          ) : null}
 
-          <div>
-            <label className="input-label">인증번호</label>
-            <div className="flex gap-2">
+          {verifyChannel === 'SMS' ? (
+            <>
+              <div>
+                <label className="input-label">휴대폰 번호</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="전화번호를 입력해 주세요"
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-800">휴대폰(SMS) 인증</p>
+                <p className="text-xs leading-relaxed text-gray-600">
+                  위에 입력한 번호로만 인증 문자가 발송됩니다. 수신이 안 되면 번호·차단 설정을 확인해 주세요.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={loading}
+                  className="w-full rounded-full bg-primary py-2.5 text-sm font-medium text-white"
+                >
+                  인증 문자 발송
+                </button>
+                <div>
+                  <label className="input-label">SMS 인증번호</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={verifyCode}
+                      onChange={(e) => setVerifyCode(e.target.value)}
+                      placeholder="문자 메시지의 6자리"
+                      className="input-field flex-1"
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={loading}
+                      className="rounded-full bg-primary px-5 text-sm font-medium text-white"
+                    >
+                      확인
+                    </button>
+                  </div>
+                  {verified && (
+                    <p className="mt-1 text-xs text-emerald-600">✓ 휴대폰 인증 완료</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="input-label">휴대폰 번호</label>
               <input
-                type="text"
-                value={verifyCode}
-                onChange={(e) => setVerifyCode(e.target.value)}
-                placeholder="인증번호 6자리"
-                className="input-field flex-1"
-                maxLength={6}
-                inputMode="numeric"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="전화번호를 입력해 주세요"
+                className="input-field"
+                required
               />
-              <button
-                type="button"
-                onClick={handleVerifyCode}
-                disabled={loading}
-                className="rounded-full bg-primary px-6 text-sm font-medium text-white"
-              >
-                확인
-              </button>
+              <p className="mt-1 text-xs text-gray-400">
+                이메일 인증과 별개로, 회원 정보에 등록할 연락처입니다.
+              </p>
             </div>
-            {verified && <p className="mt-1 text-xs text-emerald-600">✓ 인증 완료</p>}
-          </div>
+          )}
 
           <div>
             <label className="input-label">비밀번호</label>
@@ -333,6 +423,13 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
           동의하는 것으로 간주됩니다.
         </p>
       </main>
+
+      <SimpleAlertModal
+        open={Boolean(error)}
+        title="회원가입"
+        message={error ?? ''}
+        onClose={() => setError(null)}
+      />
     </Layout>
   )
 }

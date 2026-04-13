@@ -15,6 +15,7 @@ import { fetchStores } from '../../api/store'
 import type { FeaturedRestaurant } from '../../constants'
 import { FEATURED_RESTAURANTS, HOME_CATEGORIES } from '../../constants'
 import { mapStoreListItemToFeatured } from '../../lib/storeUi'
+import { useProfile } from '../../hooks/useProfile'
 import styles from './HomePage.module.css'
 
 interface HomePageProps {
@@ -46,8 +47,11 @@ function HomePage({
   hasActiveOrder,
   cartCount = 0,
 }: HomePageProps) {
+  const { profile } = useProfile()
   const [searchQuery, setSearchQuery] = useState('')
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
+
+  const greetingName = profile?.nickname?.trim() || profile?.name?.trim() || '회원'
 
   useEffect(() => {
     let cancelled = false
@@ -144,7 +148,7 @@ function HomePage({
                 <span className="material-symbols-outlined text-primary text-3xl">face_6</span>
               </div>
             </div>
-            <p className={styles.gradeName}>미식가 쭈쭈님</p>
+            <p className={styles.gradeName}>{greetingName}님</p>
             <div className={styles.gradeProgressBar}>
               <div className={styles.gradeProgressFill} style={{ width: '85%' }} />
             </div>
