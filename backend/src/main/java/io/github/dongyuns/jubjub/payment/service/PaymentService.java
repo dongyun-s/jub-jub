@@ -8,7 +8,6 @@ import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import io.github.dongyuns.jubjub.payment.domain.Payment;
 import io.github.dongyuns.jubjub.payment.domain.PaymentCancellation;
 import io.github.dongyuns.jubjub.payment.domain.PaymentStatus;
-import io.github.dongyuns.jubjub.payment.domain.PaymentTransaction;
 import io.github.dongyuns.jubjub.payment.dto.ConfirmPaymentRequest;
 import io.github.dongyuns.jubjub.payment.dto.PaymentResponse;
 import io.github.dongyuns.jubjub.payment.dto.PreparePaymentRequest;
@@ -22,12 +21,15 @@ import io.github.dongyuns.jubjub.payment.portone.PortOneRefundResult;
 import io.github.dongyuns.jubjub.payment.repository.OrderRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentCancellationRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
-import io.github.dongyuns.jubjub.payment.repository.PaymentTransactionRepository;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.OptimisticLockException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -40,9 +42,10 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentCancellationRepository paymentCancellationRepository;
-    private final PaymentTransactionRepository paymentTransactionRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final PortOneClient portOneClient;
+    private final EntityManager entityManager;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PreparePaymentResponse preparePayment(String accountEmail, PreparePaymentRequest request) {
@@ -68,19 +71,27 @@ public class PaymentService {
         String merchantUid = request.merchantUid();
         validateMerchantUid(merchantUid);
 
-        Payment payment = paymentRepository.findByMerchantUid(merchantUid)
+        PortOnePaymentDetails paymentDetails = portOneClient.getPayment(merchantUid);
+        Payment payment = paymentRepository.findByMerchantUidForUpdate(merchantUid)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
         validateOrderOwnership(accountEmail, payment.getOrder());
-        PortOnePaymentDetails paymentDetails = portOneClient.getPayment(merchantUid);
-        return confirmPaymentInternal(payment, request.transactionId(), paymentDetails);
+        try {
+            return confirmPaymentInternal(payment, request.transactionId(), paymentDetails);
+        } catch (ObjectOptimisticLockingFailureException | OptimisticLockException exception) {
+            return resolveAlreadyConfirmedPayment(merchantUid, request.transactionId());
+        }
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
     public PaymentResponse confirmPaymentByWebhook(String paymentId, String transactionId) {
-        Payment payment = paymentRepository.findByMerchantUid(paymentId)
-                .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
         PortOnePaymentDetails paymentDetails = portOneClient.getPayment(paymentId);
-        return confirmPaymentInternal(payment, transactionId, paymentDetails);
+        Payment payment = paymentRepository.findByMerchantUidForUpdate(paymentId)
+                .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
+        try {
+            return confirmPaymentInternal(payment, transactionId, paymentDetails);
+        } catch (ObjectOptimisticLockingFailureException | OptimisticLockException exception) {
+            return resolveAlreadyConfirmedPayment(paymentId, transactionId);
+        }
     }
 
     @Transactional
@@ -182,20 +193,15 @@ public class PaymentService {
         String resolvedTransactionId = paymentDetails.transactionId() != null ? paymentDetails.transactionId() : transactionId;
         payment.markPaid(resolvedTransactionId, paymentDetails.amount(), paidAt);
         order.markPaid(paidAt);
+        entityManager.flush();
 
-        // 같은 transactionId는 한 번만 남겨 정산/추적 시 중복 적재를 막는다.
-        if (paymentDetails.transactionId() != null && !paymentDetails.transactionId().isBlank()) {
-            paymentTransactionRepository.findByPortoneTransactionId(paymentDetails.transactionId())
-                    .orElseGet(() -> paymentTransactionRepository.save(
-                            PaymentTransaction.approved(
-                                    payment,
-                                    paymentDetails.transactionId(),
-                                    PaymentStatus.PAID.name(),
-                                    paymentDetails.amount(),
-                                    paymentDetails.rawJson()
-                            )
-                    ));
-        }
+        // 승인 원장 적재는 결제 커밋 이후에 처리해 FK/락 충돌이 결제 확정을 막지 않게 한다.
+        eventPublisher.publishEvent(new PaymentApprovedEvent(
+                payment.getId(),
+                paymentDetails.transactionId(),
+                paymentDetails.amount(),
+                paymentDetails.rawJson()
+        ));
 
         return PaymentResponse.from(payment);
     }
@@ -204,6 +210,23 @@ public class PaymentService {
         if (!approvedAmount.equals(refundAmount)) {
             throw new BusinessException("REFUND_AMOUNT_INVALID", "현재 구현은 전체 환불만 허용합니다.", HttpStatus.CONFLICT);
         }
+    }
+
+    private PaymentResponse resolveAlreadyConfirmedPayment(String merchantUid, String transactionId) {
+        Payment latestPayment = paymentRepository.findByMerchantUid(merchantUid)
+                .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
+        Order latestOrder = latestPayment.getOrder();
+
+        if (latestPayment.getStatus() == PaymentStatus.PAID && latestOrder.getStatus() == OrderStatus.PAID) {
+            if (transactionId != null
+                    && latestPayment.getPortonePaymentId() != null
+                    && !transactionId.equals(latestPayment.getPortonePaymentId())) {
+                throw new BusinessException("PAYMENT_ALREADY_CONFIRMED", "이미 다른 transactionId로 승인된 결제입니다.", HttpStatus.CONFLICT);
+            }
+            return PaymentResponse.from(latestPayment);
+        }
+
+        throw new BusinessException("PAYMENT_CONFIRM_RETRY_REQUIRED", "결제 상태가 확정되지 않았습니다. 다시 시도해 주세요.", HttpStatus.CONFLICT);
     }
 
     private static String merchantUidOf(Long orderId) {

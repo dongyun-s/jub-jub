@@ -16,6 +16,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findByMerchantUid(String merchantUid);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Payment p where p.merchantUid = :merchantUid")
+    Optional<Payment> findByMerchantUidForUpdate(@Param("merchantUid") String merchantUid);
+
     Optional<Payment> findByPortonePaymentId(String portonePaymentId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
