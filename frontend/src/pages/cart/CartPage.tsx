@@ -165,11 +165,48 @@ function CartPage({
           totalAmount: subtotal,
         })
 
+        // (DEBUG/임시) 주문내역 화면 표시용 로컬 저장 — 서버 주문내역 API 연결 전까지 사용
+        try {
+          const key = '__jubjub_local_orders'
+          const raw = window.localStorage.getItem(key)
+          const prev = raw ? (JSON.parse(raw) as unknown[]) : []
+          const storeImage =
+            FEATURED_RESTAURANTS.find((r) => r.id === cartStoreId)?.image ??
+            cartItems[0]?.image ??
+            null
+          const menuSummary =
+            cartItems.length === 0
+              ? '주문'
+              : cartItems.length === 1
+                ? cartItems[0].name
+                : `${cartItems[0].name} 외 ${cartItems.length - 1}건`
+
+          const next = [
+            {
+              orderId: order.orderId,
+              storeId: cartStoreId,
+              storeName: pickupStoreName?.trim() || `매장 #${cartStoreId}`,
+              menuSummary,
+              totalAmount: subtotal,
+              finalAmount: subtotal,
+              image: storeImage,
+              createdAt: new Date().toISOString(),
+              paymentStatus: 'CREATED',
+            },
+            ...prev,
+          ].slice(0, 50)
+          window.localStorage.setItem(key, JSON.stringify(next))
+        } catch {
+          /* ignore */
+        }
+
         // 2) 결제 준비 (merchantUid 발급/READY 레코드 생성)
         const prepared = await preparePayment({
           orderId: order.orderId,
           method: 'CARD',
         })
+
+        // (DEBUG) 결제 추적 저장은 제거(환불 기능 삭제)
 
         // 3) 결제창 호출 (V2 browser-sdk)
         const paymentResult = await PortOne.requestPayment({
@@ -187,19 +224,62 @@ function CartPage({
           payMethod: 'CARD',
         })
 
-        // 결제창이 닫혔거나 실패한 경우 (transactionId 없을 수 있음)
-        const txId = paymentResult?.transactionId ?? null
+        // (DEBUG) 결제 결과 추적: transactionId 누락 원인 파악용
+        // eslint-disable-next-line no-console
+        console.log('[PortOne] paymentResult', paymentResult)
+
+        /**
+         * 결제창이 닫혔거나 실패한 경우 transactionId 가 없을 수 있음.
+         * - 실제 결제가 성공했는데도(백엔드/webhook 기준) 브라우저에서 결과 전달이 누락되는 케이스가 있어
+         *   여기서 "취소"로 단정하지 않는다.
+         */
+        const txId = paymentResult?.transactionId ?? paymentResult?.txId ?? null
         if (!txId) {
-          alert('결제가 취소되었습니다.')
+          // PortOne이 실패 사유를 내려주는 경우
+          if (paymentResult?.code || paymentResult?.message) {
+            alert(
+              `결제에 실패했습니다.\n${paymentResult.code ? `코드: ${paymentResult.code}\n` : ''}${
+                paymentResult.message ? `메시지: ${paymentResult.message}` : ''
+              }`,
+            )
+            setIsProcessing(false)
+            return
+          }
+
+          alert('결제창이 닫혔습니다. 결제 완료 여부는 주문내역에서 확인해 주세요.')
+          onCheckout?.()
           setIsProcessing(false)
           return
         }
 
         // 4) 결제 확정 (PortOne 서버 조회로 재검증)
-        await confirmPayment({
+        const confirmed = await confirmPayment({
           merchantUid: prepared.merchantUid,
           transactionId: txId,
         })
+
+        // (DEBUG) 환불 기능 삭제로 결제 추적 저장 제거
+
+        // (DEBUG/임시) 방금 주문을 PAID로 업데이트 (로컬 주문내역)
+        try {
+          const key = '__jubjub_local_orders'
+          const raw = window.localStorage.getItem(key)
+          const prev = raw ? (JSON.parse(raw) as any[]) : []
+          const next = prev.map((o) =>
+            o?.orderId === order.orderId
+              ? {
+                  ...o,
+                  paymentStatus: confirmed.paymentStatus,
+                  paidAt: confirmed.paidAt,
+                  paymentRecordId: confirmed.paymentRecordId,
+                  transactionId: confirmed.transactionId,
+                }
+              : o,
+          )
+          window.localStorage.setItem(key, JSON.stringify(next))
+        } catch {
+          /* ignore */
+        }
 
         // 5) 장바구니 비우기 + 화면 진행
         try {

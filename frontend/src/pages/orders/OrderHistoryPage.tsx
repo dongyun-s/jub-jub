@@ -4,11 +4,13 @@
  * - 최근 주문 / 과거 주문 탭, 주문 카드(리뷰 쓰기 버튼), 검색, 하단 네비
  */
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { FEATURED_RESTAURANTS } from '../../constants'
+import { getMyOrders, type MyOrderItem } from '../../api/orders'
+import { ApiError } from '../../api/authClient'
 import styles from './OrderHistoryPage.module.css'
 
 interface OrderHistoryPageProps {
@@ -35,6 +37,19 @@ interface OrderItem {
   distance: string
   image: string
   status: 'completed' | 'reviewed'
+}
+
+type LocalOrder = {
+  orderId: number
+  storeId: number
+  storeName: string
+  menuSummary: string
+  finalAmount?: number
+  totalAmount?: number
+  image?: string | null
+  createdAt: string
+  paymentStatus?: string
+  paidAt?: string | null
 }
 
 /** 최근 주문 목록 (데모) */
@@ -102,10 +117,109 @@ const pastOrders: OrderItem[] = [
 
 function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatusClick, onMapClick, onMypageClick, onFavoritesClick, onReviewWriteClick, hasActiveOrder, cartCount = 0 }: OrderHistoryPageProps) {
   const [activeTab, setActiveTab] = useState<'recent' | 'past'>('recent')
+  const [myOrdersApi, setMyOrdersApi] = useState<MyOrderItem[]>([])
+  const [myOrdersLoading, setMyOrdersLoading] = useState(false)
+  const [myOrdersError, setMyOrdersError] = useState<string | null>(null)
+  const [localOrders, setLocalOrders] = useState<LocalOrder[]>([])
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
 
-  const orders = activeTab === 'recent' ? recentOrders : pastOrders
+  useEffect(() => {
+    setMyOrdersLoading(true)
+    setMyOrdersError(null)
+    void (async () => {
+      try {
+        const list = await getMyOrders()
+        setMyOrdersApi(Array.isArray(list) ? list : [])
+      } catch (e) {
+        setMyOrdersError(
+          e instanceof ApiError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : '주문 내역을 불러오지 못했습니다.',
+        )
+        setMyOrdersApi([])
+      } finally {
+        setMyOrdersLoading(false)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('__jubjub_local_orders')
+      const parsed = raw ? (JSON.parse(raw) as LocalOrder[]) : []
+      setLocalOrders(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      setLocalOrders([])
+    }
+  }, [])
+
+  const apiOrders: OrderItem[] = useMemo(() => {
+    const formatDate = (iso: string) => {
+      const d = new Date(iso)
+      if (Number.isNaN(d.getTime())) return iso
+      const yy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      return `${yy}.${mm}.${dd}`
+    }
+
+    return myOrdersApi.map((o) => ({
+      id: o.orderId,
+      storeName: o.storeName,
+      date: formatDate(o.orderedAt),
+      menu: o.orderNo,
+      price: o.finalAmount,
+      xp: 0,
+      distance: '',
+      image:
+        FEATURED_RESTAURANTS.find((r) => r.title === o.storeName)?.image ||
+        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
+      status: 'completed',
+    }))
+  }, [myOrdersApi])
+
+  const myOrders: OrderItem[] = useMemo(() => {
+    const formatDate = (iso: string) => {
+      const d = new Date(iso)
+      if (Number.isNaN(d.getTime())) return iso
+      const yy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      return `${yy}.${mm}.${dd}`
+    }
+
+    return localOrders.map((o) => {
+      const img =
+        o.image ||
+        FEATURED_RESTAURANTS.find((r) => r.id === o.storeId)?.image ||
+        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
+      const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
+      const paid = o.paymentStatus === 'PAID'
+      return {
+        id: o.orderId,
+        storeName: o.storeName,
+        date: formatDate(o.createdAt),
+        menu: o.menuSummary,
+        price,
+        xp: 0,
+        distance: '',
+        image: img,
+        status: paid ? 'completed' : 'completed',
+      }
+    })
+  }, [localOrders])
+
+  const orders =
+    activeTab === 'recent'
+      ? apiOrders.length
+        ? apiOrders
+        : myOrders.length
+          ? myOrders
+          : recentOrders
+      : pastOrders
 
   return (
     <Layout showBackground={false}>
@@ -134,6 +248,16 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
 
         {/* 스크롤 영역 */}
         <div className={styles.scrollArea}>
+          {activeTab === 'recent' && (myOrdersLoading || myOrdersError) && (
+            <div style={{ padding: '12px 16px' }}>
+              {myOrdersLoading && (
+                <p style={{ fontSize: 12, color: 'rgb(107 114 128)' }}>주문 내역을 불러오는 중…</p>
+              )}
+              {!myOrdersLoading && myOrdersError && (
+                <p style={{ fontSize: 12, color: 'rgb(185 28 28)' }}>{myOrdersError}</p>
+              )}
+            </div>
+          )}
           {/* 진행 중인 주문 */}
           {hasActiveOrder && (
             <div className={styles.activeOrderSection}>
