@@ -21,10 +21,14 @@ export default defineConfig(({ mode }) => {
           order: 'pre',
           handler(html: string) {
             if (!tmapKey) return html
+            if (html.includes('apis.openapi.sk.com/tmap/jsv2')) return html
             const sdkSrc = `https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=${encodeURIComponent(tmapKey)}`
-            const iamport = '<script src="https://cdn.iamport.kr/v1/iamport.js"></script>'
-            if (!html.includes(iamport)) return html
-            return html.replace(iamport, `${iamport}\n    <script src="${sdkSrc}"></script>`)
+            const tmapTag = `<script src="${sdkSrc}"></script>`
+            const moduleEntry = '<script type="module" src="/src/main.tsx"></script>'
+            if (html.includes(moduleEntry)) {
+              return html.replace(moduleEntry, `${tmapTag}\n    ${moduleEntry}`)
+            }
+            return html.replace('</body>', `    ${tmapTag}\n  </body>`)
           },
         },
       },

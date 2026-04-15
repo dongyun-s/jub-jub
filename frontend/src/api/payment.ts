@@ -41,8 +41,9 @@ export interface PreparePaymentResponse {
 }
 
 export interface ConfirmPaymentBody {
+  /** 백엔드 ConfirmPaymentRequest 기준 */
   merchantUid: string
-  transactionId?: string | null
+  transactionId: string
 }
 
 export interface PaymentResponse {
@@ -78,4 +79,3 @@ export function confirmPayment(body: ConfirmPaymentBody) {
     body: JSON.stringify(body),
   })
 }
-
