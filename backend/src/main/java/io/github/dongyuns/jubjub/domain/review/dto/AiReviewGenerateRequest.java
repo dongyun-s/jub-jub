@@ -9,4 +9,5 @@ public class AiReviewGenerateRequest {
     private Integer packagingRating;
     private Integer tasteRating;
     private Integer timeRating;
+    private String content;
 }
