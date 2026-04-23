@@ -22,6 +22,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -139,24 +140,12 @@ public class ReviewService {
     }
 
     public AiReviewGenerateResponse generateAiReview(AiReviewGenerateRequest request) {
-        String prompt = """
-                너는 음식 포장 주문 리뷰를 자연스럽게 작성하는 도우미다.
-                아래 평점을 보고 한국어 리뷰를 2~3문장으로 작성해라.
-                과장 없이 실제 사용자 후기처럼 써라.
-                각 항목의 만족도가 높으면 긍정적으로, 낮으면 아쉬운 점이 드러나게 작성해라.
-                항목:
-                - 포장 상태: %d점 / 5점
-                - 맛 평가: %d점 / 5점
-                - 정확한 시간: %d점 / 5점
-                결과는 리뷰 문장만 반환해라.
-                """.formatted(
-                safeRating(request.getPackagingRating()),
-                safeRating(request.getTasteRating()),
-                safeRating(request.getTimeRating())
-        );
+        String prompt = buildAiReviewPrompt(request);
 
         Map<String, Object> body = Map.of(
                 "model", openAiModel,
+                "temperature", 0.9,
+                "top_p", 0.95,
                 "input", prompt
         );
 
@@ -180,8 +169,61 @@ public class ReviewService {
         return new AiReviewGenerateResponse(generatedText.trim());
     }
 
+    private String buildAiReviewPrompt(AiReviewGenerateRequest request) {
+        String draftReview = request.getContent();
+        String variationGuide = pickReviewVariationGuide();
+
+        if (draftReview != null && !draftReview.isBlank()) {
+            return """
+                    너는 음식 포장 주문 리뷰를 자연스럽게 다듬는 도우미다.
+                    사용자가 직접 쓴 초안을 바탕으로 한국어 리뷰를 3~4문장으로 풍성하게 바꿔라.
+                    초안에 없는 구체적인 메뉴명, 매장명, 사실, 경험은 새로 만들지 마라.
+                    의미와 만족도는 유지하되 더 자연스럽고 실제 사용자 후기처럼 써라.
+                    이번 생성의 문체 지침: %s
+                    같은 초안이 다시 들어와도 이전과 다른 표현, 문장 순서, 어휘를 사용해라.
+                    초안:
+                    %s
+                    결과는 리뷰 문장만 반환해라.
+                    """.formatted(variationGuide, draftReview.trim());
+        }
+
+        return """
+                너는 음식 포장 주문 리뷰를 자연스럽게 작성하는 도우미다.
+                아래 평점을 보고 한국어 리뷰를 3~4문장으로 작성해라.
+                과장 없이 실제 사용자 후기처럼 써라.
+                각 항목의 만족도가 높으면 긍정적으로, 낮으면 아쉬운 점이 드러나게 작성해라.
+                이번 생성의 문체 지침: %s
+                같은 평점 조합이 다시 들어와도 이전과 다른 표현, 문장 순서, 어휘를 사용해라.
+                구체적인 메뉴명, 매장명, 이벤트, 할인, 서비스 경험은 입력에 없으면 만들지 마라.
+                항목:
+                - 포장 상태: %d점 / 5점
+                - 맛 평가: %d점 / 5점
+                - 정확한 시간: %d점 / 5점
+                결과는 리뷰 문장만 반환해라.
+                """.formatted(
+                variationGuide,
+                safeRating(request.getPackagingRating()),
+                safeRating(request.getTasteRating()),
+                safeRating(request.getTimeRating())
+        );
+    }
+
+    private String pickReviewVariationGuide() {
+        List<String> guides = List.of(
+                "담백하고 짧은 생활 후기처럼 작성한다.",
+                "만족한 점을 먼저 말하고 마지막에 재주문 의향을 자연스럽게 덧붙인다.",
+                "포장, 맛, 시간 중 가장 인상적인 항목 하나를 중심으로 작성한다.",
+                "차분한 톤으로 장점과 아쉬운 점을 균형 있게 작성한다.",
+                "친구에게 말하듯 자연스럽지만 과한 감탄사는 피한다.",
+                "첫 문장과 마지막 문장의 구조가 반복되지 않게 작성한다.",
+                "평점이 보통이면 무난했던 점과 개선되면 좋을 점을 함께 담는다."
+        );
+
+        return guides.get(ThreadLocalRandom.current().nextInt(guides.size()));
+    }
+
     private int safeRating(Integer rating) {
-        return rating == null ? 3 : rating;
+        return isValidRating(rating) ? rating : 3;
     }
 
     private Integer resolveOverallRating(
@@ -192,18 +234,26 @@ public class ReviewService {
             Integer timeRating
     ) {
         if (Boolean.TRUE.equals(aiGeneratedHelped)) {
-            if (packagingRating == null || tasteRating == null || timeRating == null) {
-                throw new IllegalArgumentException("AI 리뷰 사용 시 포장/맛/시간 별점을 모두 입력해야 합니다.");
+            if (isValidRating(overallRating)) {
+                return overallRating;
             }
 
-            return Math.toIntExact(Math.round((packagingRating + tasteRating + timeRating) / 3.0));
+            if (isValidRating(packagingRating) && isValidRating(tasteRating) && isValidRating(timeRating)) {
+                return Math.toIntExact(Math.round((packagingRating + tasteRating + timeRating) / 3.0));
+            }
+
+            throw new IllegalArgumentException("AI 리뷰 사용 시 1~5점 사이의 최종 별점 또는 포장/맛/시간 별점을 모두 입력해야 합니다.");
         }
 
-        if (overallRating == null) {
-            throw new IllegalArgumentException("일반 리뷰 작성 시 최종 별점을 입력해야 합니다.");
+        if (!isValidRating(overallRating)) {
+            throw new IllegalArgumentException("일반 리뷰 작성 시 1~5점 사이의 최종 별점을 입력해야 합니다.");
         }
 
         return overallRating;
+    }
+
+    private boolean isValidRating(Integer rating) {
+        return rating != null && rating >= 1 && rating <= 5;
     }
 
     private void validateReviewOwner(Long requestMemberProfileId, Long actualMemberProfileId) {
