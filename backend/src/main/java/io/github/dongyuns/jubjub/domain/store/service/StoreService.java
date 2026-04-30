@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.domain.store.dto.MenuResponse;
 import io.github.dongyuns.jubjub.domain.store.dto.StoreDetailResponse;
 import io.github.dongyuns.jubjub.domain.store.dto.StoreListResponse;
 import io.github.dongyuns.jubjub.domain.store.entity.Store;
+import io.github.dongyuns.jubjub.domain.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.store.repository.MenuRepository;
 import io.github.dongyuns.jubjub.domain.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,18 @@ public class StoreService {
 
     // 1. 모든 매장 목록 조회 (홈 화면)
     public List<StoreListResponse> getAllStores() {
-        return storeRepository.findAll().stream()
+        return getStoresByCategory(null, null);
+    }
+
+    public List<StoreListResponse> getStoresByCategory(Integer categoryId, String category) {
+        StoreCategory resolvedCategory = StoreCategory.resolve(categoryId, category);
+
+        List<Store> stores = resolvedCategory == null
+                ? storeRepository.findAll()
+                : storeRepository.findByCategoryIdOrderByIdAsc(resolvedCategory.getId());
+
+        return stores.stream()
+                .sorted((left, right) -> Long.compare(left.getId(), right.getId()))
                 .map(StoreListResponse::from)
                 .toList();
     }

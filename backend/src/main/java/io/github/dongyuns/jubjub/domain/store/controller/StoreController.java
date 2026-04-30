@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,8 +25,11 @@ public class StoreController {
 
     @Operation(summary = "매장 목록 조회", description = "홈 화면에 노출할 매장 리스트를 가져옵니다.")
     @GetMapping
-    public ApiResponse<List<StoreListResponse>> getAllStores() {
-        List<StoreListResponse> response = storeService.getAllStores();
+    public ApiResponse<List<StoreListResponse>> getAllStores(
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) String category
+    ) {
+        List<StoreListResponse> response = storeService.getStoresByCategory(categoryId, category);
         return ApiResponse.success(response);
     }
 
