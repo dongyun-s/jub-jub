@@ -5,6 +5,7 @@ import io.github.dongyuns.jubjub.domain.favorite.dto.FavoriteStoreResponse;
 import io.github.dongyuns.jubjub.domain.favorite.entity.StoreFavorite;
 import io.github.dongyuns.jubjub.domain.favorite.repository.StoreFavoriteRepository;
 import io.github.dongyuns.jubjub.domain.store.entity.Store;
+import io.github.dongyuns.jubjub.domain.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.store.repository.StoreRepository;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
@@ -61,21 +62,11 @@ public class StoreFavoriteService {
                 .map(fav -> {
                     Store store = fav.getStore();
 
-                    // 🌟 [수정된 부분] DB에 있는 categoryId(숫자)를 프론트엔드용 글자(String)로 변환!
-                    String categoryStr = "기타"; // 기본값
-                    if (store.getCategoryId() != null) {
-                        if (store.getCategoryId() == 1) {
-                            categoryStr = "샐러드";
-                        } else if (store.getCategoryId() == 2) {
-                            categoryStr = "버거";
-                        }
-                    }
-
                     return FavoriteStoreResponse.builder()
                             .favoriteId(fav.getId())
                             .storeId(store.getId())
                             .storeName(store.getName())
-                            .categoryName(categoryStr) // 👈 고정된 "카페/디저트" 대신 변환된 글자 넣기!
+                            .categoryName(StoreCategory.getLabelOf(store.getCategoryId()))
                             .storeImageUrl("https://via.placeholder.com/150") // 더미 이미지
                             .rating(4.5)
                             .reviewCount(120)
