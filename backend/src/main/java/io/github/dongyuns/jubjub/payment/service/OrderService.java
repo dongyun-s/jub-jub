@@ -17,9 +17,11 @@ import io.github.dongyuns.jubjub.payment.dto.OrderHistoryResponse;
 import io.github.dongyuns.jubjub.payment.dto.OrderResponse;
 import io.github.dongyuns.jubjub.payment.repository.OrderRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
+import io.github.dongyuns.jubjub.domain.reward.dto.PickupCompletedEvent;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class OrderService {
     private final MemberProfileRepository memberProfileRepository;
     private final StoreRepository storeRepository;
     private final PaymentRepository paymentRepository;
+    private final ApplicationEventPublisher eventPublisher; // 스프링 이벤트 발행기 추가
 
     @Transactional
     public OrderResponse createOrder(String accountEmail, CreateOrderRequest request) {
@@ -53,6 +56,25 @@ public class OrderService {
         String orderNo = "ORD-" + request.storeId() + "-" + LocalDateTime.now().toString().replace(":", "").replace(".", "");
         Order order = Order.ready(memberProfile, store, orderNo, request.totalAmount());
         return OrderResponse.from(orderRepository.save(order));
+    }
+
+    // 픽업 완료 처리 및 리워드 이벤트 발행
+    @Transactional
+    public void completePickup(Long orderId) {
+        // 1. 주문 조회
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException("ORDER_NOT_FOUND", "주문을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        // 2. 주문 상태를 픽업 완료로 변경 (Order 엔티티에 해당 메서드가 있다고 가정)
+        order.completePickup();
+
+        // 3. 리워드 적립 이벤트 발행
+        // 유저 이메일, 기본 경험치(100), 주문 금액의 일부나 고정 거리(예: 500m)를 계산해서 보냅니다.
+        eventPublisher.publishEvent(new PickupCompletedEvent(
+                order.getMemberProfile().getAccount().getEmail(),
+                100, // TODO: 추후 주문 금액 등에 따른 경험치 계산 로직 적용 가능
+                500  // TODO: 추후 실제 GPS 기반 거리 데이터 적용 가능
+        ));
     }
 
     @Transactional(readOnly = true)
