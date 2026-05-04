@@ -54,6 +54,7 @@ public class SecurityConfig {
 
                         // [인증(로그인/가입) 패스]
                         .requestMatchers(
+                                "/",
                                 "/api/test",
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
