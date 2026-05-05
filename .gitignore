@@ -2,6 +2,7 @@ HELP.md
 
 ### Gradle ###
 .gradle
+.gradle-home/
 build/
 backend/build/
 backend/.gradle/
