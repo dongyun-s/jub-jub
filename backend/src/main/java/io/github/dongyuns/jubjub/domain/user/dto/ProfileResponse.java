@@ -4,5 +4,6 @@ public record ProfileResponse(
         String email,
         String name,
         String phone,
-        String nickname
+        String nickname,
+        String profileImagePath
 ) {}

@@ -8,6 +8,7 @@ import io.portone.sdk.server.errors.WebhookVerificationException;
 import io.portone.sdk.server.webhook.WebhookVerifier;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,8 @@ import org.springframework.web.client.RestClientResponseException;
 @Slf4j
 @Component
 public class PortOneClientImpl implements PortOneClient {
+
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     private final RestClient restClient;
     private final String apiSecret;
@@ -244,7 +247,9 @@ public class PortOneClientImpl implements PortOneClient {
         }
         String value = candidate.asText();
         try {
-            return OffsetDateTime.parse(value).toLocalDateTime();
+            return OffsetDateTime.parse(value)
+                    .atZoneSameInstant(KOREA_ZONE)
+                    .toLocalDateTime();
         } catch (DateTimeParseException ignored) {
             try {
                 return LocalDateTime.parse(value);

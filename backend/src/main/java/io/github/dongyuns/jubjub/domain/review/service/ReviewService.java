@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 public class ReviewService {
+
+    private static final int MAX_REVIEW_IMAGE_COUNT = 5;
 
     private final ReviewRepository reviewRepository;
     private final MediaRepository mediaRepository;
@@ -47,6 +50,7 @@ public class ReviewService {
 
         validateReviewOwner(request.getMemberProfileId(), order.getMemberProfileId());
         validateStore(request.getStoreId(), order.getStoreId());
+        validateReviewImages(request.getImagePaths());
 
         Review review = Review.builder()
                 .orderId(request.getOrderId())
@@ -108,6 +112,7 @@ public class ReviewService {
                 .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다."));
 
         validateReviewOwner(request.getMemberProfileId(), review.getMemberProfileId());
+        validateReviewImages(request.getImagePaths());
 
         review.setOverallRating(resolveOverallRating(
                 request.getAiGeneratedHelped(),
@@ -282,6 +287,21 @@ public class ReviewService {
                 .toList();
 
         mediaRepository.saveAll(mediaList);
+    }
+
+    private void validateReviewImages(List<String> imagePaths) {
+        if (imagePaths == null) {
+            return;
+        }
+
+        if (imagePaths.size() > MAX_REVIEW_IMAGE_COUNT) {
+            throw new IllegalArgumentException("리뷰 사진은 최대 5장까지 등록할 수 있습니다.");
+        }
+
+        boolean hasBlankImagePath = imagePaths.stream().anyMatch(path -> !StringUtils.hasText(path));
+        if (hasBlankImagePath) {
+            throw new IllegalArgumentException("리뷰 사진 경로는 비어 있을 수 없습니다.");
+        }
     }
 
     private ReviewResponse buildReviewResponse(Review review) {
