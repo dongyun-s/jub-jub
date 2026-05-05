@@ -12,9 +12,9 @@ import java.time.LocalDate;
 
 @Entity
 @Table(
-        name = "출석_체크_내역",
+        name = "attendance",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_attendance_profile_date", columnNames = {"고객프로필번호", "출석일자"})
+                @UniqueConstraint(name = "uk_attendance_profile_date", columnNames = {"member_profile_id", "attendance_date"})
         }
 )
 @Getter
@@ -23,15 +23,14 @@ import java.time.LocalDate;
 public class Attendance extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "출석번호")
     private Long id;
 
     // ID(Long) 대신 MemberProfile 객체와 직접 관계를 맺습니다.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "고객프로필번호", nullable = false)
+    @JoinColumn(name = "member_profile_id", nullable = false)
     private MemberProfile memberProfile;
 
-    @Column(name = "출석일자", nullable = false)
+    @Column(nullable = false)
     private LocalDate attendanceDate;
 
     // BaseTimeEntity를 상속받으므로 createdAt 필드는 삭제해도 자동으로 생성됩니다.

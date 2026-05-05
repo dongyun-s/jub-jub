@@ -16,6 +16,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final RewardService rewardService;
+    private final CouponIssueService couponIssueService; // 쿠폰 발급 서비스 의존성 주입
 
     // 출석체크 핵심 로직
     @Transactional
@@ -44,5 +45,11 @@ public class AttendanceService {
                 0,
                 null // 주문/결제와 무관하므로 참조 ID는 null
         );
+
+        // 4. 7회차 출석 시 랜덤박스 쿠폰 발급 (저장된 직후이므로, 이번 출석을 포함한 총 누적 출석 횟수를 가져옵니다)
+        long totalAttendanceCount = attendanceRepository.countByMemberProfile(profile);
+        if (totalAttendanceCount > 0 && totalAttendanceCount % 7 == 0) {
+            couponIssueService.issueAttendanceRandomBox(profile.getId());
+        }
     }
 }

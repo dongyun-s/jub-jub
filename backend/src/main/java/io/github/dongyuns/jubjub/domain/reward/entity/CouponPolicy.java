@@ -7,31 +7,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "쿠폰_정책")
+@Table(name = "coupon_policy")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CouponPolicy {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "쿠폰정책번호")
     private Long id;
-
-    @Column(name = "쿠폰명")
     private String name;
-
-    @Column(name = "발급조건유형")
     private String conditionType; // DISTANCE, ECO, ATTENDANCE, WELCOME
-
-    @Column(name = "할인금액")
     private Integer discountAmount;
-
-    @Column(name = "할인율")
     private Double discountRate;
-
-    @Column(name = "최소주문금액")
     private Integer minOrderAmount;
-
-    @Column(name = "유효기간_일수")
     private Integer validDays;
 
     @Builder
