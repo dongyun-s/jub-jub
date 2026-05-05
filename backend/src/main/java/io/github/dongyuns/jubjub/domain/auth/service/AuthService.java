@@ -10,6 +10,7 @@ import io.github.dongyuns.jubjub.domain.auth.repository.VerificationLogRepositor
 import io.github.dongyuns.jubjub.domain.user.dto.ProfileResponse;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
+import io.github.dongyuns.jubjub.repository.MediaRepository;
 import io.github.dongyuns.jubjub.global.config.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class AuthService {
     private final VerificationLogRepository verificationLogRepository;
     private final AccountRepository accountRepository;
     private final MemberProfileRepository memberProfileRepository;
+    private final MediaRepository mediaRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
     private final RefreshTokenRepository refreshTokenRepository; // 🌟 장기 세션 관리를 위한 저장소
@@ -184,7 +186,10 @@ public class AuthService {
                 account.getEmail(),
                 profile.getName(),
                 profile.getPhone(),
-                profile.getNickname()
+                profile.getNickname(),
+                mediaRepository.findFirstByOwnerTypeAndOwnerId("PROFILE", profile.getId())
+                        .map(media -> media.getImagePath())
+                        .orElse(null)
         );
     }
 
