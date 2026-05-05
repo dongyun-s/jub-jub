@@ -29,6 +29,9 @@ public class MemberCoupon {
     @Column(nullable = false)
     private Boolean isUsed;
 
+    @Column(nullable = false)
+    private boolean isExpired = false; // 만료 여부 필드
+
     @CreatedDate
     private LocalDateTime issuedAt;
 
@@ -42,5 +45,9 @@ public class MemberCoupon {
         this.couponPolicyId = couponPolicyId;
         this.isUsed = false;
         this.expiredAt = expiredAt;
+    }
+
+    public void expire() {
+        this.isExpired = true;
     }
 }
