@@ -2,6 +2,7 @@ package io.github.dongyuns.jubjub.domain.user.entity;
 
 import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardTier; // 등급 Enum 임포트
+import io.github.dongyuns.jubjub.global.common.BaseTimeEntity; //  공통 시간 엔티티 임포트
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,7 +10,8 @@ import lombok.*;
 @Table(name = "member_profile")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemberProfile {
+// 🌟 추가: BaseTimeEntity를 상속받아 생성/수정 시간 자동화
+public class MemberProfile extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,9 +37,9 @@ public class MemberProfile {
     private RewardTier tier = RewardTier.BRONZE;  // 기본 등급은 브론즈
 
     private int pointBalance = 0;         // 포인트 잔액
-    private int cumulativeXp = 0;       // 누적 경험치 (픽업 주문 시마다 증가)
+    private int cumulativeXp = 0;         // 누적 경험치
     private int totalWalkingDistance = 0; // 누적 도보 거리
-    private int orderCount = 0;           // 누적 주문 횟수
+    private int orderCount = 0;           // 누적 주문(픽업) 횟수 - 원본 유지
     private boolean pushAgree = true;     // 푸시 알림 동의 여부
 
     @Builder
@@ -54,15 +56,18 @@ public class MemberProfile {
     // ==========================================
 
     /**
-     * 픽업 주문 완료 시 호출되는 메서드
-     * 경험치와 도보 거리를 누적하고, 횟수를 1 증가시킨 뒤 자동으로 등급을 갱신합니다.
+     * 픽업 뿐만 아니라 다양한 보상 이벤트에서 재사용 가능하도록 개편
+     * 경험치와 도보 거리를 누적하고, 픽업(isPickup)인 경우에만 횟수를 1 증가시킨 뒤 등급을 갱신합니다.
      */
-    public void addRewardOnPickup(int earnedXp, int walkedDistanceMeters) {
+    public void addReward(int earnedXp, int walkedDistanceMeters, boolean isPickup) {
         this.cumulativeXp += earnedXp;
         this.totalWalkingDistance += walkedDistanceMeters;
-        this.orderCount += 1; // 픽업 주문 횟수 증가
 
-        updateTier(); // 상태가 변했으므로 등급 승급 심사 진행
+        // 픽업으로 인한 보상일 때만 orderCount 증가 및 승급 심사
+        if (isPickup) {
+            this.orderCount += 1;
+            updateTier();
+        }
     }
 
     /**

@@ -73,7 +73,8 @@ public class OrderService {
         eventPublisher.publishEvent(new PickupCompletedEvent(
                 order.getMemberProfile().getAccount().getEmail(),
                 100, // TODO: 추후 주문 금액 등에 따른 경험치 계산 로직 적용 가능
-                500  // TODO: 추후 실제 GPS 기반 거리 데이터 적용 가능
+                500,  // TODO: 추후 실제 GPS 기반 거리 데이터 적용 가능
+                order.getId() // 리워드 내역 추적을 위해 주문 ID 추가
         ));
     }
 

@@ -1,16 +1,18 @@
 package io.github.dongyuns.jubjub.domain.reward.entity;
 
-import io.github.dongyuns.jubjub.domain.reward.enums.RewardType;
+import io.github.dongyuns.jubjub.domain.reward.enums.RewardType; // 획득, 사용 등
+import io.github.dongyuns.jubjub.domain.reward.enums.RewardSource; // PICKUP, ATTENDANCE 등
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
+import io.github.dongyuns.jubjub.global.common.BaseTimeEntity; // 공통 시간 엔티티 가정
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class RewardHistory {
+@EntityListeners(AuditingEntityListener.class) // 시간 자동 기록 보장
+public class RewardHistory extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,21 +22,30 @@ public class RewardHistory {
     private MemberProfile memberProfile;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private RewardType rewardType;
+    @Column(nullable = false, length = 50)
+    private RewardType rewardType; // 예: EARNED(획득), USED(사용)
 
-    private int amount; // 증감된 양 (XP 혹은 포인트)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private RewardSource rewardSource; // 🌟 추가: PICKUP, ATTENDANCE 등 사유 명시
+
+    private int earnedXp;      // 🌟 세분화: 이번에 획득한 XP
+    private int earnedDistance; // 🌟 세분화: 이번에 획득한 거리
 
     private String description;
 
-    private LocalDateTime createdAt;
+    // 🌟 추가: 관련된 주문 ID나 이벤트 ID를 기록 (추적용)
+    private Long referenceId;
 
     @Builder
-    public RewardHistory(MemberProfile memberProfile, RewardType rewardType, int amount, String description) {
+    public RewardHistory(MemberProfile memberProfile, RewardType rewardType, RewardSource rewardSource,
+                         int earnedXp, int earnedDistance, String description, Long referenceId) {
         this.memberProfile = memberProfile;
         this.rewardType = rewardType;
-        this.amount = amount;
+        this.rewardSource = rewardSource;
+        this.earnedXp = earnedXp;
+        this.earnedDistance = earnedDistance;
         this.description = description;
-        this.createdAt = LocalDateTime.now();
+        this.referenceId = referenceId;
     }
 }

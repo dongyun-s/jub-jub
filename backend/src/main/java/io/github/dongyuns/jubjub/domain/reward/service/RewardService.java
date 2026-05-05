@@ -3,7 +3,8 @@ package io.github.dongyuns.jubjub.domain.reward.service;
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
 import io.github.dongyuns.jubjub.domain.reward.dto.RewardProfileResponse;
 import io.github.dongyuns.jubjub.domain.reward.entity.RewardHistory;
-import io.github.dongyuns.jubjub.domain.reward.enums.RewardType;
+import io.github.dongyuns.jubjub.domain.reward.enums.RewardSource;
+import io.github.dongyuns.jubjub.domain.reward.enums.RewardType; // 기존 로직 존중
 import io.github.dongyuns.jubjub.domain.reward.repository.RewardHistoryRepository;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
@@ -17,35 +18,53 @@ import org.springframework.transaction.annotation.Transactional;
 public class RewardService {
 
     private final MemberProfileRepository memberProfileRepository;
-    private final RewardHistoryRepository rewardHistoryRepository; // 내역 저장을 위해 추가
+    private final RewardHistoryRepository rewardHistoryRepository;
 
+    // ==========================================
+    // 1. [조회]
+    // ==========================================
     @Transactional(readOnly = true)
     public RewardProfileResponse getMyRewardProfile(String accountEmail) {
-        // 기존에 팀원들이 만들어둔 MemberProfileRepository를 활용하여 회원 정보를 찾습니다.
         MemberProfile profile = memberProfileRepository.findByAccountEmail(accountEmail)
                 .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         return RewardProfileResponse.from(profile);
     }
 
+    // ==========================================
+    // 2. [범용 적립] 모든 보상(픽업, 출석 등)을 처리하는 핵심 로직
+    // ==========================================
     @Transactional
-    public void givePickupReward(String email, int xp, int distance) {
-        // 1. 회원 프로필 조회
-        MemberProfile profile = memberProfileRepository.findByAccountEmail(email)
-                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+    public void earnReward(MemberProfile profile, RewardSource source, int xp, int distance, Long referenceId) {
 
-        // 2. 엔티티 내부 비즈니스 로직 호출 (경험치/거리 추가 및 등급 갱신)
-        profile.addRewardOnPickup(xp, distance);
+        // 1) 프로필 수치 업데이트 (픽업일 경우에만 횟수 증가 및 승급 심사)
+        boolean isPickup = (source == RewardSource.EARN_PICKUP);
+        profile.addReward(xp, distance, isPickup);
 
-        // 3. 적립 내역(History) 저장
-        // RewardHistory 엔티티에 Builder가 구현되어 있다고 가정합니다.
+        // 2) 최신화된 RewardHistory 엔티티 구조에 맞춰 적립 내역 저장
         RewardHistory history = RewardHistory.builder()
                 .memberProfile(profile)
-                .rewardType(RewardType.EARN_PICKUP) // 픽업 보상 타입
-                .amount(xp)
-                .description(String.format("픽업 완료 보상 (이동 거리: %dm)", distance))
+                .rewardType(RewardType.EARNED) // 적립 고정
+                .rewardSource(source)
+                .earnedXp(xp)
+                .earnedDistance(distance)
+                .referenceId(referenceId)
+                // description은 엔티티 내부에서 source.getDescription()으로 자동 처리됨
                 .build();
 
         rewardHistoryRepository.save(history);
+    }
+
+    // ==========================================
+    // 3. [픽업 전용 적립]
+    // ==========================================
+    @Transactional
+    public void givePickupReward(String email, int xp, int distance, Long orderId) {
+        // 1) 회원 프로필 조회
+        MemberProfile profile = memberProfileRepository.findByAccountEmail(email)
+                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        // 2) 범용 메서드를 호출하여 로직 중복 제거 및 깔끔하게 처리!
+        earnReward(profile, RewardSource.EARN_PICKUP, xp, distance, orderId);
     }
 }

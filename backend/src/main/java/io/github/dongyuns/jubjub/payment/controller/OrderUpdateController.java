@@ -1,12 +1,12 @@
 package io.github.dongyuns.jubjub.payment.controller;
 
-import io.swagger.v3.oas.annotations.Hidden;
+// import io.swagger.v3.oas.annotations.Hidden;
 import io.github.dongyuns.jubjub.payment.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@Hidden // 프론트엔드 팀이 보는 Swagger 문서에서 이 테스트 API를 숨깁니다.
+// @Hidden // 프론트엔드 팀이 보는 Swagger 문서에서 이 테스트 API를 숨깁니다.
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
