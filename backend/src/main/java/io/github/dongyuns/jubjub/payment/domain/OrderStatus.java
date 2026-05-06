@@ -5,6 +5,5 @@ public enum OrderStatus {
     PAID,
     COMPLETED,
     FAILED,
-    REFUNDED,
-    PICKUP_COMPLETED;
+    REFUNDED;
 }

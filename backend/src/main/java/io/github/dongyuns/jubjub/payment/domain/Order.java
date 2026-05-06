@@ -83,20 +83,6 @@ public class Order extends BaseTimeEntity {
         this.status = OrderStatus.PAID;
         this.paidAt = paidAt;
     }
-
-    /**
-     * 픽업 완료 처리 메서드
-     * 주문의 상태를 변경하고 완료 시간을 기록합니다.
-     */
-    public void completePickup() {
-        // 1. 상태 변경 (OrderStatus Enum에 PICKUP_COMPLETED가 정의되어 있어야 합니다)
-        // 팀원분이 만드신 Enum 명칭을 확인해 보세요! (예: PICKUP_DONE, COMPLETED 등)
-        this.status = OrderStatus.PICKUP_COMPLETED;
-
-        // 2. 완료 시간 기록 (필드가 있다면 추가)
-        // this.completedAt = LocalDateTime.now();
-    }
-
     public void markRefunded() {
         this.status = OrderStatus.REFUNDED;
     }

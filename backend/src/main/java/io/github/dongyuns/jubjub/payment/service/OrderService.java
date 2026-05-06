@@ -17,11 +17,11 @@ import io.github.dongyuns.jubjub.payment.dto.OrderHistoryResponse;
 import io.github.dongyuns.jubjub.payment.dto.OrderResponse;
 import io.github.dongyuns.jubjub.payment.repository.OrderRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
-import io.github.dongyuns.jubjub.domain.reward.dto.PickupCompletedEvent;
+//import io.github.dongyuns.jubjub.domain.reward.dto.PickupCompletedEvent;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
+//import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +36,7 @@ public class OrderService {
     private final MemberProfileRepository memberProfileRepository;
     private final StoreRepository storeRepository;
     private final PaymentRepository paymentRepository;
-    private final ApplicationEventPublisher eventPublisher; // 스프링 이벤트 발행기 추가
+    //private final ApplicationEventPublisher eventPublisher; // 스프링 이벤트 발행기 추가
 
     @Transactional
     public OrderResponse createOrder(String accountEmail, CreateOrderRequest request) {
@@ -58,6 +58,7 @@ public class OrderService {
         return OrderResponse.from(orderRepository.save(order));
     }
 
+    /*
     // 픽업 완료 처리 및 리워드 이벤트 발행
     @Transactional
     public void completePickup(Long orderId) {
@@ -77,7 +78,7 @@ public class OrderService {
                 order.getId() // 리워드 내역 추적을 위해 주문 ID 추가
         ));
     }
-
+    */
     @Transactional(readOnly = true)
     public List<OrderHistoryResponse> getMyOrders(String accountEmail) {
         if (accountEmail == null || accountEmail.isBlank()) {
