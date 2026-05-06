@@ -1,14 +1,19 @@
 package io.github.dongyuns.jubjub.domain.reward.service;
 
+import io.github.dongyuns.jubjub.common.exception.BusinessException;
+import io.github.dongyuns.jubjub.domain.reward.dto.AttendanceHistoryResponse;
 import io.github.dongyuns.jubjub.domain.reward.entity.Attendance;
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardSource;
 import io.github.dongyuns.jubjub.domain.reward.repository.AttendanceRepository;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
+import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -16,9 +21,14 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final RewardService rewardService;
-    private final CouponIssueService couponIssueService; // 쿠폰 발급 서비스 의존성 주입
+    private final CouponIssueService couponIssueService;
 
-    // 출석체크 핵심 로직
+    // 유저 정보 조회를 위해 레포지토리 의존성 주입
+    private final MemberProfileRepository memberProfileRepository;
+
+    // ==========================================
+    // 1. 출석체크 핵심 로직
+    // ==========================================
     @Transactional
     public void checkIn(MemberProfile profile) {
         LocalDate today = LocalDate.now();
@@ -51,5 +61,34 @@ public class AttendanceService {
         if (totalAttendanceCount > 0 && totalAttendanceCount % 7 == 0) {
             couponIssueService.issueAttendanceRandomBox(profile.getId());
         }
+    }
+
+    // ==========================================
+    // 2. 달력용 출석 내역 데이터 조회
+    // ==========================================
+    @Transactional(readOnly = true)
+    public AttendanceHistoryResponse getMyAttendanceHistory(String accountEmail, int year, int month) {
+        // 1. 유저 조회
+        MemberProfile profile = memberProfileRepository.findByAccountEmail(accountEmail)
+                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        // 2. 조회할 해당 월의 시작일(1일)과 종료일(말일) 계산
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+
+        // 3. DB에서 기간 내 출석 내역 싹 다 가져오기
+        List<Attendance> attendances = attendanceRepository
+                .findAllByMemberProfileIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(profile.getId(), startDate, endDate);
+
+        // 4. 엔티티 리스트에서 '날짜(LocalDate)'만 쏙쏙 뽑아내기
+        List<LocalDate> attendedDates = attendances.stream()
+                .map(Attendance::getAttendanceDate)
+                .toList();
+
+        // 5. 예쁜 상자(DTO)에 담아서 반환
+        return AttendanceHistoryResponse.builder()
+                .totalAttendanceCount(attendedDates.size())
+                .attendedDates(attendedDates)
+                .build();
     }
 }

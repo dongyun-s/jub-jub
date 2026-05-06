@@ -1,6 +1,7 @@
 package io.github.dongyuns.jubjub.domain.reward.controller;
 
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
+import io.github.dongyuns.jubjub.domain.reward.dto.AttendanceHistoryResponse;
 import io.github.dongyuns.jubjub.domain.reward.dto.DiscountCalculateRequest;
 import io.github.dongyuns.jubjub.domain.reward.dto.DiscountCalculateResponse;
 import io.github.dongyuns.jubjub.domain.reward.dto.MemberCouponResponse;
@@ -17,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 import java.util.List;
 
 @Tag(name = "리워드 API", description = "사용자의 등급, 경험치, 출석체크 등을 관리하는 API")
@@ -89,6 +92,27 @@ public class RewardController {
         String accountEmail = authentication.getName();
 
         DiscountCalculateResponse response = discountCalculatorService.calculateDiscount(accountEmail, request);
+        return ResponseEntity.ok(response);
+    }
+
+    // ==========================================
+    // 5. 달력용 출석 내역 조회 API
+    // ==========================================
+    @Operation(summary = "월별 출석 달력 조회", description = "특정 연/월의 출석 날짜 목록을 반환합니다. (파라미터 생략 시 이번 달 기준)")
+    @GetMapping("/attendance/history")
+    public ResponseEntity<AttendanceHistoryResponse> getAttendanceHistory(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+
+        String accountEmail = authentication.getName();
+
+        // 파라미터가 없으면 자동으로 현재 시간 기준으로 세팅
+        LocalDate now = LocalDate.now();
+        int targetYear = (year != null) ? year : now.getYear();
+        int targetMonth = (month != null) ? month : now.getMonthValue();
+
+        AttendanceHistoryResponse response = attendanceService.getMyAttendanceHistory(accountEmail, targetYear, targetMonth);
         return ResponseEntity.ok(response);
     }
 }
