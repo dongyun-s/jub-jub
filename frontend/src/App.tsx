@@ -31,13 +31,15 @@ import {
   MyReviewsPage,
   ReviewWritePage,
   FavoritesPage,
+  NotificationsPage,
 } from './pages'
 import { FEATURED_RESTAURANTS } from './constants'
 import { clearTokens, getAccessToken } from './lib/authStorage'
 import { fetchMyCart, mapCartListToUiLines, type ServerCartLineUi } from './api/cart'
+import type { ReviewWritePayload } from './api/reviews'
 
 /** 앱에서 사용하는 모든 페이지 식별자 */
-type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites'
+type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites' | 'notifications'
 
 /** 장바구니에 적용된 쿠폰 정보 */
 interface AppliedCoupon {
@@ -79,8 +81,8 @@ function App() {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   /** 진행 중인 주문이 있는지 (지도/주문현황 연동) */
   const [hasActiveOrder, setHasActiveOrder] = useState(() => launch.activeOrder)
-  /** 리뷰 작성 페이지로 넘길 매장명 (주문내역 → 리뷰쓰기) */
-  const [reviewStoreName, setReviewStoreName] = useState('')
+  /** 리뷰 작성 페이지로 넘길 주문·매장 정보 */
+  const [reviewWriteTarget, setReviewWriteTarget] = useState<ReviewWritePayload | null>(null)
   /** 장바구니 상품 목록 (로그인 시 GET /api/v1/carts) */
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [cartStoreId, setCartStoreId] = useState<number | null>(null)
@@ -165,6 +167,7 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onNotificationsClick={goTo('notifications')}
             onStoreSelect={openStoreById}
             hasActiveOrder={hasActiveOrder}
             cartCount={cartCount}
@@ -181,6 +184,7 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onNotificationsClick={goTo('notifications')}
             cartCount={cartCount}
           />
         )
@@ -199,6 +203,7 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onNotificationsClick={goTo('notifications')}
             cartCount={cartCount}
             cartTotalPrice={cartTotalPrice}
           />
@@ -235,6 +240,7 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onNotificationsClick={goTo('notifications')}
             cartCount={cartCount}
             cartItems={cartItems}
             onCartItemsChange={(lines) => setCartItems(lines)}
@@ -272,8 +278,9 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
-            onReviewWriteClick={(storeName) => {
-              setReviewStoreName(storeName)
+            onNotificationsClick={goTo('notifications')}
+            onReviewWriteClick={(payload) => {
+              setReviewWriteTarget(payload)
               setCurrentPage('reviewWrite')
             }}
             hasActiveOrder={hasActiveOrder}
@@ -290,8 +297,9 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
-            onReviewWriteClick={(storeName) => {
-              setReviewStoreName(storeName)
+            onNotificationsClick={goTo('notifications')}
+            onReviewWriteClick={(payload) => {
+              setReviewWriteTarget(payload)
               setCurrentPage('reviewWrite')
             }}
             onPickupComplete={() => setHasActiveOrder(false)}
@@ -310,6 +318,7 @@ function App() {
             onStoreClick={() => openStoreById(FEATURED_RESTAURANTS[0].id)}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
+            onNotificationsClick={goTo('notifications')}
             hasActiveOrder={hasActiveOrder}
             cartCount={cartCount}
           />
@@ -324,6 +333,7 @@ function App() {
             onMapClick={goTo('map')}
             onReviewsClick={goTo('myReviews')}
             onFavoritesClick={goTo('favorites')}
+            onNotificationsClick={goTo('notifications')}
             onLogout={() => {
               clearTokens()
               setCartItems([])
@@ -338,6 +348,7 @@ function App() {
         return (
           <MyReviewsPage 
             onBack={goTo('mypage')}
+            onWriteReview={goTo('orders')}
             onGoHome={goTo('home')}
             onCartClick={goTo('cart')}
             onOrdersClick={goTo('orders')}
@@ -349,8 +360,17 @@ function App() {
       case 'reviewWrite':
         return (
           <ReviewWritePage 
-            storeName={reviewStoreName}
-            onBack={goTo('orders')}
+            storeName={reviewWriteTarget?.storeName ?? ''}
+            orderId={reviewWriteTarget?.orderId ?? 0}
+            storeId={reviewWriteTarget?.storeId ?? 0}
+            onBack={() => {
+              setReviewWriteTarget(null)
+              goTo('orders')()
+            }}
+            onSubmitted={() => {
+              setReviewWriteTarget(null)
+              setCurrentPage('orders')
+            }}
             onGoHome={goTo('home')}
             onCartClick={goTo('cart')}
             onOrdersClick={goTo('orders')}
@@ -375,6 +395,24 @@ function App() {
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onStoreClick={(storeId) => openStoreById(storeId)}
+            cartCount={cartCount}
+          />
+        )
+      case 'notifications':
+        return (
+          <NotificationsPage
+            onBack={() => {
+              if (lastPage) {
+                setCurrentPage(lastPage)
+              } else {
+                setCurrentPage('home')
+              }
+            }}
+            onGoHome={goTo('home')}
+            onCartClick={goTo('cart')}
+            onOrdersClick={goTo('orders')}
+            onMapClick={goTo('map')}
+            onMypageClick={goTo('mypage')}
             cartCount={cartCount}
           />
         )

@@ -10,6 +10,7 @@ import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { fetchStoreDetail } from '../../api/store'
 import type { StoreDetailDto } from '../../api/store'
+import { fetchStoreReviews, type ReviewDto } from '../../api/reviews'
 import { ApiError } from '../../api/authClient'
 import { toggleStoreFavorite } from '../../api/favorites'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
@@ -34,6 +35,7 @@ interface StoreDetailPageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   cartCount?: number
   /** 장바구니 합계 금액 (API 또는 로컬 합산) */
   cartTotalPrice?: number
@@ -105,6 +107,7 @@ function StoreDetailPage({
   onMapClick,
   onMypageClick,
   onFavoritesClick: _onFavoritesClick,
+  onNotificationsClick,
   cartCount = 0,
   cartTotalPrice = 0,
 }: StoreDetailPageProps) {
@@ -119,9 +122,36 @@ function StoreDetailPage({
   const [isFavorite, setIsFavorite] = useState(false)
   const [favError, setFavError] = useState<string | null>(null)
 
+  const [storeReviews, setStoreReviews] = useState<ReviewDto[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
+
   const categoryScrollRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (activeTab !== 'review') return
+    let cancelled = false
+    setReviewsLoading(true)
+    setReviewsError(null)
+    void fetchStoreReviews(storeId)
+      .then((list) => {
+        if (!cancelled) setStoreReviews(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStoreReviews([])
+          setReviewsError('리뷰를 불러오지 못했습니다.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, storeId])
 
   useEffect(() => {
     let cancelled = false
@@ -175,6 +205,28 @@ function StoreDetailPage({
   ] as const
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
+
+  const reviewStats = useMemo(() => {
+    const list = storeReviews
+    if (!list.length) {
+      return {
+        avg: 0,
+        count: 0,
+        bars: [5, 4, 3, 2, 1].map((score) => ({ score, pct: 0 })),
+      }
+    }
+    const tastes = list.map((r) => r.tasteRating ?? r.overallRating)
+    const avg = tastes.reduce((a, b) => a + b, 0) / tastes.length
+    const counts = [5, 4, 3, 2, 1].map((score) =>
+      list.filter((r) => (r.tasteRating ?? r.overallRating) === score).length,
+    )
+    const max = Math.max(1, ...counts)
+    const bars = [5, 4, 3, 2, 1].map((score, idx) => ({
+      score,
+      pct: Math.round((counts[idx] / max) * 100),
+    }))
+    return { avg, count: list.length, bars }
+  }, [storeReviews])
 
   // 카테고리 선택 시 해당 섹션으로 스크롤
   const handleCategoryClick = useCallback((categoryId: string, index: number) => {
@@ -335,6 +387,13 @@ function StoreDetailPage({
                 >
                   favorite
                 </span>
+              </button>
+              <button
+                type="button"
+                className={styles.headerIconButton}
+                onClick={() => onNotificationsClick?.()}
+              >
+                <span className="material-symbols-outlined">notifications</span>
               </button>
             </div>
           }
@@ -531,92 +590,104 @@ function StoreDetailPage({
 
           {activeTab === 'review' && (
             <div className={styles.reviewTab}>
-              <div className={styles.reviewSummary}>
-                <div className={styles.reviewSummaryLeft}>
-                  <div className={styles.reviewScore}>4.8</div>
-                  <div className={styles.reviewStars}>
-                    <span className="material-symbols-outlined">star</span>
-                    <span className="material-symbols-outlined">star</span>
-                    <span className="material-symbols-outlined">star</span>
-                    <span className="material-symbols-outlined">star</span>
-                    <span className="material-symbols-outlined">star_half</span>
-                  </div>
-                  <p className={styles.reviewCountText}>500+개의 리뷰</p>
-                </div>
-                <div className={styles.reviewBars}>
-                  {[5, 4, 3, 2, 1].map((score) => (
-                    <div key={score} className={styles.reviewBarRow}>
-                      <span className={styles.reviewBarLabel}>{score}점</span>
-                      <div className={styles.reviewBarTrack}>
-                        <div
-                          className={styles.reviewBarFill}
-                          style={{ width: score === 5 ? '70%' : score === 4 ? '20%' : score === 3 ? '7%' : '3%' }}
-                        />
+              {reviewsLoading ? (
+                <p className="px-4 py-6 text-center text-sm text-slate-500">리뷰를 불러오는 중…</p>
+              ) : reviewsError ? (
+                <p className="px-4 py-6 text-center text-sm text-red-600">{reviewsError}</p>
+              ) : (
+                <>
+                  <div className={styles.reviewSummary}>
+                    <div className={styles.reviewSummaryLeft}>
+                      <div className={styles.reviewScore}>
+                        {reviewStats.count ? reviewStats.avg.toFixed(1) : '—'}
                       </div>
+                      <div className={styles.reviewStars}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            className="material-symbols-outlined"
+                            style={{
+                              fontVariationSettings: "'FILL' 1",
+                              opacity: reviewStats.count && star <= Math.round(reviewStats.avg) ? 1 : 0.25,
+                            }}
+                          >
+                            star
+                          </span>
+                        ))}
+                      </div>
+                      <p className={styles.reviewCountText}>
+                        {reviewStats.count ? `${reviewStats.count}개의 리뷰` : '아직 리뷰가 없습니다'}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.reviewList}>
-                <div className={styles.reviewItem}>
-                  <div className={styles.reviewItemHeader}>
-                    <div>
-                      <p className={styles.reviewUser}>전설의 미식가</p>
-                      <p className={styles.reviewMeta}>음식 5.0 · 포장 5.0 · 픽업 4.5 · 2026.03.10</p>
-                    </div>
-                    <div className={styles.reviewItemStars}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span
-                          key={star}
-                          className={`material-symbols-outlined ${styles.reviewItemStarIcon} ${
-                            star <= 5 ? styles.reviewItemStarOn : styles.reviewItemStarOff
-                          }`}
-                        >
-                          star
-                        </span>
+                    <div className={styles.reviewBars}>
+                      {reviewStats.bars.map(({ score, pct }) => (
+                        <div key={score} className={styles.reviewBarRow}>
+                          <span className={styles.reviewBarLabel}>{score}점</span>
+                          <div className={styles.reviewBarTrack}>
+                            <div className={styles.reviewBarFill} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
-                  <p className={styles.reviewText}>
-                    포장인데도 샐러드가 전혀 눅눅하지 않고 식감이 살아있어요. 재료도 신선하고 소스도 너무 짜지 않아서
-                    자주 시키게 되는 곳이에요.
-                  </p>
-                  <div className={styles.reviewTagRow}>
-                    <span className={styles.reviewTag}>재료가 신선해요</span>
-                    <span className={styles.reviewTag}>포장이 깔끔해요</span>
-                  </div>
-                </div>
 
-                <div className={styles.reviewItem}>
-                  <div className={styles.reviewItemHeader}>
-                    <div>
-                      <p className={styles.reviewUser}>샐러드성애자</p>
-                      <p className={styles.reviewMeta}>음식 4.5 · 포장 4.0 · 픽업 4.5 · 2026.03.08</p>
-                    </div>
-                    <div className={styles.reviewItemStars}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span
-                          key={star}
-                          className={`material-symbols-outlined ${styles.reviewItemStarIcon} ${
-                            star <= 4 ? styles.reviewItemStarOn : styles.reviewItemStarOff
-                          }`}
-                        >
-                          star
-                        </span>
-                      ))}
-                    </div>
+                  <div className={styles.reviewList}>
+                    {storeReviews.map((rev) => {
+                      const t = rev.tasteRating ?? rev.overallRating
+                      const p = rev.packagingRating ?? rev.overallRating
+                      const tm = rev.timeRating ?? rev.overallRating
+                      const dt =
+                        rev.createdAt != null
+                          ? (() => {
+                              const d = new Date(rev.createdAt)
+                              return Number.isNaN(d.getTime())
+                                ? String(rev.createdAt).slice(0, 10)
+                                : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+                            })()
+                          : ''
+                      const imgs = rev.imagePaths ?? []
+                      return (
+                        <div key={rev.reviewId} className={styles.reviewItem}>
+                          <div className={styles.reviewItemHeader}>
+                            <div>
+                              <p className={styles.reviewUser}>회원 리뷰</p>
+                              <p className={styles.reviewMeta}>
+                                음식 {Number(t).toFixed(1)} · 포장 {Number(p).toFixed(1)} · 픽업 {Number(tm).toFixed(1)}
+                                {dt ? ` · ${dt}` : ''}
+                              </p>
+                            </div>
+                            <div className={styles.reviewItemStars}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <span
+                                  key={star}
+                                  className={`material-symbols-outlined ${styles.reviewItemStarIcon} ${
+                                    star <= rev.overallRating ? styles.reviewItemStarOn : styles.reviewItemStarOff
+                                  }`}
+                                >
+                                  star
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <p className={styles.reviewText}>{rev.content}</p>
+                          {imgs.length > 0 && (
+                            <div className={styles.reviewTagRow}>
+                              {imgs.map((src, i) => (
+                                <img
+                                  key={i}
+                                  src={src.startsWith('http') ? src : src}
+                                  alt=""
+                                  className="h-16 w-16 rounded-lg object-cover"
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                  <p className={styles.reviewText}>
-                    양이 생각보다 많아서 한 끼 든든하게 먹을 수 있어요. 소스 선택지가 더 많으면 좋을 것 같지만,
-                    기본 소스도 충분히 맛있습니다.
-                  </p>
-                  <div className={styles.reviewTagRow}>
-                    <span className={styles.reviewTag}>양이 많아요</span>
-                    <span className={styles.reviewTag}>가성비 좋아요</span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
 

@@ -34,6 +34,9 @@ export interface ProfileMe {
   name: string
   phone: string
   nickname: string
+  profileImagePath?: string | null
+  /** GET /api/v1/auth/me — 리뷰 API 등에서 사용 */
+  memberProfileId?: number | null
 }
 
 export interface TokenReissueResult {

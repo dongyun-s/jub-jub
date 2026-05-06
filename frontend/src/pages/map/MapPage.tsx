@@ -34,6 +34,7 @@ interface MapPageProps {
   onStoreClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   /** true면 픽업 경로 뷰, false면 주변 매장 리스트 */
   hasActiveOrder?: boolean
   cartCount?: number
@@ -606,6 +607,7 @@ function MapPage({
   onStoreClick,
   onMypageClick,
   onFavoritesClick,
+  onNotificationsClick,
   hasActiveOrder,
   cartCount = 0,
 }: MapPageProps) {
@@ -1002,7 +1004,11 @@ function MapPage({
       <div className={styles.root}>
         {hasActiveOrder ? (
           <>
-            <Header title="픽업 경로 안내" onFavoriteClick={onFavoritesClick} />
+            <Header
+              title="픽업 경로 안내"
+              onFavoriteClick={onFavoritesClick}
+              onNotificationsClick={onNotificationsClick}
+            />
 
             <div className={styles.transportRow}>
               <button
@@ -1166,7 +1172,11 @@ function MapPage({
           </>
         ) : (
           <>
-            <Header title="주변 매장" onFavoriteClick={onFavoritesClick} />
+            <Header
+              title="주변 매장"
+              onFavoriteClick={onFavoritesClick}
+              onNotificationsClick={onNotificationsClick}
+            />
 
             <div className={styles.searchBarWrap}>
               <div className={styles.searchBar}>

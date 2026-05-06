@@ -10,6 +10,7 @@ import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { FEATURED_RESTAURANTS } from '../../constants'
 import { getMyOrders, type MyOrderItem } from '../../api/orders'
+import type { ReviewWritePayload } from '../../api/reviews'
 import { ApiError } from '../../api/authClient'
 import styles from './OrderHistoryPage.module.css'
 
@@ -21,14 +22,16 @@ interface OrderHistoryPageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
-  /** 리뷰 쓰기 클릭 시 매장명 전달 후 리뷰 작성 페이지로 이동 */
-  onReviewWriteClick?: (storeName: string) => void
+  onNotificationsClick?: () => void
+  /** 리뷰 쓰기 클릭 시 주문·매장 정보 전달 후 리뷰 작성 페이지로 이동 */
+  onReviewWriteClick?: (payload: ReviewWritePayload) => void
   hasActiveOrder?: boolean
   cartCount?: number
 }
 
 interface OrderItem {
   id: number
+  storeId: number
   storeName: string
   date: string
   menu: string
@@ -37,6 +40,16 @@ interface OrderItem {
   distance: string
   image: string
   status: 'completed' | 'reviewed'
+}
+
+/** 매장명만 알 때 서버 storeId 추정 (데모·구버전 주문 API 호환) */
+function resolveStoreIdFromFeatured(storeName: string): number {
+  const hit = FEATURED_RESTAURANTS.find(
+    (r) =>
+      storeName.includes(r.title) ||
+      r.title.includes(storeName.trim().slice(0, Math.min(6, storeName.trim().length)))
+  )
+  return hit?.id ?? FEATURED_RESTAURANTS[0].id
 }
 
 type LocalOrder = {
@@ -56,6 +69,7 @@ type LocalOrder = {
 const recentOrders: OrderItem[] = [
   {
     id: 1,
+    storeId: resolveStoreIdFromFeatured('스타벅스 강남점'),
     storeName: '스타벅스 강남점',
     date: '2023.10.25',
     menu: '아이스 아메리카노 외 1건',
@@ -67,6 +81,7 @@ const recentOrders: OrderItem[] = [
   },
   {
     id: 2,
+    storeId: resolveStoreIdFromFeatured('도미노피자 역삼점'),
     storeName: '도미노피자 역삼점',
     date: '2023.10.22',
     menu: '페퍼로니 피자 L',
@@ -78,6 +93,7 @@ const recentOrders: OrderItem[] = [
   },
   {
     id: 3,
+    storeId: resolveStoreIdFromFeatured('쉑쉑버거 신논현'),
     storeName: '쉑쉑버거 신논현',
     date: '2023.10.18',
     menu: '쉑버거 싱글 세트',
@@ -93,6 +109,7 @@ const recentOrders: OrderItem[] = [
 const pastOrders: OrderItem[] = [
   {
     id: 4,
+    storeId: resolveStoreIdFromFeatured('맥도날드 강남역점'),
     storeName: '맥도날드 강남역점',
     date: '2023.09.15',
     menu: '빅맥 세트',
@@ -104,6 +121,7 @@ const pastOrders: OrderItem[] = [
   },
   {
     id: 5,
+    storeId: resolveStoreIdFromFeatured('서브웨이 역삼점'),
     storeName: '서브웨이 역삼점',
     date: '2023.09.10',
     menu: 'BLT 세트',
@@ -115,7 +133,7 @@ const pastOrders: OrderItem[] = [
   },
 ]
 
-function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatusClick, onMapClick, onMypageClick, onFavoritesClick, onReviewWriteClick, hasActiveOrder, cartCount = 0 }: OrderHistoryPageProps) {
+function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatusClick, onMapClick, onMypageClick, onFavoritesClick, onNotificationsClick, onReviewWriteClick, hasActiveOrder, cartCount = 0 }: OrderHistoryPageProps) {
   const [activeTab, setActiveTab] = useState<'recent' | 'past'>('recent')
   const [myOrdersApi, setMyOrdersApi] = useState<MyOrderItem[]>([])
   const [myOrdersLoading, setMyOrdersLoading] = useState(false)
@@ -168,6 +186,7 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
 
     return myOrdersApi.map((o) => ({
       id: o.orderId,
+      storeId: typeof o.storeId === 'number' ? o.storeId : resolveStoreIdFromFeatured(o.storeName),
       storeName: o.storeName,
       date: formatDate(o.orderedAt),
       menu: o.orderNo,
@@ -200,6 +219,7 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
       const paid = o.paymentStatus === 'PAID'
       return {
         id: o.orderId,
+        storeId: o.storeId,
         storeName: o.storeName,
         date: formatDate(o.createdAt),
         menu: o.menuSummary,
@@ -224,7 +244,11 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
-        <Header title="주문 내역" onFavoriteClick={onFavoritesClick} />
+        <Header
+          title="주문 내역"
+          onFavoriteClick={onFavoritesClick}
+          onNotificationsClick={onNotificationsClick}
+        />
 
         {/* 탭 */}
         <div className={styles.tabs}>
@@ -341,7 +365,13 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
                   </button>
                   {order.status === 'completed' && (
                     <button 
-                      onClick={() => onReviewWriteClick?.(order.storeName)}
+                      onClick={() =>
+                        onReviewWriteClick?.({
+                          storeName: order.storeName,
+                          orderId: order.id,
+                          storeId: order.storeId,
+                        })
+                      }
                       className={styles.reviewButton}
                     >
                       리뷰 작성하기

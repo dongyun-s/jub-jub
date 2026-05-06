@@ -15,7 +15,11 @@ import { fetchStores } from '../../api/store'
 import type { FeaturedRestaurant } from '../../constants'
 import { FEATURED_RESTAURANTS, HOME_CATEGORIES } from '../../constants'
 import { mapStoreListItemToFeatured } from '../../lib/storeUi'
+import { getAttendanceStreak, isAttendanceMarkedDone } from '../../lib/rewardAttendance'
 import { useProfile } from '../../hooks/useProfile'
+import { fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
+import { getAccessToken } from '../../lib/authStorage'
+import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './HomePage.module.css'
 
 interface HomePageProps {
@@ -26,14 +30,12 @@ interface HomePageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   onStoreSelect?: (storeId: number) => void
   /** 진행 중 주문이 있으면 상단 배너 표시 */
   hasActiveOrder?: boolean
   cartCount?: number
 }
-
-// 홈 상단 카드용 오늘 출석 여부 (디자인 확인용 데모 플래그)
-const isTodayCheckedInHome = false
 
 function HomePage({
   onCategoryClick,
@@ -43,6 +45,7 @@ function HomePage({
   onMapClick,
   onMypageClick,
   onFavoritesClick,
+  onNotificationsClick,
   onStoreSelect,
   hasActiveOrder,
   cartCount = 0,
@@ -50,8 +53,53 @@ function HomePage({
   const { profile } = useProfile()
   const [searchQuery, setSearchQuery] = useState('')
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
+  const [rewardMe, setRewardMe] = useState<RewardMeResponse | null>(null)
+  const [rewardLoading, setRewardLoading] = useState(false)
+  const [rewardFetchFailed, setRewardFetchFailed] = useState(false)
+  const [attendanceDoneToday, setAttendanceDoneToday] = useState(false)
+  const [attendanceStreak, setAttendanceStreak] = useState(0)
 
-  const greetingName = profile?.nickname?.trim() || profile?.name?.trim() || '회원'
+  const greetingName =
+    rewardMe?.nickname?.trim() ||
+    profile?.nickname?.trim() ||
+    profile?.name?.trim() ||
+    '회원'
+
+  useEffect(() => {
+    if (!getAccessToken()) {
+      setRewardMe(null)
+      setRewardFetchFailed(false)
+      return
+    }
+    setRewardLoading(true)
+    void fetchRewardMe()
+      .then((data) => {
+        setRewardMe(data)
+        setRewardFetchFailed(false)
+      })
+      .catch(() => {
+        setRewardMe(null)
+        setRewardFetchFailed(true)
+      })
+      .finally(() => setRewardLoading(false))
+  }, [profile?.email])
+
+  useEffect(() => {
+    const readAttendance = () => {
+      if (typeof window === 'undefined') return
+      setAttendanceDoneToday(isAttendanceMarkedDone(profile?.email))
+      setAttendanceStreak(getAttendanceStreak(profile?.email))
+    }
+    readAttendance()
+    window.addEventListener('focus', readAttendance)
+    window.addEventListener('jubjub-attendance-local', readAttendance)
+    document.addEventListener('visibilitychange', readAttendance)
+    return () => {
+      window.removeEventListener('focus', readAttendance)
+      window.removeEventListener('jubjub-attendance-local', readAttendance)
+      document.removeEventListener('visibilitychange', readAttendance)
+    }
+  }, [profile?.email])
 
   useEffect(() => {
     let cancelled = false
@@ -66,6 +114,28 @@ function HomePage({
       cancelled = true
     }
   }, [])
+
+  const ordersForNext =
+    rewardMe != null && rewardMe.nextTierRequiredCount > 0
+      ? rewardMe.orderCount + rewardMe.nextTierRequiredCount
+      : rewardMe?.orderCount ?? 0
+
+  const gradeProgressPercent =
+    rewardMe != null && ordersForNext > 0
+      ? Math.min(100, (rewardMe.orderCount / ordersForNext) * 100)
+      : rewardMe != null && rewardMe.nextTierRequiredCount === 0
+        ? 100
+        : 0
+
+  const distanceKm =
+    rewardMe != null ? Math.round((rewardMe.totalWalkingDistance / 1000) * 10) / 10 : null
+
+  /** 고정 목표 없을 때 바 길이만 완만하게 (완전 플랫 방지) */
+  const distanceBarPercent =
+    distanceKm != null ? Math.min(100, Math.max(8, (distanceKm / 10) * 100)) : 0
+
+  const tierTheme = getTierTheme(rewardMe?.tier, rewardMe?.tierName)
+  const tierLabelEn = getTierLabelEn(rewardMe?.tier, rewardMe?.tierName)
 
   const handleGoMypage = () => {
     onMypageClick?.()
@@ -88,7 +158,7 @@ function HomePage({
   return (
     <Layout showBackground={false}>
       {/* 홈은 제목 없이 로고만 표시 */}
-      <Header onFavoriteClick={onFavoritesClick} />
+      <Header onFavoriteClick={onFavoritesClick} onNotificationsClick={onNotificationsClick} />
 
       <div className={styles.hero}>
         <SearchBar
@@ -129,32 +199,71 @@ function HomePage({
           <button
             type="button"
             className={styles.gradeCard}
+            style={{
+              backgroundImage: tierTheme.gradeCardBackground,
+              backgroundColor: 'transparent',
+              boxShadow: tierTheme.gradeCardShadow,
+            }}
             onClick={handleGoMypage}
           >
             <div className={styles.gradeCardHeader}>
               <div className="flex flex-col">
                 <div className={styles.gradeBadgeRow}>
                   <span
-                    className="material-symbols-outlined text-cyan-300 text-sm"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
+                    className="material-symbols-outlined text-sm"
+                    style={{
+                      fontVariationSettings: "'FILL' 1",
+                      color: tierTheme.badgeAccent,
+                    }}
                   >
                     diamond
                   </span>
-                  <span className={styles.gradeBadgeLabel}>다이아</span>
+                  <span className={styles.gradeBadgeLabel} style={{ color: tierTheme.badgeAccent }}>
+                    {rewardLoading ? '…' : tierLabelEn}
+                  </span>
                 </div>
-                <span className={styles.gradeBenefit}>7% 할인</span>
+                <span className={styles.gradeBenefit}>
+                  XP {rewardMe != null ? rewardMe.cumulativeXp.toLocaleString('ko-KR') : rewardLoading ? '…' : '—'}
+                </span>
               </div>
               <div className={styles.gradeAvatar}>
-                <span className="material-symbols-outlined text-primary text-3xl">face_6</span>
+                <span
+                  className="material-symbols-outlined text-3xl"
+                  style={{ color: tierTheme.myAvatarIcon }}
+                >
+                  face_6
+                </span>
               </div>
             </div>
             <p className={styles.gradeName}>{greetingName}님</p>
             <div className={styles.gradeProgressBar}>
-              <div className={styles.gradeProgressFill} style={{ width: '85%' }} />
+              <div
+                className={styles.gradeProgressFill}
+                style={{
+                  width: `${gradeProgressPercent}%`,
+                  backgroundColor: tierTheme.progressFill,
+                  boxShadow: tierTheme.progressGlow,
+                  border: tierTheme.progressBorder,
+                }}
+              />
             </div>
             <div className={styles.gradeProgressLabels}>
-              <span>👑 레전드까지 85 / 100회</span>
-              <span className="text-green-300 font-bold">+15회</span>
+              <span>
+                {rewardMe != null
+                  ? rewardMe.nextTierRequiredCount > 0
+                    ? `다음 등급까지 ${rewardMe.orderCount} / ${ordersForNext}회`
+                    : `누적 ${rewardMe.orderCount.toLocaleString('ko-KR')}회 · 최고 등급`
+                  : rewardLoading
+                    ? '불러오는 중…'
+                    : !getAccessToken()
+                      ? '로그인 후 확인'
+                      : rewardFetchFailed
+                        ? '리워드 정보를 불러오지 못했습니다'
+                        : '—'}
+              </span>
+              {rewardMe != null && rewardMe.nextTierRequiredCount > 0 && (
+                <span className="text-green-300 font-bold">남음 {rewardMe.nextTierRequiredCount}회</span>
+              )}
             </div>
           </button>
 
@@ -165,12 +274,21 @@ function HomePage({
               onClick={handleGoMypage}
             >
               <div className={styles.distanceMeta}>
-                <span className={styles.distanceLabel}>다음 보상: 5km 쿠폰</span>
-                <span className={styles.distanceValue}>1.2km 남음</span>
+                <span className={styles.distanceLabel}>누적 도보 이동</span>
+                <span className={styles.distanceValue}>
+                  {distanceKm != null
+                    ? `${distanceKm} km`
+                    : rewardLoading
+                      ? '…'
+                      : '—'}
+                </span>
               </div>
               <div className={styles.distanceBarWrapper}>
-                <div className={styles.distanceBarFill} style={{ width: '76%' }} />
-                <div className={styles.distanceCheckpoint} />
+                <div className={styles.distanceBarFill} style={{ width: `${distanceBarPercent}%` }} />
+                <div className={styles.distanceBarMarkers} aria-hidden>
+                  <div className={styles.distanceCheckpoint} />
+                  <div className={styles.distanceCheckpoint} />
+                </div>
               </div>
             </button>
             <button
@@ -180,7 +298,7 @@ function HomePage({
             >
               <div className={styles.attendanceStatus}>
                 <span className={styles.attendanceLabel}>오늘의 출석</span>
-                {isTodayCheckedInHome ? (
+                {attendanceDoneToday ? (
                   <div className="flex items-center gap-1 text-primary">
                     <span
                       className="material-symbols-outlined text-lg"
@@ -200,7 +318,13 @@ function HomePage({
               <div className="border-t border-gray-50 my-1" />
               <div className="flex flex-col items-center">
                 <span className={styles.attendanceLabel}>연속 출석</span>
-                <p className="text-xs font-bold text-primary">12일째</p>
+                <p className="text-xs font-bold text-primary text-center leading-tight">
+                  {!getAccessToken()
+                    ? '로그인 후'
+                    : attendanceStreak > 0
+                      ? `${attendanceStreak}일째`
+                      : '오늘 출석으로 시작'}
+                </p>
               </div>
             </button>
           </div>

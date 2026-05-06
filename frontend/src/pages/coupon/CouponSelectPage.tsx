@@ -4,9 +4,12 @@
  * - 사용가능/사용완료 탭, 쿠폰 카드 선택 시 적용 후 장바구니로 복귀
  */
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
+import { ApiError } from '../../api/authClient'
+import { fetchMyCoupons, type MemberCouponDto } from '../../api/rewards'
+import { getAccessToken } from '../../lib/authStorage'
 import styles from './CouponSelectPage.module.css'
 
 interface AppliedCoupon {
@@ -26,8 +29,8 @@ interface CouponSelectPageProps {
   cartCount?: number
 }
 
-interface Coupon {
-  id: number
+interface CouponUi {
+  memberCouponId: number
   title: string
   expiry: string
   condition: string
@@ -35,46 +38,69 @@ interface Coupon {
   discount: number
 }
 
-/** 사용가능/사용완료 쿠폰 목록 (데모) */
-const coupons: Coupon[] = [
-  {
-    id: 1,
-    title: '3,000원 할인 쿠폰',
-    expiry: '2024-12-31',
-    condition: '모든 품목 적용 가능',
+function mapDtoToUi(d: MemberCouponDto): CouponUi {
+  return {
+    memberCouponId: d.memberCouponId,
+    title: d.name,
+    expiry: d.expiredAt,
+    condition:
+      d.minOrderAmount > 0
+        ? `${d.minOrderAmount.toLocaleString('ko-KR')}원 이상 주문 시`
+        : '최소 주문 금액 조건 없음',
     icon: 'discount',
-    discount: 3000,
-  },
-  {
-    id: 2,
-    title: '5,000원 할인 쿠폰',
-    expiry: '2024-12-25',
-    condition: '20,000원 이상 주문 시',
-    icon: 'percent',
-    discount: 5000,
-  },
-  {
-    id: 3,
-    title: '무료 배송 쿠폰',
-    expiry: '2024-12-15',
-    condition: '일부 매장 제외',
-    icon: 'delivery',
-    discount: 3000,
-  },
-]
+    discount: d.discountAmount,
+  }
+}
 
 function CouponSelectPage({ onClose, onSelect, onGoHome, onCartClick, onOrdersClick, onMapClick, onMypageClick, cartCount = 0 }: CouponSelectPageProps) {
   const [activeTab, setActiveTab] = useState<'available' | 'expired'>('available')
+  const [rows, setRows] = useState<MemberCouponDto[]>([])
+  const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
 
-  const handleUse = (coupon: Coupon) => {
+  useEffect(() => {
+    if (!getAccessToken()) {
+      setRows([])
+      setListLoading(false)
+      setListError('로그인 후 쿠폰함을 이용할 수 있습니다.')
+      return
+    }
+    setListLoading(true)
+    setListError(null)
+    void fetchMyCoupons()
+      .then(setRows)
+      .catch((e) => {
+        setRows([])
+        setListError(e instanceof ApiError ? e.message : '쿠폰 목록을 불러오지 못했습니다.')
+      })
+      .finally(() => setListLoading(false))
+  }, [])
+
+  const todayStr = useMemo(() => {
+    const n = new Date()
+    const y = n.getFullYear()
+    const m = String(n.getMonth() + 1).padStart(2, '0')
+    const d = String(n.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }, [])
+
+  const availableCoupons = useMemo(() => {
+    return rows.filter((r) => r.expiredAt >= todayStr).map(mapDtoToUi)
+  }, [rows, todayStr])
+
+  const expiredCoupons = useMemo(() => {
+    return rows.filter((r) => r.expiredAt < todayStr).map(mapDtoToUi)
+  }, [rows, todayStr])
+
+  const handleUse = (coupon: CouponUi) => {
     onSelect?.({
-      id: coupon.id,
+      id: coupon.memberCouponId,
       name: coupon.title,
       discount: coupon.discount,
     })
   }
 
-  const getIcon = (icon: Coupon['icon']) => {
+  const getIcon = (icon: CouponUi['icon']) => {
     switch (icon) {
       case 'discount':
         return (
@@ -141,10 +167,20 @@ function CouponSelectPage({ onClose, onSelect, onGoHome, onCartClick, onOrdersCl
 
         {/* 쿠폰 리스트 */}
         <div className={styles.listArea}>
-          {activeTab === 'available' ? (
+          {listLoading ? (
+            <div className={styles.emptyState}>
+              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>hourglass_empty</span>
+              <p className={styles.emptyText}>쿠폰을 불러오는 중…</p>
+            </div>
+          ) : listError ? (
+            <div className={styles.emptyState}>
+              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>error</span>
+              <p className={styles.emptyText}>{listError}</p>
+            </div>
+          ) : activeTab === 'available' ? (
             <div className={styles.storeList}>
-              {coupons.map((coupon) => (
-                <div key={coupon.id} className={styles.couponCard}>
+              {availableCoupons.map((coupon) => (
+                <div key={coupon.memberCouponId} className={styles.couponCard}>
                   <div className={styles.couponIconWrap}>
                     {getIcon(coupon.icon)}
                   </div>
@@ -162,6 +198,13 @@ function CouponSelectPage({ onClose, onSelect, onGoHome, onCartClick, onOrdersCl
                 </div>
               ))}
 
+              {availableCoupons.length === 0 && (
+                <div className={styles.emptyState}>
+                  <span className={`material-symbols-outlined ${styles.emptyIcon}`}>confirmation_number</span>
+                  <p className={styles.emptyText}>사용 가능한 쿠폰이 없습니다</p>
+                </div>
+              )}
+
               <div className={styles.promoBanner}>
                 <p className={styles.promoSub}>JUB-JUB 회원 특별 혜택</p>
                 <h3 className={styles.promoTitle}>매일 새로운 쿠폰이 도착해요!</h3>
@@ -169,9 +212,31 @@ function CouponSelectPage({ onClose, onSelect, onGoHome, onCartClick, onOrdersCl
               </div>
             </div>
           ) : (
-            <div className={styles.emptyState}>
-              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>receipt_long</span>
-              <p className={styles.emptyText}>만료된 쿠폰이 없습니다</p>
+            <div className={styles.storeList}>
+              {expiredCoupons.map((coupon) => (
+                <div key={coupon.memberCouponId} className={styles.couponCard}>
+                  <div className={styles.couponIconWrap}>
+                    {getIcon(coupon.icon)}
+                  </div>
+                  <div className={styles.couponInfo}>
+                    <h3 className={styles.couponTitle}>{coupon.title}</h3>
+                    <p className={styles.couponExpiry}>만료일: {coupon.expiry}</p>
+                    <p className={styles.couponCondition}>
+                      <span className={styles.conditionBadge}>i</span>
+                      {coupon.condition}
+                    </p>
+                  </div>
+                  <span className={styles.useButton} style={{ opacity: 0.5, cursor: 'default' }}>
+                    만료됨
+                  </span>
+                </div>
+              ))}
+              {expiredCoupons.length === 0 && (
+                <div className={styles.emptyState}>
+                  <span className={`material-symbols-outlined ${styles.emptyIcon}`}>receipt_long</span>
+                  <p className={styles.emptyText}>만료된 쿠폰이 없습니다</p>
+                </div>
+              )}
             </div>
           )}
         </div>
