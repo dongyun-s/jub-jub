@@ -4,7 +4,7 @@
  * - 상품 목록, 수량 변경, 쿠폰 적용, 결제(포트원 연동), 하단 네비
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
@@ -18,6 +18,8 @@ import {
 } from '../../api/cart'
 import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
 import { ApiError } from '../../api/authClient'
+import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
+import { getAccessToken } from '../../lib/authStorage'
 import styles from './CartPage.module.css'
 
 interface AppliedCoupon {
@@ -39,6 +41,7 @@ interface CartPageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   cartCount?: number
   cartItems?: CartItem[]
   onCartItemsChange?: (items: CartItem[]) => void
@@ -55,8 +58,8 @@ const defaultCartItems: CartItem[] = [
   {
     id: FEATURED_RESTAURANTS[0].id,
     menuId: FEATURED_RESTAURANTS[0].id,
-    name: FEATURED_RESTAURANTS[0].title,
-    options: '기본 선택 / 소스 추가',
+    name: '테스트 메뉴 (100원)',
+    options: '기본',
     price: 100,
     quantity: 1,
     image: FEATURED_RESTAURANTS[0].image,
@@ -76,6 +79,7 @@ function CartPage({
   onMapClick, 
   onMypageClick, 
   onFavoritesClick,
+  onNotificationsClick,
   cartCount = 0,
   cartItems: externalCartItems,
   onCartItemsChange,
@@ -100,6 +104,9 @@ function CartPage({
   const [isProcessing, setIsProcessing] = useState(false)
   const [cartSyncing, setCartSyncing] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  /** 로그인 시 POST /rewards/calculate 미리보기 (주문 생성 금액은 장바구니 합계와 일치해야 함) */
+  const [pricingPreview, setPricingPreview] = useState<RewardCalculateResponse | null>(null)
+  const pricingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
 
@@ -376,6 +383,28 @@ function CartPage({
   const discount = appliedCoupon?.discount || 0
   const total = subtotal - discount
 
+  /** 서버 주문 API는 장바구니 총액과 동일한 금액만 허용 → 결제 진행 금액은 로그인 장바구니일 때 항상 subtotal */
+  const payAmount = useApiCart ? subtotal : Math.max(0, total)
+
+  useEffect(() => {
+    if (!useApiCart || !getAccessToken() || subtotal <= 0) {
+      setPricingPreview(null)
+      return
+    }
+    if (pricingDebounceRef.current) clearTimeout(pricingDebounceRef.current)
+    pricingDebounceRef.current = setTimeout(() => {
+      void calculateRewardDiscount({
+        originalOrderAmount: subtotal,
+        memberCouponIds: appliedCoupon ? [appliedCoupon.id] : [],
+      })
+        .then(setPricingPreview)
+        .catch(() => setPricingPreview(null))
+    }, 400)
+    return () => {
+      if (pricingDebounceRef.current) clearTimeout(pricingDebounceRef.current)
+    }
+  }, [useApiCart, subtotal, appliedCoupon?.id])
+
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
@@ -388,7 +417,11 @@ function CartPage({
           onCancel={() => setClearConfirmOpen(false)}
           onConfirm={confirmClearCart}
         />
-        <Header title="장바구니" onFavoriteClick={onFavoritesClick} />
+        <Header
+          title="장바구니"
+          onFavoriteClick={onFavoritesClick}
+          onNotificationsClick={onNotificationsClick}
+        />
 
         {/* 스크롤 영역 */}
         <div className={styles.scrollArea}>
@@ -531,7 +564,7 @@ function CartPage({
                   <div>
                     <p className="font-bold text-slate-800">쿠폰 적용</p>
                     <p className="text-sm text-slate-500">
-                      사용 가능한 쿠폰이 <span className="text-primary font-bold">3장</span> 있습니다
+                      보유 쿠폰은 <span className="text-primary font-bold">쿠폰함</span>에서 확인할 수 있어요
                     </p>
                   </div>
                 </div>
@@ -554,8 +587,29 @@ function CartPage({
                 <span className={styles.summaryLabel}>주문 금액</span>
                 <span className={styles.summaryValue}>{formatPrice(subtotal)}</span>
               </div>
-              
-              {appliedCoupon && (
+
+              {useApiCart && pricingPreview != null && pricingPreview.tierDiscountAmount > 0 && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryDiscountLabel}>등급 할인 (예상)</span>
+                  <span className={styles.summaryDiscountValue}>
+                    -{formatPrice(pricingPreview.tierDiscountAmount)}
+                  </span>
+                </div>
+              )}
+
+              {useApiCart && pricingPreview != null && pricingPreview.couponDiscountAmount > 0 && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryDiscountLabel}>
+                    쿠폰 할인 (예상)
+                    {appliedCoupon ? ` · ${appliedCoupon.name}` : ''}
+                  </span>
+                  <span className={styles.summaryDiscountValue}>
+                    -{formatPrice(pricingPreview.couponDiscountAmount)}
+                  </span>
+                </div>
+              )}
+
+              {!useApiCart && appliedCoupon && (
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryDiscountLabel}>
                     쿠폰 할인 ({appliedCoupon.name})
@@ -565,12 +619,35 @@ function CartPage({
                   </span>
                 </div>
               )}
-              
+
+              {useApiCart && pricingPreview == null && appliedCoupon && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryDiscountLabel}>선택한 쿠폰</span>
+                  <span className={styles.summaryValue}>{appliedCoupon.name}</span>
+                </div>
+              )}
+
+              {useApiCart && pricingPreview != null && (
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                  할인 금액은 서버 미리보기입니다. 주문 생성은 장바구니 합계와 맞추기 위해{' '}
+                  <strong>{formatPrice(subtotal)}</strong> 기준으로 진행됩니다.
+                </p>
+              )}
+
+              {useApiCart && pricingPreview != null && (
+                <div className={`${styles.summaryRow} border-t border-dashed border-slate-200 pt-3 mt-1`}>
+                  <span className={styles.summaryLabel}>예상 결제액 (참고)</span>
+                  <span className={styles.summaryValue}>
+                    {formatPrice(pricingPreview.finalPaymentAmount)}
+                  </span>
+                </div>
+              )}
+
               <div className={styles.summaryTotalRow}>
-                <span className={styles.summaryTotalLabel}>최종 결제 금액</span>
-                <span className={styles.summaryTotalValue}>
-                  {formatPrice(total)}
+                <span className={styles.summaryTotalLabel}>
+                  {useApiCart ? '결제 진행 금액' : '최종 결제 금액'}
                 </span>
+                <span className={styles.summaryTotalValue}>{formatPrice(payAmount)}</span>
               </div>
             </div>
           </section>
@@ -607,7 +684,7 @@ function CartPage({
               <>
                 <div className={styles.payButtonMain}>
                   <span className="material-symbols-outlined">shopping_bag</span>
-                  <span>{formatPrice(total)} 결제하기</span>
+                  <span>{formatPrice(payAmount)} 결제하기</span>
                 </div>
                 <span className={styles.payButtonSub}>
                   PICKUP ESTIMATED AT 12:45 PM

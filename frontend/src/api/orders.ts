@@ -8,6 +8,8 @@ export interface MyOrderItem {
   orderId: number
   orderNo: string
   storeName: string
+  /** 구버전 서버 호환: 없을 수 있음 */
+  storeId?: number
   orderedAt: string
   orderStatus: string
   finalAmount: number

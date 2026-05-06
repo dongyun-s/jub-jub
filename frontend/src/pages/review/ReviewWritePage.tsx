@@ -8,25 +8,24 @@ import { useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import AppModal from '../../components/AppModal/AppModal'
+import { ApiError } from '../../api/authClient'
+import { createReview, generateAiReview } from '../../api/reviews'
+import { useProfile } from '../../hooks/useProfile'
 import styles from './ReviewWritePage.module.css'
 
 interface ReviewWritePageProps {
   storeName?: string
+  orderId: number
+  storeId: number
   onBack?: () => void
-  onSubmit?: (review: ReviewData) => void
+  /** 서버 등록 성공 후 */
+  onSubmitted?: () => void
   onGoHome?: () => void
   onCartClick?: () => void
   onOrdersClick?: () => void
   onMapClick?: () => void
   onMypageClick?: () => void
   cartCount?: number
-}
-
-interface ReviewData {
-  rating: number
-  content: string
-  photos: string[]
-  keywords: string[]
 }
 
 /** 추천 키워드 버튼 목록 */
@@ -52,9 +51,11 @@ const getRatingLabel = (rating: number, category: string) => {
 }
 
 function ReviewWritePage({ 
-  storeName = '카페 네온 하이브', 
+  storeName = '카페 네온 하이브',
+  orderId,
+  storeId,
   onBack,
-  onSubmit,
+  onSubmitted,
   onGoHome,
   onCartClick,
   onOrdersClick,
@@ -62,12 +63,14 @@ function ReviewWritePage({
   onMypageClick,
   cartCount = 0
 }: ReviewWritePageProps) {
+  const { profile } = useProfile()
   const [rating, setRating] = useState(0)
   const [content, setContent] = useState('')
-  const [photos, setPhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop'
-  ])
+  const [photos, setPhotos] = useState<string[]>([])
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
+  const [usedAiAssist, setUsedAiAssist] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
   
   // AI 모달 관련 상태
   const [showAIModal, setShowAIModal] = useState(false)
@@ -94,28 +97,59 @@ function ReviewWritePage({
   }
 
   const handleAIGenerate = () => {
-    // 모든 별점이 선택되었는지 확인
-    if (aiRatings.taste === 0 || aiRatings.packaging === 0 || aiRatings.pickup === 0) {
-      alert('모든 항목의 별점을 선택해주세요.')
-      return
-    }
-    
-    // AI 리뷰 생성 로직
-    const tasteText = aiRatings.taste >= 4 ? '음식이 정말 맛있었어요!' : '음식은 무난했어요.'
-    const packagingText = aiRatings.packaging >= 4 ? '포장도 깔끔하게 해주셔서' : '포장 상태는 괜찮았고'
-    const pickupText = aiRatings.pickup >= 4 ? '픽업 경험도 만족스러웠습니다.' : '픽업은 편리했습니다.'
-    
-    const generatedReview = `${tasteText} ${packagingText} ${pickupText} 다음에도 또 방문하고 싶어요!`
-    setContent(generatedReview)
-    
-    // 평균 별점 계산
-    const avgRating = Math.round((aiRatings.taste + aiRatings.packaging + aiRatings.pickup) / 3)
-    setRating(avgRating)
-    
-    setShowAIModal(false)
+    const draft = content.trim()
+
+    void (async () => {
+      setAiGenerating(true)
+      try {
+        if (draft) {
+          /** 초안 부풀리기 — 명세: 별점은 0, content에 초안 */
+          const res = await generateAiReview({
+            packagingRating: 0,
+            tasteRating: 0,
+            timeRating: 0,
+            content: draft,
+          })
+          setContent(res.generatedReview)
+          setUsedAiAssist(true)
+          setShowAIModal(false)
+          return
+        }
+
+        if (aiRatings.taste === 0 || aiRatings.packaging === 0 || aiRatings.pickup === 0) {
+          alert('모든 항목의 별점을 선택해주세요.')
+          return
+        }
+
+        const res = await generateAiReview({
+          packagingRating: aiRatings.packaging,
+          tasteRating: aiRatings.taste,
+          timeRating: aiRatings.pickup,
+          content: '',
+        })
+        setContent(res.generatedReview)
+        const avgRating = Math.round((aiRatings.taste + aiRatings.packaging + aiRatings.pickup) / 3)
+        setRating(avgRating)
+        setUsedAiAssist(true)
+        setShowAIModal(false)
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : 'AI 리뷰 생성에 실패했습니다.')
+      } finally {
+        setAiGenerating(false)
+      }
+    })()
   }
 
   const handleSubmit = () => {
+    const memberProfileId = profile?.memberProfileId
+    if (memberProfileId == null || Number.isNaN(Number(memberProfileId))) {
+      alert('프로필(memberProfileId)을 불러오지 못했습니다. 다시 로그인 후 시도해 주세요.')
+      return
+    }
+    if (!orderId || !storeId) {
+      alert('주문 정보(orderId / storeId)가 없습니다. 주문 내역에서 리뷰 작성을 다시 시도해 주세요.')
+      return
+    }
     if (rating === 0) {
       alert('별점을 선택해주세요.')
       return
@@ -124,12 +158,38 @@ function ReviewWritePage({
       alert('리뷰는 최소 10자 이상 작성해주세요.')
       return
     }
-    onSubmit?.({
-      rating,
-      content,
-      photos,
-      keywords: selectedKeywords
-    })
+
+    const hasModalSubs =
+      usedAiAssist && aiRatings.taste > 0 && aiRatings.packaging > 0 && aiRatings.pickup > 0
+    const packagingRating = hasModalSubs ? aiRatings.packaging : rating
+    const tasteRating = hasModalSubs ? aiRatings.taste : rating
+    const timeRating = hasModalSubs ? aiRatings.pickup : rating
+
+    const imagePaths = photos.filter((p) => typeof p === 'string' && p.length > 0 && !p.startsWith('http'))
+
+    setSubmitLoading(true)
+    void (async () => {
+      try {
+        await createReview({
+          orderId,
+          memberProfileId: Number(memberProfileId),
+          storeId,
+          overallRating: rating,
+          packagingRating,
+          tasteRating,
+          timeRating,
+          content: content.trim(),
+          aiGeneratedHelped: usedAiAssist,
+          imagePaths,
+        })
+        alert('리뷰가 등록되었습니다.')
+        onSubmitted?.()
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : '리뷰 등록에 실패했습니다.')
+      } finally {
+        setSubmitLoading(false)
+      }
+    })()
   }
 
   return (
@@ -215,8 +275,13 @@ function ReviewWritePage({
         </div>
 
         <div className={styles.submitBar}>
-          <button type="button" onClick={handleSubmit} className={styles.submitButton}>
-            리뷰 등록하기
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitLoading}
+            className={styles.submitButton}
+          >
+            {submitLoading ? '등록 중…' : '리뷰 등록하기'}
           </button>
         </div>
 
@@ -291,10 +356,17 @@ function ReviewWritePage({
                 </div>
               </div>
               <div className={styles.modalFooter}>
-                <button type="button" onClick={handleAIGenerate} className={styles.modalSubmit}>
-                  생성하기
+                <button
+                  type="button"
+                  onClick={handleAIGenerate}
+                  disabled={aiGenerating}
+                  className={styles.modalSubmit}
+                >
+                  {aiGenerating ? '생성 중…' : '생성하기'}
                 </button>
-                <p className={styles.modalHint}>선택하신 평점을 기반으로 정성스러운 리뷰를 생성합니다.</p>
+                <p className={styles.modalHint}>
+                  본문에 글이 있으면 초안을 다듬고, 비어 있으면 선택한 세부 별점으로 새 리뷰를 만듭니다.
+                </p>
               </div>
         </AppModal>
       </div>

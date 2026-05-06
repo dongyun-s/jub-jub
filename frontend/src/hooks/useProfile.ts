@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getMe, type ProfileMe } from '../api/auth'
 import { getAccessToken } from '../lib/authStorage'
+import { migrateWeeklyAnonAttendanceToEmail } from '../lib/rewardAttendance'
 
 export function useProfile() {
   const [profile, setProfile] = useState<ProfileMe | null>(null)
@@ -19,7 +20,10 @@ export function useProfile() {
     }
     setLoading(true)
     getMe()
-      .then(setProfile)
+      .then((p) => {
+        setProfile(p)
+        if (p.email?.trim()) migrateWeeklyAnonAttendanceToEmail(p.email)
+      })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false))
   }, [])

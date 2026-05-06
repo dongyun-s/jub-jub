@@ -4,12 +4,29 @@
  * - 프로필·등급·이동거리·주간 출석 퀘스트, 주문내역/쿠폰/리뷰/찜 등 메뉴
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { useProfile } from '../../hooks/useProfile'
 import AppModal from '../../components/AppModal/AppModal'
+import { ApiError } from '../../api/authClient'
+import {
+  fetchAttendanceWeek,
+  fetchAttendanceHistory,
+  fetchRewardMe,
+  postAttendanceCheck,
+  type RewardMeResponse,
+} from '../../api/rewards'
+import { getAccessToken } from '../../lib/authStorage'
+import {
+  getAttendanceStreak,
+  getWeekAttendanceCheckedLocally,
+  isAttendanceMarkedDone,
+  markAttendanceDone,
+  weekIsoDatesMondayFirst,
+} from '../../lib/rewardAttendance'
+import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './MyPage.module.css'
 
 interface MyPageProps {
@@ -20,59 +37,187 @@ interface MyPageProps {
   onMapClick?: () => void
   onReviewsClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   onLogout?: () => void
   cartCount?: number
 }
 
-/**
- * 등급·이동거리·주문 카운트는 백엔드 미연동 — 리워드 UI 자리용 데모 값
- * 프로필 상단: 닉네임·이메일만 (GET /api/v1/auth/me)
- */
-const rewardDemoStats = {
-  grade: 'GOLD',
-  gradeKr: '골드 등급',
-  totalDistance: 42.5,
-  distanceChange: '+2.4km',
-  orderCount: 27,
-  nextGradeCount: 30,
-  nextGrade: 'Platinum',
+const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
+/** 월요일=0 … 일요일=6 */
+function todayWeekIndex(): number {
+  return (new Date().getDay() + 6) % 7
 }
 
-const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-/** 오늘 요일 인덱스 (0=월 … 6=일) */
-const todayIndex = 3
-
-function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onLogout, cartCount = 0 }: MyPageProps) {
+function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onNotificationsClick, onLogout, cartCount = 0 }: MyPageProps) {
   const { profile, loading: profileLoading } = useProfile()
 
-  /** 요일별 출석 체크 여부 */
-  const [checkedDays, setCheckedDays] = useState([true, true, true, false, false, false, false])
+  const todayIndex = todayWeekIndex()
+
+  /** GET /api/v1/rewards/me */
+  const [rewardMe, setRewardMe] = useState<RewardMeResponse | null>(null)
+  const [rewardLoading, setRewardLoading] = useState(false)
+  const [rewardFetchFailed, setRewardFetchFailed] = useState(false)
+
+  /** 요일별 출석 — 로컬 일별 키 + (있으면) GET /rewards/attendance/week */
+  const [checkedDays, setCheckedDays] = useState<boolean[]>(() => Array(7).fill(false))
   /** 출석 완료 모달 표시 여부 */
   const [showAttendanceModal, setShowAttendanceModal] = useState(false)
+  const [attendanceModalMessage, setAttendanceModalMessage] = useState('오늘의 출석체크가 완료되었습니다.')
 
   const questSectionRef = useRef<HTMLDivElement | null>(null)
 
+  const loadRewards = useCallback(async () => {
+    if (!getAccessToken()) {
+      setRewardMe(null)
+      setRewardFetchFailed(false)
+      return
+    }
+    setRewardLoading(true)
+    try {
+      const data = await fetchRewardMe()
+      setRewardMe(data)
+      setRewardFetchFailed(false)
+    } catch {
+      setRewardMe(null)
+      setRewardFetchFailed(true)
+    } finally {
+      setRewardLoading(false)
+    }
+  }, [profile?.email])
+
+  useEffect(() => {
+    void loadRewards()
+  }, [loadRewards])
+
+  const [attendanceStreak, setAttendanceStreak] = useState(0)
+
+  /** 주간 그리드: 로컬 과거 일별 출석 + 서버 주간 API(선택) + 오늘 플래그 */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let cancelled = false
+
+    const mergeWeek = (local: boolean[], api: boolean[] | null): boolean[] => {
+      if (!api || api.length !== 7) return [...local]
+      return local.map((v, i) => v || !!api[i])
+    }
+
+    const sync = async () => {
+      const localWeek = getWeekAttendanceCheckedLocally(profile?.email)
+      let merged = [...localWeek]
+
+      if (getAccessToken()) {
+        const apiWeek = await fetchAttendanceWeek()
+        if (!cancelled) merged = mergeWeek(merged, apiWeek)
+
+        // 월별 출석 내역 API가 있으면 이번 주 날짜와 교집합으로 주간 칸 채우기
+        try {
+          const now = new Date()
+          const history = await fetchAttendanceHistory({
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+          })
+          if (!cancelled && history.attendedDates.length > 0) {
+            const set = new Set(history.attendedDates)
+            const weekDates = weekIsoDatesMondayFirst()
+            const fromHistory = weekDates.map((d) => set.has(d))
+            merged = mergeWeek(merged, fromHistory)
+          }
+        } catch {
+          // 무시 (서버 미구현/에러 시 로컬+주간API만)
+        }
+      }
+
+      const todayDone = isAttendanceMarkedDone(profile?.email)
+      if (!cancelled) {
+        merged[todayIndex] = merged[todayIndex] || todayDone
+        setCheckedDays(merged)
+        setAttendanceStreak(getAttendanceStreak(profile?.email))
+      }
+    }
+
+    void sync()
+
+    const onLocal = () => {
+      void sync()
+    }
+    window.addEventListener('jubjub-attendance-local', onLocal)
+    return () => {
+      cancelled = true
+      window.removeEventListener('jubjub-attendance-local', onLocal)
+    }
+  }, [profile?.email, todayIndex])
+
   const displayNickname =
-    profile?.nickname?.trim() || (profileLoading ? '불러오는 중…' : '회원')
-  /** 프로필 아바타 뱃지 — 등급 (리워드 데모; API 연동 시 교체) */
+    rewardMe?.nickname?.trim() ||
+    profile?.nickname?.trim() ||
+    (profileLoading || rewardLoading ? '불러오는 중…' : '회원')
+
   const profileGradeBadge =
-    rewardDemoStats.gradeKr.replace(/\s*등급\s*$/, '').trim() || rewardDemoStats.grade
+    rewardMe != null ? getTierLabelEn(rewardMe.tier, rewardMe.tierName) : 'TIER'
 
-  const progressPercent = (rewardDemoStats.orderCount / rewardDemoStats.nextGradeCount) * 100
-  const remainingDistance = 1.2
-  const distanceProgress = ((5 - remainingDistance) / 5) * 100
+  const ordersForNext =
+    rewardMe != null && rewardMe.nextTierRequiredCount > 0
+      ? rewardMe.orderCount + rewardMe.nextTierRequiredCount
+      : rewardMe?.orderCount ?? 1
 
-  const consecutiveDays = checkedDays.filter(Boolean).length
+  const progressPercent =
+    rewardMe != null && ordersForNext > 0
+      ? Math.min(100, (rewardMe.orderCount / ordersForNext) * 100)
+      : rewardMe != null && rewardMe.nextTierRequiredCount === 0
+        ? 100
+        : 0
+
+  const distanceKm =
+    rewardMe != null ? Math.round((rewardMe.totalWalkingDistance / 1000) * 10) / 10 : null
+
+  const cumulativeXpDisplay = rewardMe?.cumulativeXp ?? null
+
+  const tierTheme = getTierTheme(rewardMe?.tier, rewardMe?.tierName)
+  const tierLabelEn = getTierLabelEn(rewardMe?.tier, rewardMe?.tierName)
+
   const isTodayChecked = checkedDays[todayIndex]
 
-  /** 오늘 출석 버튼 클릭: 체크 후 모달 표시 */
+  /** 오늘 출석 버튼 클릭: POST /api/v1/rewards/attendance */
   const handleAttendanceCheck = () => {
-    if (!isTodayChecked) {
-      const newCheckedDays = [...checkedDays]
-      newCheckedDays[todayIndex] = true
-      setCheckedDays(newCheckedDays)
-      setShowAttendanceModal(true)
+    if (!getAccessToken()) {
+      alert('로그인 후 출석체크를 이용할 수 있습니다.')
+      return
     }
+    if (isTodayChecked) return
+
+    void (async () => {
+      try {
+        const msg = await postAttendanceCheck()
+        markAttendanceDone(profile?.email)
+        setCheckedDays((prev) => {
+          const next = [...prev]
+          next[todayIndex] = true
+          return next
+        })
+        setAttendanceModalMessage(msg || '출석체크가 완료되었습니다.')
+        setShowAttendanceModal(true)
+        await loadRewards()
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : ''
+        const alreadyDone =
+          e instanceof ApiError &&
+          (e.status === 400 || /이미.*출석|출석.*완료|오늘은 이미/i.test(msg))
+        if (alreadyDone) {
+          markAttendanceDone(profile?.email)
+          setCheckedDays((prev) => {
+            const next = [...prev]
+            next[todayIndex] = true
+            return next
+          })
+          setAttendanceModalMessage(msg || '오늘 출석은 이미 완료되었습니다.')
+          setShowAttendanceModal(true)
+          await loadRewards()
+          return
+        }
+        alert(msg || '출석체크를 처리하지 못했습니다.')
+      }
+    })()
   }
 
   // 홈 출석 카드에서 진입한 경우에만 주간 퀘스트(출석체크) 섹션을 화면 가운데로 스크롤
@@ -91,15 +236,35 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
   return (
     <Layout showBackground={false}>
       <div className={styles.root}>
-        <Header title="내 정보" onFavoriteClick={onFavoritesClick} />
+        <Header
+          title="내 정보"
+          onFavoriteClick={onFavoritesClick}
+          onNotificationsClick={onNotificationsClick}
+        />
 
         <div className={styles.scrollArea}>
           <section className={styles.profileSection}>
             <div className={styles.avatarWrap}>
-              <div className={styles.avatarCircle}>
-                <span className={`material-symbols-outlined ${styles.avatarIcon}`}>face_6</span>
+              <div
+                className={styles.avatarCircle}
+                style={{
+                  borderColor: tierTheme.myAvatarRing,
+                  boxShadow: tierTheme.myAvatarGlow,
+                }}
+              >
+                <span
+                  className={`material-symbols-outlined ${styles.avatarIcon}`}
+                  style={{ color: tierTheme.myAvatarIcon }}
+                >
+                  face_6
+                </span>
               </div>
-              <div className={styles.gradeBadge}>{profileGradeBadge}</div>
+              <div
+                className={styles.gradeBadge}
+                style={{ backgroundImage: tierTheme.myBadgeGradient }}
+              >
+                {profileGradeBadge}
+              </div>
             </div>
             <h2 className={styles.profileName}>{displayNickname}</h2>
             {profile?.email && <p className={styles.profileMeta}>{profile.email}</p>}
@@ -112,21 +277,45 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             <div className={styles.statsGrid}>
               <div className={styles.statCard}>
                 <p className={styles.statLabel}>이동 거리</p>
-                <p className={`${styles.statValue} ${styles.statValuePrimary}`}>{rewardDemoStats.totalDistance} KM</p>
+                <p className={`${styles.statValue} ${styles.statValuePrimary}`}>
+                  {distanceKm != null ? `${distanceKm} KM` : rewardLoading ? '…' : '—'}
+                </p>
                 <div className={styles.statSub}>
-                  <span className={`material-symbols-outlined ${styles.statTrendIcon}`}>trending_up</span>
-                  지난주 대비 {rewardDemoStats.distanceChange}
+                  <span className={`material-symbols-outlined ${styles.statTrendIcon}`}>straighten</span>
+                  누적 도보 {rewardMe != null ? `${rewardMe.totalWalkingDistance.toLocaleString('ko-KR')} m` : '—'}
                 </div>
               </div>
               <div className={styles.statCard}>
                 <p className={styles.statLabel}>현재 등급</p>
-                <p className={`${styles.statValue} ${styles.statValueDark}`}>{rewardDemoStats.gradeKr}</p>
+                <p
+                  className={`${styles.statValue} ${styles.statValueDark}`}
+                  style={{ color: tierTheme.myTierNameColor }}
+                >
+                  {rewardMe != null ? tierLabelEn : rewardLoading ? '…' : '—'}
+                </p>
                 <div className={styles.progressBarWrap}>
                   <div className={styles.progressBar}>
-                    <div className={styles.progressBarFill} style={{ width: `${progressPercent}%` }} />
+                    <div
+                      className={styles.progressBarFill}
+                      style={{
+                        width: `${progressPercent}%`,
+                        backgroundColor: tierTheme.myTierProgress,
+                        boxShadow: tierTheme.myTierProgressGlow,
+                      }}
+                    />
                   </div>
                   <p className={styles.progressLabel}>
-                    {rewardDemoStats.orderCount}/{rewardDemoStats.nextGradeCount} 회
+                    {rewardMe != null
+                      ? rewardMe.nextTierRequiredCount > 0
+                        ? `${rewardMe.orderCount}회 · 다음 등급까지 ${rewardMe.nextTierRequiredCount}회`
+                        : `${rewardMe.orderCount}회 · 최고 등급`
+                      : rewardLoading
+                        ? '…'
+                        : !getAccessToken()
+                          ? '로그인 후 확인'
+                          : rewardFetchFailed
+                            ? '리워드 정보를 불러오지 못했습니다'
+                            : '—'}
                   </p>
                 </div>
               </div>
@@ -137,15 +326,32 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             <div className={styles.distanceGoalCard}>
               <div className={styles.distanceGoalHeader}>
                 <h3 className={styles.distanceGoalTitle}>
-                  <span className={`material-symbols-outlined ${styles.distanceGoalIcon}`}>directions_walk</span>
-                  이동 거리 목표
+                  <span
+                    className={`material-symbols-outlined ${styles.distanceGoalIcon}`}
+                    style={{ color: tierTheme.myGoalIcon }}
+                  >
+                    military_tech
+                  </span>
+                  리워드 요약
                 </h3>
-                <span className={styles.distanceGoalBadge}>D-{remainingDistance} KM</span>
+                <span className={styles.distanceGoalBadge} style={{ color: tierTheme.myGoalBadgeColor }}>
+                  XP {cumulativeXpDisplay != null ? cumulativeXpDisplay.toLocaleString('ko-KR') : '—'}
+                </span>
               </div>
               <div className={styles.distanceGoalBarWrap}>
-                <div className={styles.distanceGoalBarFill} style={{ width: `${distanceProgress}%` }} />
+                <div
+                  className={styles.distanceGoalBarFill}
+                  style={{
+                    width: `${progressPercent}%`,
+                    backgroundColor: tierTheme.myGoalBar,
+                    boxShadow: tierTheme.myTierProgressGlow,
+                  }}
+                />
               </div>
-              <p className={styles.distanceGoalDesc}>다음 목표까지 {remainingDistance} KM 남았습니다!</p>
+              <p className={styles.distanceGoalDesc}>
+                누적 주문 {rewardMe != null ? `${rewardMe.orderCount.toLocaleString('ko-KR')}회` : '—'} · 등급 코드{' '}
+                {rewardMe?.tier ?? '—'}
+              </p>
             </div>
           </section>
 
@@ -155,7 +361,9 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                 <span className={`material-symbols-outlined ${styles.questIcon}`}>calendar_month</span>
                 주간 퀘스트(출석체크)
               </h3>
-              <span className={styles.questBadge}>{consecutiveDays}일 연속 달성 중!</span>
+              <span className={styles.questBadge}>
+                {attendanceStreak > 0 ? `${attendanceStreak}일째 연속 출석 중!` : '연속 출석을 시작해 보세요!'}
+              </span>
             </div>
             <div className={styles.weekGrid}>
               {weekDays.map((day, idx) => (
@@ -272,8 +480,10 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
               <span className={`material-symbols-outlined ${styles.modalIcon}`}>check_circle</span>
             </div>
             <h3 className={styles.modalTitle}>출석 완료!</h3>
-            <p className={styles.modalDesc}>오늘의 출석체크가 완료되었습니다.</p>
-            <p className={styles.modalSub}>🔥 {consecutiveDays}일 연속 출석 중!</p>
+            <p className={styles.modalDesc}>{attendanceModalMessage}</p>
+            <p className={styles.modalSub}>
+              🔥 {attendanceStreak > 0 ? `${attendanceStreak}일째 연속 출석 중이에요!` : '내일도 이어가면 연속 출석이 쌓여요!'}
+            </p>
             <button type="button" onClick={() => setShowAttendanceModal(false)} className={styles.modalButton}>
               확인
             </button>

@@ -1,13 +1,19 @@
 /**
  * MyReviewsPage.tsx
  * 내 리뷰 관리 페이지 (마이페이지 → 리뷰 관리)
- * - 작성한 리뷰 카드 목록, 수정/삭제, 삭제 확인 모달
+ * - GET /api/reviews/my/{memberProfileId}, DELETE /api/reviews/{reviewId}
  */
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import AppModal from '../../components/AppModal/AppModal'
+import { ApiError } from '../../api/authClient'
+import { deleteReview, fetchMyReviews, type ReviewDto } from '../../api/reviews'
+import { fetchStoreDetail } from '../../api/store'
+import { useProfile } from '../../hooks/useProfile'
+import { getAccessToken } from '../../lib/authStorage'
+import { FEATURED_RESTAURANTS } from '../../constants'
 import styles from './MyReviewsPage.module.css'
 
 interface MyReviewsPageProps {
@@ -21,8 +27,9 @@ interface MyReviewsPageProps {
   cartCount?: number
 }
 
-interface Review {
+interface ReviewUi {
   id: number
+  storeId: number
   storeName: string
   storeImage: string
   rating: number
@@ -32,53 +39,101 @@ interface Review {
   keywords: string[]
 }
 
-/** 내가 작성한 리뷰 목록 (데모) */
-const mockReviews: Review[] = [
-  {
-    id: 1,
-    storeName: '카페 네온 하이브',
-    storeImage: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=100&h=100&fit=crop',
-    rating: 5,
-    date: '2026.03.10',
-    content: '분위기가 정말 좋고 커피도 맛있어요! 작업하기에도 딱 좋은 곳이에요. 다음에 또 방문할 예정입니다.',
-    photos: ['https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop'],
-    keywords: ['분위기가 좋아요', '커피가 맛있어요'],
-  },
-  {
-    id: 2,
-    storeName: '맛있는 치킨집',
-    storeImage: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=100&h=100&fit=crop',
-    rating: 4,
-    date: '2026.03.05',
-    content: '치킨이 바삭하고 맛있어요. 배달도 빨랐습니다. 양념치킨 강추!',
-    photos: [],
-    keywords: ['맛있어요'],
-  },
-  {
-    id: 3,
-    storeName: '건강한 샐러드',
-    storeImage: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=100&h=100&fit=crop',
-    rating: 5,
-    date: '2026.02.28',
-    content: '신선한 재료로 만든 샐러드가 정말 맛있어요. 다이어트 중인데 자주 이용하고 있습니다.',
-    photos: ['https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop'],
-    keywords: ['건강해요', '신선해요'],
-  },
-]
+function formatReviewDate(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
+  const yy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yy}.${mm}.${dd}`
+}
 
-function MyReviewsPage({ 
-  onBack, 
+function storeThumb(storeId: number): string {
+  return (
+    FEATURED_RESTAURANTS.find((r) => r.id === storeId)?.image ??
+    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'
+  )
+}
+
+function mapDtoToUi(d: ReviewDto, storeName: string): ReviewUi {
+  const urls = (d.imagePaths ?? []).map((p) => (p.startsWith('http') ? p : p))
+  const kw: string[] = []
+  if (d.aiGeneratedHelped) kw.push('AI 도움 받음')
+  return {
+    id: d.reviewId,
+    storeId: d.storeId,
+    storeName,
+    storeImage: storeThumb(d.storeId),
+    rating: d.overallRating,
+    date: formatReviewDate(d.createdAt),
+    content: d.content,
+    photos: urls,
+    keywords: kw,
+  }
+}
+
+function MyReviewsPage({
+  onBack,
   onWriteReview,
   onGoHome,
   onCartClick,
   onOrdersClick,
   onMapClick,
   onMypageClick,
-  cartCount = 0
+  cartCount = 0,
 }: MyReviewsPageProps) {
-  const [reviews, setReviews] = useState<Review[]>(mockReviews)
+  const { profile } = useProfile()
+  const [reviews, setReviews] = useState<ReviewUi[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const loadReviews = useCallback(async () => {
+    if (!getAccessToken()) {
+      setReviews([])
+      setLoadError('로그인이 필요합니다.')
+      setLoading(false)
+      return
+    }
+    const mpid = profile?.memberProfileId
+    if (mpid == null) {
+      setReviews([])
+      setLoadError('프로필 정보를 불러오지 못했습니다.')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const list = await fetchMyReviews(Number(mpid))
+      const ids = [...new Set(list.map((r) => r.storeId))]
+      const nameByStore: Record<number, string> = {}
+      await Promise.all(
+        ids.map(async (sid) => {
+          try {
+            const det = await fetchStoreDetail(sid)
+            nameByStore[sid] = det.name
+          } catch {
+            nameByStore[sid] = `매장 #${sid}`
+          }
+        }),
+      )
+      setReviews(list.map((r) => mapDtoToUi(r, nameByStore[r.storeId] ?? `매장 #${r.storeId}`)))
+    } catch (e) {
+      setReviews([])
+      setLoadError(e instanceof ApiError ? e.message : '리뷰 목록을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [profile?.memberProfileId])
+
+  useEffect(() => {
+    void loadReviews()
+  }, [loadReviews])
 
   const handleDeleteClick = (id: number) => {
     setSelectedReviewId(id)
@@ -86,11 +141,24 @@ function MyReviewsPage({
   }
 
   const handleDeleteConfirm = () => {
-    if (selectedReviewId !== null) {
-      setReviews(prev => prev.filter(r => r.id !== selectedReviewId))
+    const mpid = profile?.memberProfileId
+    if (selectedReviewId === null || mpid == null) {
+      setShowDeleteModal(false)
+      return
     }
-    setShowDeleteModal(false)
-    setSelectedReviewId(null)
+    setDeleting(true)
+    void (async () => {
+      try {
+        await deleteReview(selectedReviewId, { memberProfileId: Number(mpid) })
+        await loadReviews()
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : '삭제하지 못했습니다.')
+      } finally {
+        setDeleting(false)
+        setShowDeleteModal(false)
+        setSelectedReviewId(null)
+      }
+    })()
   }
 
   const renderStars = (rating: number) => {
@@ -119,7 +187,17 @@ function MyReviewsPage({
         </header>
 
         <div className={styles.scrollArea}>
-          {reviews.length > 0 ? (
+          {loading ? (
+            <section className={styles.emptySection}>
+              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>hourglass_empty</span>
+              <p className={styles.emptyTitle}>불러오는 중…</p>
+            </section>
+          ) : loadError ? (
+            <section className={styles.emptySection}>
+              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>error</span>
+              <p className={styles.emptyTitle}>{loadError}</p>
+            </section>
+          ) : reviews.length > 0 ? (
             <section className={styles.listSection}>
               <div className={styles.list}>
                 {reviews.map((review) => (
@@ -145,16 +223,22 @@ function MyReviewsPage({
                     {review.keywords.length > 0 && (
                       <div className={styles.cardKeywords}>
                         {review.keywords.map((keyword) => (
-                          <span key={keyword} className={styles.keyword}>{keyword}</span>
+                          <span key={keyword} className={styles.keyword}>
+                            {keyword}
+                          </span>
                         ))}
                       </div>
                     )}
                     <div className={styles.cardActions}>
-                      <button type="button" className={styles.actionButton}>
+                      <button type="button" className={styles.actionButton} disabled title="수정 API는 추후 연결 예정">
                         <span className={`material-symbols-outlined ${styles.actionIcon}`}>edit</span>
                         수정
                       </button>
-                      <button type="button" onClick={() => handleDeleteClick(review.id)} className={`${styles.actionButton} ${styles.actionButtonDelete}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClick(review.id)}
+                        className={`${styles.actionButton} ${styles.actionButtonDelete}`}
+                      >
                         <span className={`material-symbols-outlined ${styles.actionIcon}`}>delete</span>
                         삭제
                       </button>
@@ -175,24 +259,28 @@ function MyReviewsPage({
           )}
         </div>
 
-        <AppModal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="md">
+        <AppModal open={showDeleteModal} onClose={() => !deleting && setShowDeleteModal(false)} size="md">
           <h3 className={styles.modalTitle}>리뷰 삭제</h3>
           <p className={styles.modalDesc}>
             정말 이 리뷰를 삭제하시겠어요?<br />삭제된 리뷰는 복구할 수 없습니다.
           </p>
           <div className={styles.modalActions}>
-            <button type="button" onClick={() => setShowDeleteModal(false)} className={styles.modalCancel}>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => setShowDeleteModal(false)}
+              className={styles.modalCancel}
+            >
               취소
             </button>
-            <button type="button" onClick={handleDeleteConfirm} className={styles.modalConfirm}>
-              삭제
+            <button type="button" disabled={deleting} onClick={handleDeleteConfirm} className={styles.modalConfirm}>
+              {deleting ? '삭제 중…' : '삭제'}
             </button>
           </div>
         </AppModal>
 
-        {/* 하단 네비게이션 */}
-        <BottomNav 
-          active="mypage" 
+        <BottomNav
+          active="mypage"
           cartCount={cartCount}
           onNavigate={(page) => {
             if (page === 'home') onGoHome?.()
