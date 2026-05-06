@@ -9,6 +9,7 @@ import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import PickupRewardModal from '../../components/PickupRewardModal/PickupRewardModal'
 import { FEATURED_RESTAURANTS } from '../../constants'
+import type { ReviewWritePayload } from '../../api/reviews'
 import { MapTmapCanvas } from '../map/MapPage'
 import styles from './OrderStatusPage.module.css'
 
@@ -20,8 +21,9 @@ interface OrderStatusPageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   /** 픽업 리워드 모달에서 리뷰 작성으로 이동 */
-  onReviewWriteClick?: (storeName: string) => void
+  onReviewWriteClick?: (payload: ReviewWritePayload) => void
   /**
    * 매장에서 픽업 완료 처리 시 — App에서 진행 주문 플래그 해제(홈·지도·주문내역 등)
    */
@@ -46,6 +48,24 @@ const orderData = {
   estimatedTime: '에서 확인',
   /** 진입 시 조리중 → COOKING_TO_READY_MS 후 픽업준비, 그때 픽업 완료 버튼 표시 */
   currentStep: 'cooking' as OrderStep,
+}
+
+function buildReviewPayloadFromLocalOrders(): ReviewWritePayload {
+  try {
+    const raw = window.localStorage.getItem('__jubjub_local_orders')
+    const arr = raw ? (JSON.parse(raw) as { orderId: number; storeId: number; storeName: string; paymentStatus?: string }[]) : []
+    const paid = Array.isArray(arr) ? arr.find((o) => o.paymentStatus === 'PAID') : undefined
+    if (paid) {
+      return { orderId: paid.orderId, storeId: paid.storeId, storeName: paid.storeName }
+    }
+  } catch {
+    /* ignore */
+  }
+  return {
+    orderId: 0,
+    storeId: orderData.storeId,
+    storeName: orderData.storeName,
+  }
 }
 
 const steps: { key: OrderStep; label: string; icon: string }[] = [
@@ -103,7 +123,7 @@ function OrderStatusPage({
 
   const handleReviewFromModal = () => {
     setRewardModalOpen(false)
-    onReviewWriteClick?.(orderData.storeName)
+    onReviewWriteClick?.(buildReviewPayloadFromLocalOrders())
   }
 
   const pickupStore =

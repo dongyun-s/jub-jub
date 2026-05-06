@@ -27,6 +27,7 @@ interface CategoryDetailPageProps {
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
+  onNotificationsClick?: () => void
   cartCount?: number
 }
 
@@ -39,6 +40,7 @@ function CategoryDetailPage({
   onMapClick,
   onMypageClick,
   onFavoritesClick,
+  onNotificationsClick,
   cartCount = 0,
 }: CategoryDetailPageProps) {
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
@@ -116,7 +118,12 @@ function CategoryDetailPage({
 
   return (
     <Layout showBackground={false}>
-      <Header showBack onBack={onBack} onFavoriteClick={onFavoritesClick} />
+      <Header
+        showBack
+        onBack={onBack}
+        onFavoriteClick={onFavoritesClick}
+        onNotificationsClick={onNotificationsClick}
+      />
 
       {/* 검색 영역 - 홈과 동일한 SearchBar 사용 */}
       <SearchBar

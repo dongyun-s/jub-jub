@@ -81,14 +81,12 @@
   border-radius: 9999px;
   background-color: #ffffff;
   border: 4px solid rgba(246, 49, 154, 0.2);
-  box-shadow: 0 10px 15px -3px rgba(246, 49, 154, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .avatarIcon {
-  color: var(--color-primary);
   font-size: 4.5rem;
 }
 
@@ -97,7 +95,7 @@
   bottom: -0.5rem;
   left: 50%;
   transform: translateX(-50%);
-  background-image: linear-gradient(to right, var(--color-primary), #ec4899);
+  white-space: nowrap;
   color: #ffffff;
   font-size: 0.75rem;
   font-weight: 700;
@@ -193,8 +191,6 @@
 .progressBarFill {
   height: 100%;
   border-radius: 9999px;
-  background-color: var(--color-primary);
-  box-shadow: 0 0 8px rgba(246, 49, 154, 0.5);
 }
 
 .progressLabel {
@@ -234,14 +230,12 @@
 }
 
 .distanceGoalIcon {
-  color: var(--color-primary);
   font-size: 1.125rem;
 }
 
 .distanceGoalBadge {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--color-primary);
 }
 
 .distanceGoalBarWrap {
@@ -256,8 +250,6 @@
 .distanceGoalBarFill {
   height: 100%;
   border-radius: 9999px;
-  background-color: var(--color-primary);
-  filter: drop-shadow(0 0 4px #f6319a);
 }
 
 .distanceGoalDesc {

@@ -8,7 +8,8 @@ import Layout from '../../components/Layout'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { login } from '../../api/auth'
 import { ApiError } from '../../api/authClient'
-import { setTokens } from '../../lib/authStorage'
+import { setSessionEmail, setTokens } from '../../lib/authStorage'
+import { migrateWeeklyAnonAttendanceToEmail } from '../../lib/rewardAttendance'
 
 interface LoginPageProps {
   onLogin: () => void
@@ -31,6 +32,9 @@ function LoginPage({ onLogin, onSignUp, onForgotId, onForgotPassword }: LoginPag
     try {
       const res = await login(email.trim(), password)
       setTokens(res.accessToken, res.refreshToken)
+      const loggedEmail = res.email?.trim() || email.trim()
+      setSessionEmail(loggedEmail)
+      migrateWeeklyAnonAttendanceToEmail(loggedEmail)
       onLogin()
     } catch (err) {
       const msg =
