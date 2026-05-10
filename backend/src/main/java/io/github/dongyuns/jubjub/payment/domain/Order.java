@@ -83,7 +83,6 @@ public class Order extends BaseTimeEntity {
         this.status = OrderStatus.PAID;
         this.paidAt = paidAt;
     }
-
     public void markRefunded() {
         this.status = OrderStatus.REFUNDED;
     }
