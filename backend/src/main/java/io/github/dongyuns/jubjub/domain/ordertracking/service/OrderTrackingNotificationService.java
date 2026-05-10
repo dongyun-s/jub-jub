@@ -64,6 +64,20 @@ public class OrderTrackingNotificationService {
         notifications.forEach(OrderTrackingNotification::markAsRead);
     }
 
+    @Transactional
+    public void markAsRead(String accountEmail, Long notificationId) {
+        MemberProfile memberProfile = findMemberProfile(accountEmail);
+        OrderTrackingNotification notification = orderTrackingNotificationRepository
+                .findByIdAndMemberProfileId(notificationId, memberProfile.getId())
+                .orElseThrow(() -> new BusinessException(
+                        "ORDER_TRACKING_NOTIFICATION_NOT_FOUND",
+                        "알림을 찾을 수 없습니다.",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        notification.markAsRead();
+    }
+
     private MemberProfile findMemberProfile(String accountEmail) {
         if (accountEmail == null || accountEmail.isBlank()) {
             throw new BusinessException("UNAUTHORIZED", "로그인한 사용자만 알림을 조회할 수 있습니다.", HttpStatus.UNAUTHORIZED);

@@ -34,4 +34,9 @@ public class OrderTrackingController {
     public void markAllNotificationsAsRead(Authentication authentication) {
         orderTrackingNotificationService.markAllAsRead(authentication != null ? authentication.getName() : null);
     }
+
+    @PostMapping("/notifications/{notificationId}/read")
+    public void markNotificationAsRead(Authentication authentication, @PathVariable Long notificationId) {
+        orderTrackingNotificationService.markAsRead(authentication != null ? authentication.getName() : null, notificationId);
+    }
 }

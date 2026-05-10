@@ -12,4 +12,6 @@ public interface OrderTrackingNotificationRepository extends JpaRepository<Order
     long countByMemberProfileIdAndReadFalse(Long memberProfileId);
 
     Optional<OrderTrackingNotification> findTopByOrderIdAndTitleOrderByCreatedAtDesc(Long orderId, String title);
+
+    Optional<OrderTrackingNotification> findByIdAndMemberProfileId(Long id, Long memberProfileId);
 }
