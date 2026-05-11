@@ -1,7 +1,7 @@
 /**
  * OrderStatusPage.tsx
  * 주문 현황 페이지 (결제 후 또는 주문내역/홈 배너에서 진입)
- * - 픽업 매장 지도, 주문접수→조리중→픽업준비→픽업완료 단계 표시, 주문 요약
+ * - 픽업 매장 지도, 주문접수→조리중→픽업준비→픽업완료 단계 표시, 주문 요약 (데모)
  */
 
 import { useEffect, useState } from 'react'
@@ -22,11 +22,7 @@ interface OrderStatusPageProps {
   onMypageClick?: () => void
   onFavoritesClick?: () => void
   onNotificationsClick?: () => void
-  /** 픽업 리워드 모달에서 리뷰 작성으로 이동 */
   onReviewWriteClick?: (payload: ReviewWritePayload) => void
-  /**
-   * 매장에서 픽업 완료 처리 시 — App에서 진행 주문 플래그 해제(홈·지도·주문내역 등)
-   */
   onPickupComplete?: () => void
   cartCount?: number
 }
@@ -36,7 +32,6 @@ type OrderStep = 'received' | 'cooking' | 'ready' | 'completed'
 /** 조리중 → 픽업준비(조리 완료) 자동 전환 대기 시간 (ms) */
 const COOKING_TO_READY_MS = 15_000
 
-/** 현재 주문 정보 (데모) — 픽업 매장 id는 FEATURED_RESTAURANTS 와 맞춤 */
 const orderData = {
   orderNumber: '20231024-001',
   pickupTime: '15:15',
@@ -46,7 +41,6 @@ const orderData = {
   storeAddress: '서울 강남구 테헤란로 123 (데모)',
   distance: '지도·경로 탭',
   estimatedTime: '에서 확인',
-  /** 진입 시 조리중 → COOKING_TO_READY_MS 후 픽업준비, 그때 픽업 완료 버튼 표시 */
   currentStep: 'cooking' as OrderStep,
 }
 
@@ -83,6 +77,7 @@ function OrderStatusPage({
   onMapClick,
   onMypageClick,
   onFavoritesClick: _onFavoritesClick,
+  onNotificationsClick: _onNotificationsClick,
   onReviewWriteClick,
   onPickupComplete,
   cartCount = 0,
@@ -131,7 +126,6 @@ function OrderStatusPage({
   const storeMapLat = pickupStore.lat
   const storeMapLng = pickupStore.lng
 
-  /** 단계별 상태: 완료 / 진행중 / 대기 */
   const getStepStatus = (index: number) => {
     if (index < currentStepIndex) return 'completed'
     if (index === currentStepIndex) return 'active'
@@ -142,7 +136,7 @@ function OrderStatusPage({
     <Layout showBackground={false}>
       <div className={styles.root}>
         <header className={styles.header}>
-          <button onClick={onBack} className={styles.backButton}>
+          <button type="button" onClick={() => onBack()} className={styles.backButton}>
             <span className={`material-symbols-outlined ${styles.backIcon}`}>arrow_back</span>
           </button>
           <h1 className={styles.headerTitle}>주문 현황 및 경로</h1>
@@ -160,7 +154,17 @@ function OrderStatusPage({
                 fitMarkers={false}
               />
             ) : (
-              <div className={styles.mapIframe} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgb(243 244 246)', color: 'rgb(107 114 128)', fontSize: '0.875rem' }}>
+              <div
+                className={styles.mapIframe}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgb(243 244 246)',
+                  color: 'rgb(107 114 128)',
+                  fontSize: '0.875rem',
+                }}
+              >
                 매장 좌표가 없습니다.
               </div>
             )}
@@ -195,18 +199,28 @@ function OrderStatusPage({
                 const status = getStepStatus(index)
                 return (
                   <div key={step.key} className={styles.stepItem}>
-                    <div className={`${styles.stepIcon} ${
-                      status === 'completed' ? styles.stepIconCompleted :
-                      status === 'active' ? styles.stepIconActive : styles.stepIconPending
-                    }`}>
+                    <div
+                      className={`${styles.stepIcon} ${
+                        status === 'completed'
+                          ? styles.stepIconCompleted
+                          : status === 'active'
+                            ? styles.stepIconActive
+                            : styles.stepIconPending
+                      }`}
+                    >
                       <span className={`material-symbols-outlined ${styles.stepIconSpan}`}>
                         {status === 'completed' ? 'check' : step.icon}
                       </span>
                     </div>
-                    <p className={`${styles.stepLabel} ${
-                      status === 'active' ? styles.stepLabelActive :
-                      status === 'completed' ? styles.stepLabelCompleted : styles.stepLabelPending
-                    }`}>
+                    <p
+                      className={`${styles.stepLabel} ${
+                        status === 'active'
+                          ? styles.stepLabelActive
+                          : status === 'completed'
+                            ? styles.stepLabelCompleted
+                            : styles.stepLabelPending
+                      }`}
+                    >
                       {step.label}
                     </p>
                     {index < steps.length - 1 && (
@@ -260,7 +274,7 @@ function OrderStatusPage({
                   </p>
                 </div>
               </div>
-              <button onClick={onMapClick} className={styles.navButton}>
+              <button type="button" onClick={() => onMapClick?.()} className={styles.navButton}>
                 <span className="material-symbols-outlined">directions</span>
                 길찾기 보러가기
               </button>
@@ -268,9 +282,8 @@ function OrderStatusPage({
           </div>
         </div>
 
-        {/* 하단 네비게이션 */}
-        <BottomNav 
-          active="orders" 
+        <BottomNav
+          active="orders"
           cartCount={cartCount}
           onNavigate={(page) => {
             if (page === 'home') onGoHome?.()

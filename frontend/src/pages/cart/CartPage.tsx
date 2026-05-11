@@ -19,7 +19,7 @@ import {
 import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
 import { ApiError } from '../../api/authClient'
 import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
-import { getAccessToken } from '../../lib/authStorage'
+import { getAccessToken, setCachedMemberProfileId } from '../../lib/authStorage'
 import styles from './CartPage.module.css'
 
 interface AppliedCoupon {
@@ -32,6 +32,7 @@ type CartItem = ServerCartLineUi
 
 interface CartPageProps {
   onBack: () => void
+  /** 결제 성공 시 주문 현황으로 이동 */
   onCheckout?: () => void
   onCouponClick?: () => void
   appliedCoupon?: AppliedCoupon | null
@@ -171,6 +172,9 @@ function CartPage({
           storeId: cartStoreId,
           totalAmount: subtotal,
         })
+        if (order.memberProfileId != null) {
+          setCachedMemberProfileId(order.memberProfileId)
+        }
 
         // (DEBUG/임시) 주문내역 화면 표시용 로컬 저장 — 서버 주문내역 API 연결 전까지 사용
         try {
@@ -199,6 +203,7 @@ function CartPage({
               image: storeImage,
               createdAt: new Date().toISOString(),
               paymentStatus: 'CREATED',
+              memberProfileId: order.memberProfileId,
             },
             ...prev,
           ].slice(0, 50)
@@ -254,7 +259,6 @@ function CartPage({
           }
 
           alert('결제창이 닫혔습니다. 결제 완료 여부는 주문내역에서 확인해 주세요.')
-          onCheckout?.()
           setIsProcessing(false)
           return
         }

@@ -11,6 +11,8 @@ import BottomNav from '../../components/BottomNav'
 import { useProfile } from '../../hooks/useProfile'
 import AppModal from '../../components/AppModal/AppModal'
 import { ApiError } from '../../api/authClient'
+import { createMyProfileImage, updateMyProfileImage } from '../../api/profileImage'
+import { uploadImageFileViaPresigned } from '../../api/uploads'
 import {
   fetchAttendanceWeek,
   fetchAttendanceHistory,
@@ -27,6 +29,7 @@ import {
   weekIsoDatesMondayFirst,
 } from '../../lib/rewardAttendance'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
+import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import styles from './MyPage.module.css'
 
 interface MyPageProps {
@@ -50,7 +53,9 @@ function todayWeekIndex(): number {
 }
 
 function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onNotificationsClick, onLogout, cartCount = 0 }: MyPageProps) {
-  const { profile, loading: profileLoading } = useProfile()
+  const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile()
+  const avatarFileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
 
   const todayIndex = todayWeekIndex()
 
@@ -178,6 +183,40 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
 
   const isTodayChecked = checkedDays[todayIndex]
 
+  const profileImageUrl = (() => {
+    const raw = profile?.profileImagePath?.trim()
+    if (!raw) return null
+    const u = resolveDisplayImageUrl(raw)
+    if (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:')) return u
+    return null
+  })()
+
+  const handleAvatarFileChange = (list: FileList | null) => {
+    const file = list?.[0]
+    if (!file) return
+    if (!getAccessToken()) {
+      alert('로그인 후 프로필 사진을 변경할 수 있습니다.')
+      return
+    }
+    void (async () => {
+      setAvatarUploading(true)
+      try {
+        const fileUrl = await uploadImageFileViaPresigned('PROFILE', file)
+        const hasExisting = Boolean(profile?.profileImagePath?.trim())
+        if (hasExisting) {
+          await updateMyProfileImage(fileUrl)
+        } else {
+          await createMyProfileImage(fileUrl)
+        }
+        await refetchProfile()
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : '프로필 사진을 변경하지 못했습니다.')
+      } finally {
+        setAvatarUploading(false)
+      }
+    })()
+  }
+
   /** 오늘 출석 버튼 클릭: POST /api/v1/rewards/attendance */
   const handleAttendanceCheck = () => {
     if (!getAccessToken()) {
@@ -245,20 +284,44 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
         <div className={styles.scrollArea}>
           <section className={styles.profileSection}>
             <div className={styles.avatarWrap}>
-              <div
-                className={styles.avatarCircle}
-                style={{
-                  borderColor: tierTheme.myAvatarRing,
-                  boxShadow: tierTheme.myAvatarGlow,
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                className={styles.avatarFileInput}
+                aria-hidden
+                tabIndex={-1}
+                onChange={(e) => {
+                  handleAvatarFileChange(e.target.files)
+                  e.target.value = ''
                 }}
+              />
+              <button
+                type="button"
+                className={styles.avatarTap}
+                disabled={avatarUploading || !getAccessToken()}
+                onClick={() => avatarFileInputRef.current?.click()}
+                aria-label={avatarUploading ? '프로필 사진 업로드 중' : '프로필 사진 변경'}
               >
-                <span
-                  className={`material-symbols-outlined ${styles.avatarIcon}`}
-                  style={{ color: tierTheme.myAvatarIcon }}
+                <div
+                  className={styles.avatarCircle}
+                  style={{
+                    borderColor: tierTheme.myAvatarRing,
+                    boxShadow: tierTheme.myAvatarGlow,
+                  }}
                 >
-                  face_6
-                </span>
-              </div>
+                  {profileImageUrl ? (
+                    <img src={profileImageUrl} alt="" className={styles.avatarImage} />
+                  ) : (
+                    <span
+                      className={`material-symbols-outlined ${styles.avatarIcon}`}
+                      style={{ color: tierTheme.myAvatarIcon }}
+                    >
+                      face_6
+                    </span>
+                  )}
+                </div>
+              </button>
               <div
                 className={styles.gradeBadge}
                 style={{ backgroundImage: tierTheme.myBadgeGradient }}

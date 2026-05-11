@@ -136,6 +136,13 @@
   color: rgb(156 163 175);
 }
 
+.photosHint {
+  font-size: 0.75rem;
+  color: rgb(107 114 128);
+  margin: -0.25rem 0 0.875rem;
+  line-height: 1.4;
+}
+
 .photosRow {
   display: flex;
   gap: 0.75rem;
@@ -175,6 +182,24 @@
   height: 5rem;
 }
 
+.photoThumbHit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: rgb(243 244 246);
+  outline: none;
+}
+
+.photoThumbHit:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .photoImg {
   width: 100%;
   height: 100%;
@@ -186,6 +211,7 @@
   position: absolute;
   top: -0.5rem;
   right: -0.5rem;
+  z-index: 2;
   width: 1.5rem;
   height: 1.5rem;
   background-color: rgb(31 41 55);
@@ -480,4 +506,134 @@
   font-size: 0.75rem;
   color: rgb(156 163 175);
   margin-top: 0.75rem;
+}
+
+/* 전체 화면 사진 미리보기 */
+.photoLightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.photoLightboxBackdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.photoLightboxPanel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;
+}
+
+.photoLightboxPanel > * {
+  pointer-events: auto;
+}
+
+.photoLightboxClose {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  z-index: 3;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.photoLightboxClose:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.photoLightboxClose .material-symbols-outlined {
+  font-size: 1.5rem;
+}
+
+.photoLightboxImg {
+  max-width: min(100vw - 2rem, 36rem);
+  max-height: min(70vh, 32rem);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+}
+
+.photoLightboxPrev,
+.photoLightboxNext {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.photoLightboxPrev:hover,
+.photoLightboxNext:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.photoLightboxPrev {
+  left: max(0.5rem, env(safe-area-inset-left));
+}
+
+.photoLightboxNext {
+  right: max(0.5rem, env(safe-area-inset-right));
+}
+
+.photoLightboxPrev .material-symbols-outlined,
+.photoLightboxNext .material-symbols-outlined {
+  font-size: 2rem;
+}
+
+.photoLightboxCounter {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

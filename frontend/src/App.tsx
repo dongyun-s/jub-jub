@@ -418,7 +418,12 @@ function App() {
         )
       default:
         /** 정의되지 않은 페이지일 경우 홈으로 폴백 */
-        return <HomePage onCategoryClick={goTo('category')} />
+        return (
+          <HomePage
+            onCategoryClick={goTo('category')}
+            hasActiveOrder={hasActiveOrder}
+          />
+        )
     }
   }
 
