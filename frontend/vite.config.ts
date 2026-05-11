@@ -39,6 +39,18 @@ export default defineConfig(({ mode }) => {
           target: 'https://jayde-proreconciliation-luigi.ngrok-free.dev',
           changeOrigin: true,
         },
+        '/order-tracking': {
+          target: 'https://jayde-proreconciliation-luigi.ngrok-free.dev',
+          changeOrigin: true,
+        },
+        '/orders': {
+          target: 'https://jayde-proreconciliation-luigi.ngrok-free.dev',
+          changeOrigin: true,
+        },
+        '/payments': {
+          target: 'https://jayde-proreconciliation-luigi.ngrok-free.dev',
+          changeOrigin: true,
+        },
       },
     },
   }

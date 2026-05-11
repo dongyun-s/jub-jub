@@ -12,8 +12,9 @@ import { ApiError } from '../../api/authClient'
 import { deleteReview, fetchMyReviews, type ReviewDto } from '../../api/reviews'
 import { fetchStoreDetail } from '../../api/store'
 import { useProfile } from '../../hooks/useProfile'
-import { getAccessToken } from '../../lib/authStorage'
+import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
 import { FEATURED_RESTAURANTS } from '../../constants'
+import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import styles from './MyReviewsPage.module.css'
 
 interface MyReviewsPageProps {
@@ -57,7 +58,7 @@ function storeThumb(storeId: number): string {
 }
 
 function mapDtoToUi(d: ReviewDto, storeName: string): ReviewUi {
-  const urls = (d.imagePaths ?? []).map((p) => (p.startsWith('http') ? p : p))
+  const urls = (d.imagePaths ?? []).map((p) => resolveDisplayImageUrl(p)).filter((u): u is string => Boolean(u))
   const kw: string[] = []
   if (d.aiGeneratedHelped) kw.push('AI 도움 받음')
   return {
@@ -98,10 +99,10 @@ function MyReviewsPage({
       setLoading(false)
       return
     }
-    const mpid = profile?.memberProfileId
+    const mpid = profile?.memberProfileId ?? getCachedMemberProfileId()
     if (mpid == null) {
       setReviews([])
-      setLoadError('프로필 정보를 불러오지 못했습니다.')
+      setLoadError('프로필 정보를 불러오지 못했습니다. 주문을 한 번 생성(결제 진행)한 뒤 다시 시도해 주세요.')
       setLoading(false)
       return
     }
@@ -141,7 +142,7 @@ function MyReviewsPage({
   }
 
   const handleDeleteConfirm = () => {
-    const mpid = profile?.memberProfileId
+    const mpid = profile?.memberProfileId ?? getCachedMemberProfileId()
     if (selectedReviewId === null || mpid == null) {
       setShowDeleteModal(false)
       return

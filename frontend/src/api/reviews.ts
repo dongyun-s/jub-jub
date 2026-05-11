@@ -1,5 +1,5 @@
 /**
- * 리뷰 API — 명세: `/api/reviews/*` (Spring은 ApiResponse 래핑 없이 본문만 반환하는 경우가 많음 → apiFetch)
+ * 리뷰 API — `/api/reviews/*` (Vite `/api` 프록시·직접 호출 공통)
  */
 import { apiFetch } from './authClient'
 
@@ -66,45 +66,45 @@ export interface ReviewDeleteBody {
 }
 
 export function generateAiReview(body: AiReviewGenerateBody) {
-  return apiFetch<AiReviewGenerateResponse>('/reviews/ai-generate', {
+  return apiFetch<AiReviewGenerateResponse>('/api/reviews/ai-generate', {
     method: 'POST',
     body: JSON.stringify(body),
   })
 }
 
 export function createReview(body: ReviewCreateBody) {
-  return apiFetch<ReviewDto>('/reviews', {
+  return apiFetch<ReviewDto>('/api/reviews', {
     method: 'POST',
     body: JSON.stringify(body),
   })
 }
 
 export function getReview(reviewId: number) {
-  return apiFetch<ReviewDto>(`/reviews/${reviewId}`, { method: 'GET' })
+  return apiFetch<ReviewDto>(`/api/reviews/${reviewId}`, { method: 'GET' })
 }
 
 export function fetchStoreReviews(storeId: number) {
-  return apiFetch<ReviewDto[]>(`/reviews/store/${storeId}`, { method: 'GET' })
+  return apiFetch<ReviewDto[]>(`/api/reviews/store/${storeId}`, { method: 'GET' })
 }
 
 export function fetchStoreReviewsByTasteRating(storeId: number, rating: number) {
   const q = new URLSearchParams({ rating: String(rating) })
-  return apiFetch<ReviewDto[]>(`/reviews/store/${storeId}/taste-rating?${q}`, { method: 'GET' })
+  return apiFetch<ReviewDto[]>(`/api/reviews/store/${storeId}/taste-rating?${q}`, { method: 'GET' })
 }
 
 export function fetchMyReviews(memberProfileId: number) {
-  return apiFetch<ReviewDto[]>(`/reviews/my/${memberProfileId}`, { method: 'GET' })
+  return apiFetch<ReviewDto[]>(`/api/reviews/my/${memberProfileId}`, { method: 'GET' })
 }
 
 export function updateReview(reviewId: number, body: ReviewUpdateBody) {
-  return apiFetch<ReviewDto>(`/reviews/${reviewId}`, {
+  return apiFetch<ReviewDto>(`/api/reviews/${reviewId}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   })
 }
 
 export function deleteReview(reviewId: number, body: ReviewDeleteBody) {
-  return apiFetch<string>(`/reviews/${reviewId}`, {
+  return apiFetch<string>(`/api/reviews/${reviewId}`, {
     method: 'DELETE',
     body: JSON.stringify(body),
   })

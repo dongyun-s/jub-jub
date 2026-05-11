@@ -298,11 +298,10 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
                 </div>
                 <div className={styles.activeOrderText}>
                   <div className={styles.activeOrderStatusRow}>
-                    <span className={styles.activeOrderStatusBadge}>조리중</span>
-                    <span className={styles.activeOrderStatusTime}>픽업 15:15 예정</span>
+                    <span className={styles.activeOrderStatusBadge}>진행 중</span>
                   </div>
                   <p className={styles.activeOrderStoreName}>{FEATURED_RESTAURANTS[0].title}</p>
-                  <p className={styles.activeOrderSubtitle}>예시 주문 1건</p>
+                  <p className={styles.activeOrderSubtitle}>주문 현황에서 단계를 확인하세요.</p>
                 </div>
                 <span className="material-symbols-outlined text-primary">chevron_right</span>
               </button>

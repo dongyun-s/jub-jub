@@ -75,6 +75,33 @@
   position: relative;
 }
 
+.avatarFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.avatarTap {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+
+.avatarTap:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .avatarCircle {
   width: 7rem;
   height: 7rem;
@@ -84,6 +111,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatarIcon {

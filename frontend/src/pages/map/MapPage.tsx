@@ -706,7 +706,7 @@ function MapPage({
       ]
     }
     return [dest]
-  }, [currentLocation, userHeadingDeg])
+  }, [currentLocation, userHeadingDeg, destinationData])
 
   const pickupPolyline = useMemo(() => {
     if (!currentLocation) return undefined
@@ -714,7 +714,7 @@ function MapPage({
       { lat: currentLocation.lat, lng: currentLocation.lng },
       { lat: destinationData.lat, lng: destinationData.lng },
     ]
-  }, [currentLocation])
+  }, [currentLocation, destinationData])
 
   const pickupPolylineForMap = useMemo(() => {
     if (pickupRoutePath && pickupRoutePath.length >= 2) return pickupRoutePath
@@ -729,7 +729,7 @@ function MapPage({
             lng: (currentLocation.lng + destinationData.lng) / 2,
           }
         : { lat: destinationData.lat, lng: destinationData.lng },
-    [currentLocation]
+    [currentLocation, destinationData]
   )
 
   const nearbyMarkers = useMemo(() => {
@@ -960,7 +960,7 @@ function MapPage({
     return () => {
       cancelled = true
     }
-  }, [hasActiveOrder, currentLocation, transportMode])
+  }, [hasActiveOrder, currentLocation, transportMode, destinationData])
 
   // 현재 위치 변경 시 주변 매장 거리 업데이트
   const getDistanceText = (storeLat: number, storeLng: number): string => {

@@ -15,6 +15,7 @@ import { ApiError } from '../../api/authClient'
 import { toggleStoreFavorite } from '../../api/favorites'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { getAccessToken } from '../../lib/authStorage'
+import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import {
   buildMenuCategoriesFromApi,
@@ -675,7 +676,7 @@ function StoreDetailPage({
                               {imgs.map((src, i) => (
                                 <img
                                   key={i}
-                                  src={src.startsWith('http') ? src : src}
+                                  src={resolveDisplayImageUrl(src)}
                                   alt=""
                                   className="h-16 w-16 rounded-lg object-cover"
                                 />

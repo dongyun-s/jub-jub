@@ -19,6 +19,7 @@ import { getAttendanceStreak, isAttendanceMarkedDone } from '../../lib/rewardAtt
 import { useProfile } from '../../hooks/useProfile'
 import { fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
 import { getAccessToken } from '../../lib/authStorage'
+import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './HomePage.module.css'
 
@@ -130,6 +131,15 @@ function HomePage({
   const distanceKm =
     rewardMe != null ? Math.round((rewardMe.totalWalkingDistance / 1000) * 10) / 10 : null
 
+  const avatarResolved = profile?.profileImagePath?.trim()
+    ? resolveDisplayImageUrl(profile.profileImagePath.trim())
+    : ''
+  const showAvatarImg =
+    Boolean(avatarResolved) &&
+    (avatarResolved.startsWith('http://') ||
+      avatarResolved.startsWith('https://') ||
+      avatarResolved.startsWith('data:'))
+
   /** 고정 목표 없을 때 바 길이만 완만하게 (완전 플랫 방지) */
   const distanceBarPercent =
     distanceKm != null ? Math.min(100, Math.max(8, (distanceKm / 10) * 100)) : 0
@@ -175,9 +185,9 @@ function HomePage({
                 <span className="material-symbols-outlined text-white text-2xl">skillet</span>
               </div>
               <div className={styles.activeOrderText}>
-                <p className={styles.activeOrderLabel}>조리중</p>
-                <p className={styles.activeOrderTitle}>스페셜 치킨 샐러드 외 1건</p>
-                <p className={styles.activeOrderTime}>픽업 예정 15:15</p>
+                <p className={styles.activeOrderLabel}>주문 진행 중</p>
+                <p className={styles.activeOrderTitle}>주문 내역 보기</p>
+                <p className={styles.activeOrderTime}>{FEATURED_RESTAURANTS[0].title}</p>
               </div>
               <div className={styles.activeOrderLink}>
                 <span className="text-sm font-bold">주문 현황</span>
@@ -227,12 +237,16 @@ function HomePage({
                 </span>
               </div>
               <div className={styles.gradeAvatar}>
-                <span
-                  className="material-symbols-outlined text-3xl"
-                  style={{ color: tierTheme.myAvatarIcon }}
-                >
-                  face_6
-                </span>
+                {showAvatarImg ? (
+                  <img src={avatarResolved} alt="" className={styles.gradeAvatarImg} />
+                ) : (
+                  <span
+                    className="material-symbols-outlined text-3xl"
+                    style={{ color: tierTheme.myAvatarIcon }}
+                  >
+                    face_6
+                  </span>
+                )}
               </div>
             </div>
             <p className={styles.gradeName}>{greetingName}님</p>
