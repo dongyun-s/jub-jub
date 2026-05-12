@@ -1,0 +1,15 @@
+{
+  "name": "jub-jub",
+  "private": true,
+  "workspaces": [
+    "frontend/user-web",
+    "frontend/owner-web"
+  ],
+  "scripts": {
+    "dev:user": "npm run dev -w user-web",
+    "dev:owner": "npm run dev -w owner-web",
+    "build:user": "npm run build -w user-web",
+    "build:owner": "npm run build -w owner-web",
+    "build": "npm run build --workspaces --if-present"
+  }
+}

@@ -54,10 +54,17 @@ logs/
 .DS_Store
 
 # ========================
-# Node / Next.js
+# Node / Vite (모노레포)
 # ========================
-frontend/node_modules/
+node_modules/
+frontend/user-web/node_modules/
+frontend/user-web/dist/
+frontend/user-web/.vite/
+frontend/owner-web/node_modules/
+frontend/owner-web/dist/
+frontend/owner-web/.vite/
 frontend/dist/
+frontend/.vite/
 frontend/.next/
 frontend/out/
 frontend/.turbo/
