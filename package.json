@@ -1,0 +1,5 @@
+{
+  "name": "jub-jub",
+  "private": true,
+  "workspaces": ["frontend/user-web", "frontend/owner-web"]
+}

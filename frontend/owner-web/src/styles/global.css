@@ -1,0 +1,68 @@
+/* 사장님 앱 전역: 테마 변수, 리셋, 아이콘 폰트 베이스 (페이지 스타일은 각 *.module.css) */
+:root {
+  --owner-font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --owner-bg: #121416;
+  --owner-surface-lowest: #0c0e10;
+  --owner-surface-low: #1a1c1e;
+  --owner-surface: #1e2022;
+  --owner-surface-high: #282a2c;
+  --owner-surface-highest: #333537;
+  --owner-sidebar: #1a1c1e;
+  --owner-primary: #ffb1c4;
+  --owner-primary-container: #ff4d8d;
+  --owner-on-primary-container: #5b0028;
+  --owner-on-surface: #e2e2e5;
+  --owner-on-surface-variant: #e1bec5;
+  --owner-tertiary: #75d1ff;
+  --owner-tertiary-container: #009dcf;
+  --owner-secondary: #c1c1ff;
+  --owner-secondary-container: #312ec5;
+  --owner-outline-variant: #594046;
+  --owner-error: #ffb4ab;
+  --owner-error-container: #93000a;
+  --owner-muted: #6b7280;
+  --owner-header-h: 4rem;
+  --owner-sidebar-w: 6rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--owner-font);
+  background: var(--owner-bg);
+  color: var(--owner-on-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
+  user-select: none;
+}
+
+.monoNum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 리뷰 목록 등 스크롤 영역 — 필요 시 className에 직접 부여 */
+.customScrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.customScrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.customScrollbar::-webkit-scrollbar-thumb {
+  background: var(--owner-surface-highest);
+  border-radius: 10px;
+}

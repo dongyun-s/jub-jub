@@ -1,0 +1,109 @@
+.header {
+  position: fixed;
+  right: 0;
+  left: var(--owner-sidebar-w);
+  top: 0;
+  z-index: 30;
+  display: flex;
+  min-width: 0;
+  height: var(--owner-header-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--owner-outline-variant) 10%, transparent);
+  background: color-mix(in srgb, var(--owner-bg) 80%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.left {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.brand {
+  font-family: var(--owner-font);
+  font-size: 1.125rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.04em;
+  color: var(--owner-primary-container);
+}
+
+.sep {
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--owner-on-surface-variant) 40%, transparent);
+}
+
+.title {
+  font-weight: 500;
+  color: var(--owner-on-surface-variant);
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--owner-on-surface-variant) 70%, transparent);
+}
+
+.right {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 0 1 16rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 0.875rem;
+  color: var(--owner-muted);
+}
+
+.searchInput {
+  width: 100%;
+  max-width: 16rem;
+  min-width: 0;
+  border: none;
+  border-radius: 9999px;
+  background: var(--owner-surface-lowest);
+  padding: 0.375rem 1rem 0.375rem 2.5rem;
+  font-size: 0.875rem;
+  color: var(--owner-on-surface);
+  outline: none;
+}
+
+.searchInput:focus {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--owner-primary) 30%, transparent);
+}
+
+.iconRow {
+  display: flex;
+  gap: 1rem;
+}
+
+.iconBtn {
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.iconBtn:hover {
+  color: var(--owner-primary);
+}
