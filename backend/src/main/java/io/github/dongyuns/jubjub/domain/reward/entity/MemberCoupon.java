@@ -50,4 +50,14 @@ public class MemberCoupon {
     public void expire() {
         this.isExpired = true;
     }
+
+    public void markAsUsed() {
+        this.isUsed = true;
+        this.usedAt = LocalDateTime.now();
+    }
+
+    public void restore() {
+        this.isUsed = false;
+        this.usedAt = null;
+    }
 }
