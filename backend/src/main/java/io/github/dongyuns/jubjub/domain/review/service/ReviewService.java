@@ -8,6 +8,7 @@ import io.github.dongyuns.jubjub.domain.review.dto.ReviewResponse;
 import io.github.dongyuns.jubjub.domain.review.dto.ReviewUpdateRequest;
 import io.github.dongyuns.jubjub.domain.review.entity.Review;
 import io.github.dongyuns.jubjub.domain.review.repository.ReviewRepository;
+import io.github.dongyuns.jubjub.domain.reviewnotification.service.ReviewNotificationService;
 import io.github.dongyuns.jubjub.entity.Media;
 import io.github.dongyuns.jubjub.payment.domain.Order;
 import io.github.dongyuns.jubjub.payment.repository.OrderRepository;
@@ -34,6 +35,7 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final MediaRepository mediaRepository;
     private final OrderRepository orderRepository;
+    private final ReviewNotificationService reviewNotificationService;
     private final WebClient openAiWebClient;
 
     @Value("${spring.openai.model}")
@@ -73,6 +75,7 @@ public class ReviewService {
 
         Review savedReview = reviewRepository.save(review);
         saveReviewImages(savedReview.getReviewId(), request.getImagePaths());
+        reviewNotificationService.markAsReadByOrderId(savedReview.getOrderId());
 
         return buildReviewResponse(savedReview);
     }
