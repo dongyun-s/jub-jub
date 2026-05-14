@@ -3,6 +3,8 @@ package io.github.dongyuns.jubjub.payment.domain;
 import io.github.dongyuns.jubjub.domain.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,7 +15,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.util.ArrayList;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -48,6 +52,26 @@ public class Order extends BaseTimeEntity {
     private Integer finalAmount;
 
     @Column(nullable = false)
+    private Integer originalAmount;
+
+    @Column(nullable = false)
+    private Integer tierDiscountAmount;
+
+    @Column(nullable = false)
+    private Integer couponDiscountAmount;
+
+    @Column(nullable = false)
+    private Integer ecoDiscountAmount;
+
+    @Column(nullable = false)
+    private Boolean useMultiUseContainer;
+
+    @ElementCollection
+    @CollectionTable(name = "order_used_coupon", joinColumns = @JoinColumn(name = "order_id"))
+    @Column(name = "member_coupon_id", nullable = false)
+    private List<Long> usedCouponIds = new ArrayList<>();
+
+    @Column(nullable = false)
     private LocalDateTime requestedAt;
 
     private LocalDateTime paidAt;
@@ -57,23 +81,59 @@ public class Order extends BaseTimeEntity {
     private Long version;
 
     @Builder
-    private Order(MemberProfile memberProfile, Store store, String orderNo, OrderStatus status, Integer finalAmount, LocalDateTime requestedAt) {
+    private Order(
+            MemberProfile memberProfile,
+            Store store,
+            String orderNo,
+            OrderStatus status,
+            Integer finalAmount,
+            Integer originalAmount,
+            Integer tierDiscountAmount,
+            Integer couponDiscountAmount,
+            Integer ecoDiscountAmount,
+            Boolean useMultiUseContainer,
+            List<Long> usedCouponIds,
+            LocalDateTime requestedAt
+    ) {
         this.memberProfile = memberProfile;
         this.store = store;
         this.orderNo = orderNo;
         this.status = status;
         this.finalAmount = finalAmount;
+        this.originalAmount = originalAmount;
+        this.tierDiscountAmount = tierDiscountAmount;
+        this.couponDiscountAmount = couponDiscountAmount;
+        this.ecoDiscountAmount = ecoDiscountAmount;
+        this.useMultiUseContainer = useMultiUseContainer;
+        this.usedCouponIds = usedCouponIds != null ? new ArrayList<>(usedCouponIds) : new ArrayList<>();
         this.requestedAt = requestedAt;
     }
 
-    public static Order ready(MemberProfile memberProfile, Store store, String orderNo, Integer finalAmount) {
+    public static Order ready(
+            MemberProfile memberProfile,
+            Store store,
+            String orderNo,
+            Integer originalAmount,
+            Integer tierDiscountAmount,
+            Integer couponDiscountAmount,
+            Integer ecoDiscountAmount,
+            Integer finalAmount,
+            Boolean useMultiUseContainer,
+            List<Long> usedCouponIds
+    ) {
         // 주문 생성 시점에는 결제 전 상태와 최종 결제 금액을 같이 고정한다.
         return Order.builder()
                 .memberProfile(memberProfile)
                 .store(store)
                 .orderNo(orderNo)
                 .status(OrderStatus.READY)
+                .originalAmount(originalAmount)
+                .tierDiscountAmount(tierDiscountAmount)
+                .couponDiscountAmount(couponDiscountAmount)
+                .ecoDiscountAmount(ecoDiscountAmount)
                 .finalAmount(finalAmount)
+                .useMultiUseContainer(useMultiUseContainer)
+                .usedCouponIds(usedCouponIds)
                 .requestedAt(LocalDateTime.now())
                 .build();
     }
@@ -85,6 +145,10 @@ public class Order extends BaseTimeEntity {
     }
     public void markRefunded() {
         this.status = OrderStatus.REFUNDED;
+    }
+
+    public void completePickup() {
+        this.status = OrderStatus.COMPLETED;
     }
 
     public Long getMemberProfileId() {

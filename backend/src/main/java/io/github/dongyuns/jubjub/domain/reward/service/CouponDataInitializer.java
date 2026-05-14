@@ -25,6 +25,11 @@ public class CouponDataInitializer implements CommandLineRunner {
 
         // 4. 출석 랜덤박스 - 잭팟 (ATTENDANCE / 1000원 / 30일)
         savePolicyIfAbsent("출석체크 잭팟 당첨 쿠폰", "ATTENDANCE", 1000, 30);
+
+        // 5. 이벤트 쿠폰 (EVENT / 1000원, 3000원, 5000원 / 30일)
+        savePolicyIfAbsent("이벤트 쿠폰 1000원", "EVENT", 1000, 30);
+        savePolicyIfAbsent("이벤트 쿠폰 3000원", "EVENT", 3000, 30);
+        savePolicyIfAbsent("이벤트 쿠폰 5000원", "EVENT", 5000, 30);
     }
 
     private void savePolicyIfAbsent(String name, String type, Integer amount, Integer days) {

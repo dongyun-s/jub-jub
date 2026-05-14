@@ -1,6 +1,8 @@
 package io.github.dongyuns.jubjub.payment.service;
 
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
+import io.github.dongyuns.jubjub.domain.reward.entity.MemberCoupon;
+import io.github.dongyuns.jubjub.domain.reward.repository.MemberCouponRepository;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
@@ -24,6 +26,7 @@ import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import jakarta.persistence.OptimisticLockException;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +46,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentCancellationRepository paymentCancellationRepository;
     private final MemberProfileRepository memberProfileRepository;
+    private final MemberCouponRepository memberCouponRepository;
     private final PortOneClient portOneClient;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher eventPublisher;
@@ -113,6 +117,7 @@ public class PaymentService {
 
         payment.markRefunded();
         payment.getOrder().markRefunded();
+        restoreUsedCoupons(payment.getOrder());
     }
 
     @Transactional
@@ -151,6 +156,7 @@ public class PaymentService {
 
         payment.markRefunded();
         payment.getOrder().markRefunded();
+        restoreUsedCoupons(payment.getOrder());
 
         return RefundResponse.from(paymentCancellationRepository.save(refund));
     }
@@ -193,6 +199,7 @@ public class PaymentService {
         String resolvedTransactionId = paymentDetails.transactionId() != null ? paymentDetails.transactionId() : transactionId;
         payment.markPaid(resolvedTransactionId, paymentDetails.amount(), paidAt);
         order.markPaid(paidAt);
+        markUsedCoupons(order);
         entityManager.flush();
 
         // 승인 원장 적재는 결제 커밋 이후에 처리해 FK/락 충돌이 결제 확정을 막지 않게 한다.
@@ -209,6 +216,51 @@ public class PaymentService {
     private void validateRefundAmount(Integer approvedAmount, Integer refundAmount) {
         if (!approvedAmount.equals(refundAmount)) {
             throw new BusinessException("REFUND_AMOUNT_INVALID", "현재 구현은 전체 환불만 허용합니다.", HttpStatus.CONFLICT);
+        }
+    }
+
+    private void markUsedCoupons(Order order) {
+        List<Long> usedCouponIds = order.getUsedCouponIds();
+        if (usedCouponIds == null || usedCouponIds.isEmpty()) {
+            return;
+        }
+
+        List<MemberCoupon> coupons = memberCouponRepository.findAllByIdInForUpdate(usedCouponIds);
+        if (coupons.size() != usedCouponIds.size()) {
+            throw new BusinessException("COUPON_NOT_FOUND", "주문에 사용한 쿠폰을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        for (MemberCoupon coupon : coupons) {
+            if (!coupon.getMemberProfileId().equals(order.getMemberProfileId())) {
+                throw new BusinessException("COUPON_FORBIDDEN", "본인의 쿠폰만 사용할 수 있습니다.", HttpStatus.FORBIDDEN);
+            }
+            if (coupon.getIsUsed()) {
+                throw new BusinessException("COUPON_ALREADY_USED", "이미 사용된 쿠폰입니다.", HttpStatus.CONFLICT);
+            }
+            if (coupon.isExpired() || (coupon.getExpiredAt() != null && coupon.getExpiredAt().isBefore(now))) {
+                throw new BusinessException("COUPON_EXPIRED", "유효기간이 만료된 쿠폰입니다.", HttpStatus.CONFLICT);
+            }
+            coupon.markAsUsed();
+        }
+    }
+
+    private void restoreUsedCoupons(Order order) {
+        List<Long> usedCouponIds = order.getUsedCouponIds();
+        if (usedCouponIds == null || usedCouponIds.isEmpty()) {
+            return;
+        }
+
+        List<MemberCoupon> coupons = memberCouponRepository.findAllByIdInForUpdate(usedCouponIds);
+        if (coupons.size() != usedCouponIds.size()) {
+            throw new BusinessException("COUPON_NOT_FOUND", "주문에 사용한 쿠폰을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
+
+        for (MemberCoupon coupon : coupons) {
+            if (!coupon.getMemberProfileId().equals(order.getMemberProfileId())) {
+                throw new BusinessException("COUPON_FORBIDDEN", "본인의 쿠폰만 복구할 수 있습니다.", HttpStatus.FORBIDDEN);
+            }
+            coupon.restore();
         }
     }
 

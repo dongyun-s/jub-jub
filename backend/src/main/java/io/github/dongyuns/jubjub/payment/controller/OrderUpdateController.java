@@ -1,4 +1,3 @@
-/*
 package io.github.dongyuns.jubjub.payment.controller;
 
 // import io.swagger.v3.oas.annotations.Hidden;
@@ -15,13 +14,10 @@ public class OrderUpdateController {
 
     private final OrderService orderService;
 
-    /**
-     * 점주용: 픽업 완료 처리 API
-     * POST /api/v1/orders/{orderId}/complete
+    // 점주용: 픽업 완료 처리 API
     @PostMapping("/{orderId}/complete")
     public ResponseEntity<String> completePickup(@PathVariable Long orderId) {
         orderService.completePickup(orderId);
         return ResponseEntity.ok("픽업 완료 처리되었습니다. 리워드가 자동으로 적립됩니다.");
     }
 }
-*/
