@@ -56,8 +56,16 @@ logs/
 # ========================
 # Node / Next.js
 # ========================
+/node_modules/
 frontend/node_modules/
+frontend/user-web/node_modules/
+frontend/owner-web/node_modules/
 frontend/dist/
+frontend/user-web/dist/
+frontend/owner-web/dist/
+frontend/.vite/
+frontend/user-web/.vite/
+frontend/owner-web/.vite/
 frontend/.next/
 frontend/out/
 frontend/.turbo/

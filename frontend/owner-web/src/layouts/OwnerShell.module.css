@@ -1,0 +1,101 @@
+.root {
+  display: flex;
+  min-height: 100%;
+  overflow: hidden;
+  background: var(--owner-bg);
+  color: var(--owner-on-surface);
+}
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  height: 100vh;
+  width: var(--owner-sidebar-w);
+  flex-direction: column;
+  border: none;
+  background: var(--owner-sidebar);
+  font-family: var(--owner-font);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.logoWrap {
+  display: flex;
+  height: var(--owner-header-h);
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.04em;
+  color: var(--owner-primary-container);
+}
+
+.nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  gap: 0.25rem;
+}
+
+.navItem {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0;
+  text-decoration: none;
+  color: #6b7280;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.navItem:hover {
+  background: var(--owner-surface-high);
+  color: #fff;
+}
+
+.navItemActive {
+  border-right: 4px solid var(--owner-primary-container);
+  background: var(--owner-surface-high);
+  color: var(--owner-primary);
+}
+
+.navLabel {
+  margin-top: 0.25rem;
+  font-size: 10px;
+}
+
+.profileWrap {
+  display: flex;
+  height: var(--owner-header-h);
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 2px solid var(--owner-outline-variant);
+  object-fit: cover;
+}
+
+.content {
+  /* flex 자식 기본 min-width:auto 때문에 본문이 넓어지면 가로로 잘리는 현상 방지 */
+  min-width: 0;
+  margin-left: var(--owner-sidebar-w);
+  display: flex;
+  min-height: 100vh;
+  flex: 1;
+  flex-direction: column;
+}

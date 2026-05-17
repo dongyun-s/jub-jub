@@ -1,0 +1,84 @@
+.main {
+  margin-top: var(--owner-header-h);
+  padding: 2rem;
+}
+
+.card {
+  margin: 0 auto;
+  max-width: 48rem;
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 20%, transparent);
+  background: var(--owner-surface-low);
+  padding: 2.5rem;
+  text-align: center;
+}
+
+.iconWrap {
+  margin: 0 auto 1.5rem;
+  display: flex;
+  height: 4rem;
+  width: 4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--owner-primary-container) 15%, transparent);
+}
+
+.icon {
+  font-size: 1.875rem;
+  color: var(--owner-primary-container);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--owner-on-surface);
+}
+
+.desc {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--owner-on-surface-variant);
+}
+
+.actions {
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.btnGhost {
+  cursor: pointer;
+  border-radius: 0.75rem;
+  border: none;
+  background: var(--owner-surface-highest);
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+  transition: background 0.15s;
+}
+
+.btnGhost:hover {
+  background: var(--owner-outline-variant);
+}
+
+.btnPrimary {
+  cursor: pointer;
+  border-radius: 0.75rem;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ff4d8d 0%, #b90a5a 100%);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--owner-primary-container) 25%, transparent);
+}
+
+.btnPrimary:hover {
+  opacity: 0.95;
+}
