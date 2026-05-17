@@ -57,6 +57,7 @@ dependencies {
     // CoolSMS SDK
     implementation 'net.nurigo:sdk:4.3.0'
     implementation 'software.amazon.awssdk:s3'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 tasks.named('test') {
