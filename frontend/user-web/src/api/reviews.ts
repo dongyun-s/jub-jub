@@ -83,8 +83,79 @@ export function getReview(reviewId: number) {
   return apiFetch<ReviewDto>(`/api/reviews/${reviewId}`, { method: 'GET' })
 }
 
-export function fetchStoreReviews(storeId: number) {
-  return apiFetch<ReviewDto[]>(`/api/reviews/store/${storeId}`, { method: 'GET' })
+function num(v: unknown, fallback = 0): number {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v)
+    if (!Number.isNaN(n)) return n
+  }
+  return fallback
+}
+
+function optNum(v: unknown): number | null | undefined {
+  if (v === null || v === undefined) return v as null | undefined
+  const n = num(v, NaN)
+  return Number.isNaN(n) ? undefined : n
+}
+
+function normalizeReviewDto(raw: unknown): ReviewDto | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const p = raw as Record<string, unknown>
+  const reviewId = num(p.reviewId ?? p.review_id ?? p.id)
+  const orderId = num(p.orderId ?? p.order_id)
+  const memberProfileId = num(p.memberProfileId ?? p.member_profile_id)
+  const storeId = num(p.storeId ?? p.store_id)
+  const overallRating = num(p.overallRating ?? p.overall_rating)
+  const content = String(p.content ?? '').trim()
+  if (!reviewId || !orderId || !storeId || !overallRating) return null
+
+  const imagePathsRaw = p.imagePaths ?? p.image_paths
+  const imagePaths = Array.isArray(imagePathsRaw)
+    ? imagePathsRaw.map((x) => String(x)).filter(Boolean)
+    : undefined
+
+  return {
+    reviewId,
+    orderId,
+    memberProfileId,
+    storeId,
+    overallRating,
+    packagingRating: optNum(p.packagingRating ?? p.packaging_rating) ?? null,
+    tasteRating: optNum(p.tasteRating ?? p.taste_rating) ?? null,
+    timeRating: optNum(p.timeRating ?? p.time_rating) ?? null,
+    content,
+    aiGeneratedHelped:
+      p.aiGeneratedHelped === true ||
+      p.ai_generated_helped === true ||
+      p.aiGeneratedHelped === 1,
+    createdAt:
+      typeof p.createdAt === 'string'
+        ? p.createdAt
+        : typeof p.created_at === 'string'
+          ? p.created_at
+          : undefined,
+    imagePaths,
+  }
+}
+
+function parseReviewList(body: unknown): ReviewDto[] {
+  if (Array.isArray(body)) {
+    return body.map(normalizeReviewDto).filter(Boolean) as ReviewDto[]
+  }
+  if (typeof body === 'object' && body !== null) {
+    const o = body as Record<string, unknown>
+    if (o.success === true && Array.isArray(o.data)) {
+      return parseReviewList(o.data)
+    }
+    const arr = o.data ?? o.reviews ?? o.items
+    if (Array.isArray(arr)) return parseReviewList(arr)
+  }
+  return []
+}
+
+export async function fetchStoreReviews(storeId: number): Promise<ReviewDto[]> {
+  const raw = await apiFetch<unknown>(`/api/reviews/store/${storeId}`, { method: 'GET' })
+  return parseReviewList(raw)
 }
 
 export function fetchStoreReviewsByTasteRating(storeId: number, rating: number) {
@@ -92,8 +163,9 @@ export function fetchStoreReviewsByTasteRating(storeId: number, rating: number) 
   return apiFetch<ReviewDto[]>(`/api/reviews/store/${storeId}/taste-rating?${q}`, { method: 'GET' })
 }
 
-export function fetchMyReviews(memberProfileId: number) {
-  return apiFetch<ReviewDto[]>(`/api/reviews/my/${memberProfileId}`, { method: 'GET' })
+export async function fetchMyReviews(memberProfileId: number): Promise<ReviewDto[]> {
+  const raw = await apiFetch<unknown>(`/api/reviews/my/${memberProfileId}`, { method: 'GET' })
+  return parseReviewList(raw)
 }
 
 export function updateReview(reviewId: number, body: ReviewUpdateBody) {

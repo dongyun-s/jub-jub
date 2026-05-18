@@ -1,7 +1,7 @@
 /**
  * ReviewWritePage.tsx
  * 리뷰 작성 페이지 (주문내역에서 '리뷰 쓰기' 클릭 시)
- * - 매장명, 별점(음식/가격/픽업경험), 사진, 한줄평, 추천 키워드, AI 리뷰 도움 모달
+ * - 매장명, 별점, 사진, 한줄평, AI 리뷰 도움 모달
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -14,6 +14,7 @@ import { assertImageFileConstraints, MAX_REVIEW_IMAGES, uploadImageFileViaPresig
 import { createReview, generateAiReview } from '../../api/reviews'
 import { useProfile } from '../../hooks/useProfile'
 import { resolveMemberProfileIdForReview } from '../../lib/authStorage'
+import { notifyReviewNotificationsUpdated } from '../../hooks/useUnreadReviewNotificationCount'
 import styles from './ReviewWritePage.module.css'
 
 interface ReviewWritePageProps {
@@ -30,14 +31,6 @@ interface ReviewWritePageProps {
   onMypageClick?: () => void
   cartCount?: number
 }
-
-/** 추천 키워드 버튼 목록 */
-const recommendKeywords = [
-  { icon: '✨', label: '분위기가 좋아요' },
-  { icon: '☕', label: '커피가 맛있어요' },
-  { icon: '🧁', label: '디저트 맛집' },
-  { icon: '💻', label: '작업하기좋아요' },
-]
 
 /** 별점 1~5에 대응하는 라벨 (AI 평가용) */
 const ratingLabels: Record<number, string> = {
@@ -95,7 +88,6 @@ function ReviewWritePage({
   /** 로컬 미리보기(data URL) + 업로드용 File */
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhotoRow[]>([])
   const [photoPickLoading, setPhotoPickLoading] = useState(false)
-  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
   const [usedAiAssist, setUsedAiAssist] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
@@ -111,14 +103,6 @@ function ReviewWritePage({
 
   const handleStarClick = (star: number) => {
     setRating(star)
-  }
-
-  const handleKeywordToggle = (keyword: string) => {
-    setSelectedKeywords(prev => 
-      prev.includes(keyword) 
-        ? prev.filter(k => k !== keyword)
-        : [...prev, keyword]
-    )
   }
 
   useLayoutEffect(() => {
@@ -221,31 +205,38 @@ function ReviewWritePage({
     })
   }
 
-  const handleAIGenerate = () => {
-    const draft = content.trim()
+  /** 본문 초안이 있으면 프롬프트(초안 다듬기) API만 호출 — 별점 모달 없음 */
+  const runAiFromDraft = (draft: string) => {
+    void (async () => {
+      setAiGenerating(true)
+      try {
+        const res = await generateAiReview({
+          packagingRating: 0,
+          tasteRating: 0,
+          timeRating: 0,
+          content: draft,
+        })
+        setContent(res.generatedReview)
+        setUsedAiAssist(true)
+        setShowAIModal(false)
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : 'AI 리뷰 생성에 실패했습니다.')
+      } finally {
+        setAiGenerating(false)
+      }
+    })()
+  }
+
+  /** 본문이 비어 있을 때만 — 모달에서 고른 세부 별점으로 생성 */
+  const handleAIGenerateFromModal = () => {
+    if (aiRatings.taste === 0 || aiRatings.packaging === 0 || aiRatings.pickup === 0) {
+      alert('모든 항목의 별점을 선택해주세요.')
+      return
+    }
 
     void (async () => {
       setAiGenerating(true)
       try {
-        if (draft) {
-          /** 초안 부풀리기 — 명세: 별점은 0, content에 초안 */
-          const res = await generateAiReview({
-            packagingRating: 0,
-            tasteRating: 0,
-            timeRating: 0,
-            content: draft,
-          })
-          setContent(res.generatedReview)
-          setUsedAiAssist(true)
-          setShowAIModal(false)
-          return
-        }
-
-        if (aiRatings.taste === 0 || aiRatings.packaging === 0 || aiRatings.pickup === 0) {
-          alert('모든 항목의 별점을 선택해주세요.')
-          return
-        }
-
         const res = await generateAiReview({
           packagingRating: aiRatings.packaging,
           tasteRating: aiRatings.taste,
@@ -263,6 +254,15 @@ function ReviewWritePage({
         setAiGenerating(false)
       }
     })()
+  }
+
+  const handleAIButtonClick = () => {
+    const draft = content.trim()
+    if (draft) {
+      runAiFromDraft(draft)
+      return
+    }
+    setShowAIModal(true)
   }
 
   const handleSubmit = () => {
@@ -324,6 +324,7 @@ function ReviewWritePage({
           aiGeneratedHelped: usedAiAssist,
           imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
         })
+        notifyReviewNotificationsUpdated()
         alert(
           imagePaths.length > 0
             ? `리뷰가 등록되었습니다. 사진 ${imagePaths.length}장이 함께 저장되었습니다.`
@@ -365,21 +366,21 @@ function ReviewWritePage({
           <section className={styles.photosSection}>
             <div className={styles.photosHeader}>
               <div className={styles.photosHeaderLeft}>
-                <h3 className={styles.photosTitle}>어떤 점이 좋았나요?</h3>
+                <h3 className={styles.photosTitle}>맛있는 순간, 사진으로 남겨요</h3>
                 {pendingPhotos.length > 0 ? (
                   <span className={styles.photoCountBadge} aria-live="polite">
-                    사진 {pendingPhotos.length}장 선택됨
+                    {pendingPhotos.length}장 골랐어요
                   </span>
                 ) : null}
               </div>
               <span className={styles.photosOptional}>(선택사항)</span>
             </div>
             <p className={styles.photosHint}>
-              화면을 아래로 스크롤하면 사진 썸네일이 보입니다. JPEG·PNG·WebP·GIF만 등록할 수 있어요. (iPhone에서
-              HEIC만 보이면 사진 앱에서 JPG로 보낸 뒤 선택해 주세요.) 여러 장은 갤러리에서 한 번에 고르거나, 사진추가를
-              여러 번 눌러 넣을 수 있어요. 썸네일을 누르면 크게 미리보기 할 수 있어요.
+              최대 {MAX_REVIEW_IMAGES}장까지 · 썸네일을 누르면 크게 볼 수 있어요
             </p>
-            {photoPickLoading ? <p className={styles.photoReadPending}>미리보기 준비 중…</p> : null}
+            {photoPickLoading ? (
+              <p className={styles.photoReadPending}>잠깐만요, 미리보기 준비 중이에요…</p>
+            ) : null}
             <div className={styles.photosRow}>
               <input
                 ref={photoInputRef}
@@ -401,7 +402,7 @@ function ReviewWritePage({
                 onClick={() => photoInputRef.current?.click()}
               >
                 <span className={`material-symbols-outlined ${styles.addPhotoIcon}`}>photo_camera</span>
-                <span className={styles.addPhotoLabel}>사진추가</span>
+                <span className={styles.addPhotoLabel}>사진 고르기</span>
               </button>
               {pendingPhotos.map((photo, index) => (
                 <div key={photo.id} className={styles.photoWrap}>
@@ -444,9 +445,14 @@ function ReviewWritePage({
           <section className={styles.contentSection}>
             <div className={styles.contentHeader}>
               <h3 className={styles.contentTitle}>리뷰 작성</h3>
-              <button type="button" onClick={() => setShowAIModal(true)} className={styles.aiButton}>
+              <button
+                type="button"
+                onClick={handleAIButtonClick}
+                disabled={aiGenerating}
+                className={styles.aiButton}
+              >
                 <span className={`material-symbols-outlined ${styles.aiButtonIcon}`}>auto_awesome</span>
-                AI리뷰 생성
+                {aiGenerating ? 'AI 생성 중…' : 'AI리뷰 생성'}
               </button>
             </div>
             <div className={styles.textareaWrap}>
@@ -458,22 +464,6 @@ function ReviewWritePage({
                 className={styles.textarea}
               />
               <span className={styles.charCount}>{content.length}/500</span>
-            </div>
-          </section>
-
-          <section className={styles.keywordsSection}>
-            <h3 className={styles.keywordsTitle}>추천 키워드</h3>
-            <div className={styles.keywordsRow}>
-              {recommendKeywords.map((keyword) => (
-                <button
-                  key={keyword.label}
-                  onClick={() => handleKeywordToggle(keyword.label)}
-                  className={`${styles.keywordButton} ${selectedKeywords.includes(keyword.label) ? styles.keywordButtonActive : styles.keywordButtonInactive}`}
-                >
-                  <span>{keyword.icon}</span>
-                  <span>{keyword.label}</span>
-                </button>
-              ))}
             </div>
           </section>
         </div>
@@ -622,14 +612,14 @@ function ReviewWritePage({
               <div className={styles.modalFooter}>
                 <button
                   type="button"
-                  onClick={handleAIGenerate}
+                  onClick={handleAIGenerateFromModal}
                   disabled={aiGenerating}
                   className={styles.modalSubmit}
                 >
                   {aiGenerating ? '생성 중…' : '생성하기'}
                 </button>
                 <p className={styles.modalHint}>
-                  본문에 글이 있으면 초안을 다듬고, 비어 있으면 선택한 세부 별점으로 새 리뷰를 만듭니다.
+                  본문이 비어 있을 때만 이 화면이 열립니다. 글을 먼저 쓰고 AI리뷰 생성을 누르면 별점 선택 없이 초안을 다듬습니다.
                 </p>
               </div>
         </AppModal>

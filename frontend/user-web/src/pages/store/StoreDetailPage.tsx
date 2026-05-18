@@ -14,6 +14,8 @@ import { fetchStoreReviews, type ReviewDto } from '../../api/reviews'
 import { ApiError } from '../../api/authClient'
 import { toggleStoreFavorite } from '../../api/favorites'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
+import NotificationIconButton from '../../components/NotificationIconButton/NotificationIconButton'
+import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount'
 import { getAccessToken } from '../../lib/authStorage'
 import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { STORE_LIST_CARD_IMAGES } from '../../constants'
@@ -112,6 +114,7 @@ function StoreDetailPage({
   cartCount = 0,
   cartTotalPrice = 0,
 }: StoreDetailPageProps) {
+  const unreadNotificationCount = useUnreadNotificationCount()
   const [detail, setDetail] = useState<StoreDetailDto | null>(null)
   const [storeLoading, setStoreLoading] = useState(true)
   const [storeError, setStoreError] = useState<string | null>(null)
@@ -132,18 +135,19 @@ function StoreDetailPage({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (activeTab !== 'review') return
     let cancelled = false
     setReviewsLoading(true)
     setReviewsError(null)
     void fetchStoreReviews(storeId)
       .then((list) => {
-        if (!cancelled) setStoreReviews(Array.isArray(list) ? list : [])
+        if (!cancelled) setStoreReviews(list)
       })
-      .catch(() => {
+      .catch((e) => {
         if (!cancelled) {
           setStoreReviews([])
-          setReviewsError('리뷰를 불러오지 못했습니다.')
+          setReviewsError(
+            e instanceof ApiError ? e.message : '리뷰를 불러오지 못했습니다.',
+          )
         }
       })
       .finally(() => {
@@ -152,7 +156,7 @@ function StoreDetailPage({
     return () => {
       cancelled = true
     }
-  }, [activeTab, storeId])
+  }, [storeId])
 
   useEffect(() => {
     let cancelled = false
@@ -216,10 +220,10 @@ function StoreDetailPage({
         bars: [5, 4, 3, 2, 1].map((score) => ({ score, pct: 0 })),
       }
     }
-    const tastes = list.map((r) => r.tasteRating ?? r.overallRating)
-    const avg = tastes.reduce((a, b) => a + b, 0) / tastes.length
+    const ratings = list.map((r) => r.overallRating)
+    const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length
     const counts = [5, 4, 3, 2, 1].map((score) =>
-      list.filter((r) => (r.tasteRating ?? r.overallRating) === score).length,
+      list.filter((r) => r.overallRating === score).length,
     )
     const max = Math.max(1, ...counts)
     const bars = [5, 4, 3, 2, 1].map((score, idx) => ({
@@ -389,13 +393,11 @@ function StoreDetailPage({
                   favorite
                 </span>
               </button>
-              <button
-                type="button"
-                className={styles.headerIconButton}
+              <NotificationIconButton
+                unreadCount={unreadNotificationCount}
                 onClick={() => onNotificationsClick?.()}
-              >
-                <span className="material-symbols-outlined">notifications</span>
-              </button>
+                className={styles.headerIconButton}
+              />
             </div>
           }
         />
@@ -422,8 +424,16 @@ function StoreDetailPage({
                   </div>
                   <div className={styles.profileMeta}>
                     <span className={`material-symbols-outlined ${styles.starIcon}`}>star</span>
-                    <span className={styles.profileRating}>4.8</span>
-                    <span>(500+ 리뷰)</span>
+                    <span className={styles.profileRating}>
+                      {reviewsLoading ? '…' : reviewStats.count > 0 ? reviewStats.avg.toFixed(1) : '—'}
+                    </span>
+                    <span>
+                      {reviewsLoading
+                        ? ''
+                        : reviewStats.count > 0
+                          ? `(${reviewStats.count}개 리뷰)`
+                          : '(리뷰 없음)'}
+                    </span>
                     <span className={styles.profileMetaDot}>•</span>
                     <span>{addressLine}</span>
                   </div>
