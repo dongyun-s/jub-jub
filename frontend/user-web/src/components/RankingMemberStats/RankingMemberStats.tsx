@@ -1,5 +1,6 @@
 import type { RankingEntry } from '../../constants/ranking'
 import { getTierLabelColors } from '../TierBadge/TierBadge'
+import TierIcon from '../TierIcon/TierIcon'
 import { getTierTheme } from '../../lib/rewardTierTheme'
 import { formatWalkingDistance } from '../../lib/rankingDisplay'
 import styles from './RankingMemberStats.module.css'
@@ -71,9 +72,7 @@ export default function RankingMemberStats({
               }),
         }}
       >
-        <span className="material-symbols-outlined" style={{ color: tierColors.iconColor }}>
-          military_tech
-        </span>
+        <TierIcon label={entry.tierLabel} size="xs" glow alt="" />
         {entry.tierLabel}
       </span>
       {statItems.map(({ key, icon, label }) => (

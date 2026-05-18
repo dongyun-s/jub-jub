@@ -13,7 +13,6 @@ import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
 import SearchBar from '../../components/SearchBar'
 import { fetchStores } from '../../api/store'
 import type { FeaturedRestaurant } from '../../constants'
-import { getTierLabelColors } from '../../components/TierBadge/TierBadge'
 import {
   FEATURED_RESTAURANTS,
   HOME_CATEGORIES,
@@ -27,21 +26,15 @@ import { useProfile } from '../../hooks/useProfile'
 import { fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
 import { getAccessToken } from '../../lib/authStorage'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
+import TierIcon from '../../components/TierIcon/TierIcon'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './HomePage.module.css'
 
 function RankingStripLine({ entry }: { entry: RankingEntry }) {
-  const tierColors = getTierLabelColors(entry.tierLabel)
   return (
     <span className={styles.rankingStripItem}>
       <span className={styles.rankingStripRank}>{entry.rank}위</span>
-      <span
-        className={`material-symbols-outlined ${styles.rankingStripTier}`}
-        style={{ color: tierColors.iconColor }}
-        aria-hidden
-      >
-        military_tech
-      </span>
+      <TierIcon label={entry.tierLabel} size="xs" className={styles.rankingStripTier} alt="" />
       <span className={styles.rankingStripName}>{entry.nickname}</span>
       <span className={styles.rankingStripMeta}>
         {formatRankingStripDistanceKm(entry.walkingDistanceM)}
@@ -310,15 +303,13 @@ function HomePage({
             <div className={styles.gradeCardHeader}>
               <div className="flex flex-col">
                 <div className={styles.gradeBadgeRow}>
-                  <span
-                    className="material-symbols-outlined text-sm"
-                    style={{
-                      fontVariationSettings: "'FILL' 1",
-                      color: tierTheme.badgeAccent,
-                    }}
-                  >
-                    diamond
-                  </span>
+                  <TierIcon
+                    tier={rewardMe?.tier}
+                    tierName={rewardMe?.tierName}
+                    size="sm"
+                    glow
+                    alt=""
+                  />
                   <span className={styles.gradeBadgeLabel} style={{ color: tierTheme.badgeAccent }}>
                     {rewardLoading ? '…' : tierLabelEn}
                   </span>

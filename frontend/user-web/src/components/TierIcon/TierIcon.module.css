@@ -1,0 +1,60 @@
+.icon {
+  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
+}
+
+.xs {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.sm {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.md {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.lg {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.xl {
+  width: 3.375rem;
+  height: 3.375rem;
+}
+
+.glowBronze {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 14px rgba(205, 127, 50, 0.45));
+}
+
+.glowSilver {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 16px rgba(148, 163, 184, 0.4))
+    drop-shadow(0 0 8px rgba(96, 165, 250, 0.2));
+}
+
+.glowGold {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 18px rgba(234, 179, 8, 0.5))
+    drop-shadow(0 0 6px rgba(254, 243, 199, 0.15));
+}
+
+.glowPlatinum {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 16px rgba(45, 212, 191, 0.45))
+    drop-shadow(0 0 8px rgba(236, 254, 255, 0.15));
+}
+
+.glowDiamond {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 18px rgba(56, 189, 248, 0.45))
+    drop-shadow(0 0 10px rgba(167, 139, 250, 0.25));
+}
+
+.glowLegend {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 20px rgba(251, 191, 36, 0.35))
+    drop-shadow(0 0 12px rgba(167, 139, 250, 0.3));
+}
