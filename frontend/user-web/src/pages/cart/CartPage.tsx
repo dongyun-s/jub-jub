@@ -21,6 +21,8 @@ import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
 import { ApiError } from '../../api/authClient'
 import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
 import { getAccessToken, setCachedMemberProfileId } from '../../lib/authStorage'
+import { resolveUserCoords } from '../../lib/geolocation'
+import { ECO_DISCOUNT_AMOUNT, estimateFinalPaymentAmount } from '../../lib/orderPricing'
 import styles from './CartPage.module.css'
 
 interface AppliedCoupon {
@@ -260,13 +262,11 @@ function CartPage({
           method: 'CARD',
         })
 
-        // (DEBUG) 결제 추적 저장은 제거(환불 기능 삭제)
-
-        // 3) 결제창 호출 (V2 browser-sdk)
+        // 3) 결제창 — merchantUid·requestedAmount (명세)
         const paymentResult = await PortOne.requestPayment({
           storeId,
           channelKey,
-          paymentId: prepared.paymentId, // = prepared.merchantUid
+          paymentId: prepared.merchantUid,
           orderName: orderName.length > 40 ? `${orderName.substring(0, 40)}...` : orderName,
           customer: {
             email: 'test@jubjub.com',
@@ -315,10 +315,19 @@ function CartPage({
           return
         }
 
-        // 4) 결제 확정 (PortOne 서버 조회로 재검증)
+        // 4) 결제 확정 — 사용자 위치로 픽업 거리 저장 (백엔드 필수)
+        const storeCoords = FEATURED_RESTAURANTS.find((r) => r.id === cartStoreId)
+        const geoFallback =
+          storeCoords?.lat != null && storeCoords?.lng != null
+            ? { latitude: storeCoords.lat, longitude: storeCoords.lng }
+            : null
+        const userCoords = await resolveUserCoords(geoFallback)
+
         const confirmed = await confirmPayment({
           merchantUid: prepared.merchantUid,
           transactionId: txId,
+          userLatitude: userCoords.latitude,
+          userLongitude: userCoords.longitude,
         })
 
         // (DEBUG) 환불 기능 삭제로 결제 추적 저장 제거
@@ -334,7 +343,7 @@ function CartPage({
                   ...o,
                   orderStatus: 'PAID',
                   paymentStatus: confirmed.paymentStatus,
-                  finalAmount: confirmed.requestedAmount ?? o.finalAmount,
+                  finalAmount: confirmed.paidAmount ?? order.finalAmount,
                   paidAt: confirmed.paidAt,
                   paymentRecordId: confirmed.paymentRecordId,
                   transactionId: confirmed.transactionId,
@@ -364,6 +373,22 @@ function CartPage({
         setIsProcessing(false)
       } catch (e) {
         setIsProcessing(false)
+        if (e instanceof Error && e.message === 'GEO_DENIED') {
+          showCartAlert({
+            title: '위치 권한 필요',
+            message: '결제 완료 처리를 위해 위치 권한을 허용해 주세요.',
+            variant: 'info',
+          })
+          return
+        }
+        if (e instanceof Error && e.message === 'GEO_UNAVAILABLE') {
+          showCartAlert({
+            title: '위치 정보 없음',
+            message: '이 기기에서는 위치 정보를 사용할 수 없어 결제를 완료할 수 없습니다.',
+            variant: 'error',
+          })
+          return
+        }
         showCartAlert({
           title: '결제 오류',
           message:
@@ -450,13 +475,19 @@ function CartPage({
     applyCartItems((items) => items.filter((item) => item.id !== id))
   }
 
-  // 가격 계산
+  // 가격 계산 — 주문 생성 totalAmount는 할인 전 장바구니 합계(명세)
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const discount = appliedCoupon?.discount || 0
   const total = subtotal - discount
 
-  /** 서버 주문 API는 장바구니 총액과 동일한 금액만 허용 → 결제 진행 금액은 로그인 장바구니일 때 항상 subtotal */
-  const payAmount = useApiCart ? subtotal : Math.max(0, total)
+  const estimatedFinal = estimateFinalPaymentAmount(
+    pricingPreview,
+    useMultiUseContainer,
+    useApiCart ? subtotal : total,
+  )
+
+  /** UI·PortOne 전: 예상 결제액 / 주문 생성 시 totalAmount는 subtotal */
+  const payAmount = useApiCart ? estimatedFinal : Math.max(0, total - (useMultiUseContainer ? ECO_DISCOUNT_AMOUNT : 0))
 
   useEffect(() => {
     if (!useApiCart || !getAccessToken() || subtotal <= 0) {
@@ -475,7 +506,7 @@ function CartPage({
     return () => {
       if (pricingDebounceRef.current) clearTimeout(pricingDebounceRef.current)
     }
-  }, [useApiCart, subtotal, appliedCoupon?.id])
+  }, [useApiCart, subtotal, appliedCoupon?.id, useMultiUseContainer])
 
   return (
     <Layout showBackground={false}>
@@ -727,24 +758,22 @@ function CartPage({
 
               {useApiCart && pricingPreview != null && (
                 <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-                  할인 금액은 서버 미리보기입니다. 주문 생성은 장바구니 합계와 맞추기 위해{' '}
-                  <strong>{formatPrice(subtotal)}</strong> 기준으로 진행됩니다.
+                  쿠폰은 결제 승인 성공 시에만 사용 처리됩니다. 주문 금액 검증은 장바구니 합계{' '}
+                  <strong>{formatPrice(subtotal)}</strong> 기준입니다.
                 </p>
               )}
 
-              {useApiCart && pricingPreview != null && (
-                <div className={`${styles.summaryRow} border-t border-dashed border-slate-200 pt-3 mt-1`}>
-                  <span className={styles.summaryLabel}>예상 결제액 (참고)</span>
-                  <span className={styles.summaryValue}>
-                    {formatPrice(pricingPreview.finalPaymentAmount)}
+              {useMultiUseContainer && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryDiscountLabel}>다회용기 할인 (예상)</span>
+                  <span className={styles.summaryDiscountValue}>
+                    -{formatPrice(ECO_DISCOUNT_AMOUNT)}
                   </span>
                 </div>
               )}
 
               <div className={styles.summaryTotalRow}>
-                <span className={styles.summaryTotalLabel}>
-                  {useApiCart ? '결제 진행 금액' : '최종 결제 금액'}
-                </span>
+                <span className={styles.summaryTotalLabel}>예상 결제 금액</span>
                 <span className={styles.summaryTotalValue}>{formatPrice(payAmount)}</span>
               </div>
             </div>

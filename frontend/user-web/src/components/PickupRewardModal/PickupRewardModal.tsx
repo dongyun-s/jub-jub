@@ -1,50 +1,36 @@
 /**
- * 픽업 성공 시 지급되는 리워드 안내 모달
+ * 픽업 성공 시 서버 /rewards/me 기준으로 지급된 리워드 안내 모달
  */
 
 import { useId } from 'react'
 import AppModal from '../AppModal/AppModal'
+import type { PickupRewardBreakdown } from '../../lib/pickupReward'
+import { formatWalkedDistance } from '../../lib/pickupReward'
 import styles from './PickupRewardModal.module.css'
-
-export interface PickupRewardBreakdown {
-  xp: number
-  /** 줄포인트 등 */
-  points: number
-  /** 연속 픽업 보너스 XP (0이면 행 숨김) */
-  streakBonusXp?: number
-  streakDays?: number
-}
 
 interface PickupRewardModalProps {
   open: boolean
   onClose: () => void
   storeName: string
-  rewards?: PickupRewardBreakdown
+  loading?: boolean
+  rewards?: PickupRewardBreakdown | null
   onWriteReview?: () => void
-}
-
-const defaultRewards: PickupRewardBreakdown = {
-  xp: 50,
-  points: 300,
-  streakBonusXp: 10,
-  streakDays: 3,
 }
 
 function PickupRewardModal({
   open,
   onClose,
   storeName,
-  rewards = defaultRewards,
+  loading = false,
+  rewards,
   onWriteReview,
 }: PickupRewardModalProps) {
   const titleId = useId()
   const descId = useId()
 
-  const showStreak =
-    rewards.streakBonusXp != null &&
-    rewards.streakBonusXp > 0 &&
-    rewards.streakDays != null &&
-    rewards.streakDays > 0
+  const showXp = rewards != null && rewards.earnedXp > 0
+  const showDistance = rewards != null && rewards.walkedMeters > 0
+  const showOrderCount = rewards != null && rewards.orderCountGain > 0
 
   return (
     <AppModal
@@ -82,47 +68,74 @@ function PickupRewardModal({
       <p id={descId} className={styles.subtitle}>
         <span className={styles.storeName}>{storeName}</span>에서의 픽업이 확인되었어요.
         <br />
-        리워드가 지급됐습니다.
+        {loading ? '리워드 반영 내역을 불러오는 중…' : '아래는 서버에 반영된 보상입니다.'}
       </p>
 
-      <ul className={styles.rewardList}>
-        <li className={styles.rewardRow}>
-          <div className={styles.rewardIconWrap}>
-            <span className={`material-symbols-outlined ${styles.rewardIcon}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-              star
-            </span>
-          </div>
-          <div className={styles.rewardText}>
-            <span className={styles.rewardLabel}>경험치</span>
-            <span className={styles.rewardValue}>+{rewards.xp} XP</span>
-          </div>
-        </li>
-        <li className={styles.rewardRow}>
-          <div className={`${styles.rewardIconWrap} ${styles.rewardIconWrapPoints}`}>
-            <span className={`material-symbols-outlined ${styles.rewardIcon}`}>savings</span>
-          </div>
-          <div className={styles.rewardText}>
-            <span className={styles.rewardLabel}>줍 포인트</span>
-            <span className={styles.rewardValue}>+{rewards.points.toLocaleString('ko-KR')} P</span>
-          </div>
-        </li>
-        {showStreak && (
-          <li className={`${styles.rewardRow} ${styles.rewardRowStreak}`}>
-            <div className={`${styles.rewardIconWrap} ${styles.rewardIconWrapStreak}`}>
-              <span className={`material-symbols-outlined ${styles.rewardIcon}`}>local_fire_department</span>
-            </div>
-            <div className={styles.rewardText}>
-              <span className={styles.rewardLabel}>
-                {rewards.streakDays}일 연속 픽업 보너스
-              </span>
-              <span className={styles.rewardValue}>+{rewards.streakBonusXp} XP</span>
-            </div>
-          </li>
-        )}
-      </ul>
+      {rewards?.tierUpgraded && rewards.previousTierName && !loading && (
+        <p className={styles.tierUpgradeBanner}>
+          <span className="material-symbols-outlined">military_tech</span>
+          {rewards.previousTierName} → {rewards.tierName} 등급 달성!
+        </p>
+      )}
+
+      {loading ? (
+        <div className={styles.loadingBox}>
+          <span className={`material-symbols-outlined ${styles.loadingIcon}`}>progress_activity</span>
+          <p>리워드 조회 중…</p>
+        </div>
+      ) : (
+        <ul className={styles.rewardList}>
+          {showXp && rewards && (
+            <li className={styles.rewardRow}>
+              <div className={styles.rewardIconWrap}>
+                <span
+                  className={`material-symbols-outlined ${styles.rewardIcon}`}
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
+                  star
+                </span>
+              </div>
+              <div className={styles.rewardText}>
+                <span className={styles.rewardLabel}>경험치</span>
+                <span className={styles.rewardValue}>+{rewards.earnedXp} XP</span>
+              </div>
+            </li>
+          )}
+          {showDistance && rewards && (
+            <li className={styles.rewardRow}>
+              <div className={`${styles.rewardIconWrap} ${styles.rewardIconWrapDistance}`}>
+                <span className={`material-symbols-outlined ${styles.rewardIcon}`}>directions_walk</span>
+              </div>
+              <div className={styles.rewardText}>
+                <span className={styles.rewardLabel}>이동 거리</span>
+                <span className={styles.rewardValue}>+{formatWalkedDistance(rewards.walkedMeters)}</span>
+              </div>
+            </li>
+          )}
+          {showOrderCount && rewards && (
+            <li className={styles.rewardRow}>
+              <div className={`${styles.rewardIconWrap} ${styles.rewardIconWrapPickup}`}>
+                <span className={`material-symbols-outlined ${styles.rewardIcon}`}>shopping_bag</span>
+              </div>
+              <div className={styles.rewardText}>
+                <span className={styles.rewardLabel}>누적 픽업</span>
+                <span className={styles.rewardValue}>
+                  {rewards.totalOrderCount.toLocaleString('ko-KR')}회
+                  <span className={styles.rewardSub}> (+{rewards.orderCountGain})</span>
+                </span>
+              </div>
+            </li>
+          )}
+          {!showXp && !showDistance && !showOrderCount && (
+            <li className={styles.rewardRowMuted}>
+              <p>보상은 처리됐습니다. 홈·마이페이지에서 잠시 후 다시 확인해 주세요.</p>
+            </li>
+          )}
+        </ul>
+      )}
 
       <div className={styles.actions}>
-        {onWriteReview && (
+        {onWriteReview && !loading && (
           <button type="button" className={styles.btnSecondary} onClick={onWriteReview}>
             <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
               rate_review
@@ -130,7 +143,7 @@ function PickupRewardModal({
             리뷰 남기기
           </button>
         )}
-        <button type="button" className={styles.btnPrimary} onClick={onClose}>
+        <button type="button" className={styles.btnPrimary} onClick={onClose} disabled={loading}>
           확인
         </button>
       </div>

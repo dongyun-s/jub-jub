@@ -1,63 +1,70 @@
 /**
- * 주문/결제 API
- * - 주문: /orders
- * - 결제: /payments
- *
- * (주의) 이 API들은 /api/v1 prefix가 아니라서 apiFetch 사용
+ * 주문·결제 할인 API (/orders, /payments)
+ * @see 주문·결제 할인 API 명세서
  */
 import { apiFetch } from './authClient'
 
 export type PaymentMethod = 'CARD' | 'EASY_PAY' | 'VBANK' | 'TRANSFER' | 'UNKNOWN'
+export type OrderStatus = 'READY' | 'PAID' | 'COMPLETED' | 'REFUNDED' | 'FAILED'
+export type PaymentStatus = 'READY' | 'PAID' | 'REFUNDED' | 'FAILED'
 
+/** POST /orders */
 export interface CreateOrderBody {
   storeId: number
+  /** 할인 전 장바구니 총액 */
   totalAmount: number
-  /** 사용할 회원 쿠폰 ID 목록 (명세: memberCouponIds) */
-  memberCouponIds?: number[]
-  /** 다회용기 포장 선택 — 할인 금액은 서버에서 적용 */
+  memberCouponIds?: number[] | null
   useMultiUseContainer?: boolean
 }
 
-/** POST /orders 응답 (주문·결제 할인 API 명세) */
+/** POST /orders 응답 */
 export interface OrderResponse {
   orderId: number
   orderNo: string
-  memberProfileId: number
-  storeId: number
-  /** READY | PAID | COMPLETED | REFUNDED | FAILED */
-  orderStatus: string
+  orderStatus: OrderStatus
   originalAmount: number
   tierDiscountAmount: number
   couponDiscountAmount: number
   ecoDiscountAmount: number
+  /** 실제 결제해야 하는 금액 */
   finalAmount: number
   useMultiUseContainer: boolean
   usedCouponIds: number[]
   paymentId: number | null
+  /** 백엔드 확장 필드 */
+  memberProfileId?: number
+  storeId?: number
 }
 
+/** POST /payments/prepare */
 export interface PreparePaymentBody {
   orderId: number
   method: PaymentMethod
 }
 
+/** POST /payments/prepare 응답 */
 export interface PreparePaymentResponse {
   paymentRecordId: number
   orderId: number
   merchantUid: string
-  paymentId: string
-  pgProvider: string
-  method: PaymentMethod
-  paymentStatus: string
+  paymentStatus: PaymentStatus
+  /** PortOne 결제 금액 */
   requestedAmount: number
+  /** 백엔드 확장 (PortOne paymentId = merchantUid) */
+  paymentId?: string
+  pgProvider?: string
+  method?: PaymentMethod
 }
 
+/** POST /payments/confirm */
 export interface ConfirmPaymentBody {
-  /** 백엔드 ConfirmPaymentRequest 기준 */
   merchantUid: string
   transactionId: string
+  userLatitude: number
+  userLongitude: number
 }
 
+/** POST /payments/confirm 응답 */
 export interface PaymentResponse {
   paymentRecordId: number
   orderId: number
@@ -65,16 +72,33 @@ export interface PaymentResponse {
   transactionId: string | null
   pgProvider: string
   method: PaymentMethod
-  paymentStatus: string
+  paymentStatus: PaymentStatus
   requestedAmount: number
   paidAmount: number | null
   paidAt: string | null
 }
 
+/** POST /payments/{paymentRecordId}/refund */
+export interface RefundPaymentBody {
+  amount: number
+  reason: string
+}
+
+export interface RefundPaymentResponse {
+  refundId: number
+  paymentId: number
+  refundStatus: string
+  refundAmount: number
+  refundedAt: string
+}
+
 export function createOrder(body: CreateOrderBody) {
   return apiFetch<OrderResponse>('/orders', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      ...body,
+      memberCouponIds: body.memberCouponIds ?? [],
+    }),
   })
 }
 
@@ -87,6 +111,13 @@ export function preparePayment(body: PreparePaymentBody) {
 
 export function confirmPayment(body: ConfirmPaymentBody) {
   return apiFetch<PaymentResponse>('/payments/confirm', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function refundPayment(paymentRecordId: number, body: RefundPaymentBody) {
+  return apiFetch<RefundPaymentResponse>(`/payments/${paymentRecordId}/refund`, {
     method: 'POST',
     body: JSON.stringify(body),
   })

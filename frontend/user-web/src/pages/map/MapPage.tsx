@@ -780,13 +780,11 @@ function MapPage({
         setCurrentLocation(loc)
         lastWatchLocationRef.current = loc
         setIsLoadingLocation(false)
-        
-        // 거리 및 시간 계산 (간단한 직선거리 계산)
+
         const dist = calculateDistance(latitude, longitude, destinationData.lat, destinationData.lng)
         console.log('[MapPage] 목적지까지 거리:', dist, 'm')
         setDistance(dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`)
-        
-        // 도보 시간 계산 (평균 보행 속도: 분당 80m)
+
         const walkMinutes = Math.round(dist / 80)
         setWalkTime(`도보 ${walkMinutes}분`)
       },
