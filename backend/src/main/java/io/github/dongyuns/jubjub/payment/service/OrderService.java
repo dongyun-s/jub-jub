@@ -17,6 +17,7 @@ import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import io.github.dongyuns.jubjub.payment.domain.Payment;
+import io.github.dongyuns.jubjub.payment.dto.CompletePickupRequest;
 import io.github.dongyuns.jubjub.payment.dto.CreateOrderRequest;
 import io.github.dongyuns.jubjub.payment.dto.OrderHistoryResponse;
 import io.github.dongyuns.jubjub.payment.dto.OrderResponse;
@@ -44,6 +45,7 @@ public class OrderService {
     private final StoreRepository storeRepository;
     private final PaymentRepository paymentRepository;
     private final DiscountCalculatorService discountCalculatorService;
+    private final PickupDistanceService pickupDistanceService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -88,7 +90,7 @@ public class OrderService {
 
     // 픽업 완료 처리 및 리워드 이벤트 발행
     @Transactional
-    public void completePickup(Long orderId) {
+    public void completePickup(Long orderId, CompletePickupRequest request) {
         // 1. 주문 조회
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException("ORDER_NOT_FOUND", "주문을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -97,16 +99,21 @@ public class OrderService {
             throw new BusinessException("ORDER_NOT_PAID", "결제 완료 주문만 픽업 완료 처리할 수 있습니다.", HttpStatus.CONFLICT);
         }
 
+        int walkedDistanceMeters = pickupDistanceService.calculatePickupDistanceMeters(
+                request.userLatitude(),
+                request.userLongitude(),
+                order.getStore()
+        );
+
         // 2. 주문 상태를 픽업 완료로 변경 (Order 엔티티에 해당 메서드가 있다고 가정)
         order.completePickup();
 
         // 3. 리워드 적립 이벤트 발행
-        // 유저 이메일, 기본 경험치(100), 주문 금액의 일부나 고정 거리(예: 500m)를 계산해서 보냅니다.
         eventPublisher.publishEvent(new PickupCompletedEvent(
                 order.getMemberProfile().getAccount().getEmail(),
-                100, // TODO: 추후 주문 금액 등에 따른 경험치 계산 로직 적용 가능
-                500,  // TODO: 추후 실제 GPS 기반 거리 데이터 적용 가능
-                order.getId(), // 리워드 내역 추적을 위해 주문 ID 추가
+                100,
+                walkedDistanceMeters,
+                order.getId(),
                 Boolean.TRUE.equals(order.getUseMultiUseContainer())
         ));
     }

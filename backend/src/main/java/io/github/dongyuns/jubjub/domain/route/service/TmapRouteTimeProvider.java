@@ -77,6 +77,7 @@ public class TmapRouteTimeProvider implements RouteTimeProvider {
             int travelTimeMinutes = convertTravelTimeMinutes(totalTimeSeconds, travelMode);
 
             return RouteTimeResult.builder()
+                    .distanceMeters(totalDistanceMeters)
                     .distanceKm(distanceKm)
                     .travelTimeMinutes(travelTimeMinutes)
                     .build();

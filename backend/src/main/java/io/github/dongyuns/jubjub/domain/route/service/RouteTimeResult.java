@@ -6,6 +6,7 @@ import lombok.Getter;
 @Getter
 @Builder
 public class RouteTimeResult {
+    private int distanceMeters;
     private double distanceKm;
     private int travelTimeMinutes;
 }

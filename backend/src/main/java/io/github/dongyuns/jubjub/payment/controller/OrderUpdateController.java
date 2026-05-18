@@ -1,7 +1,9 @@
 package io.github.dongyuns.jubjub.payment.controller;
 
 // import io.swagger.v3.oas.annotations.Hidden;
+import io.github.dongyuns.jubjub.payment.dto.CompletePickupRequest;
 import io.github.dongyuns.jubjub.payment.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,8 +18,11 @@ public class OrderUpdateController {
 
     // 점주용: 픽업 완료 처리 API
     @PostMapping("/{orderId}/complete")
-    public ResponseEntity<String> completePickup(@PathVariable Long orderId) {
-        orderService.completePickup(orderId);
+    public ResponseEntity<String> completePickup(
+            @PathVariable Long orderId,
+            @RequestBody @Valid CompletePickupRequest request
+    ) {
+        orderService.completePickup(orderId, request);
         return ResponseEntity.ok("픽업 완료 처리되었습니다. 리워드가 자동으로 적립됩니다.");
     }
 }
