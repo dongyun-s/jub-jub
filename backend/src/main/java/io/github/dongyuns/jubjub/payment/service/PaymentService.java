@@ -48,6 +48,7 @@ public class PaymentService {
     private final MemberProfileRepository memberProfileRepository;
     private final MemberCouponRepository memberCouponRepository;
     private final PortOneClient portOneClient;
+    private final PickupDistanceService pickupDistanceService;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -205,6 +206,14 @@ public class PaymentService {
         LocalDateTime paidAt = paymentDetails.paidAt() != null ? paymentDetails.paidAt() : LocalDateTime.now();
         String resolvedTransactionId = paymentDetails.transactionId() != null ? paymentDetails.transactionId() : transactionId;
         order.recordUserLocation(userLatitude, userLongitude);
+        if (userLatitude != null && userLongitude != null) {
+            int pickupDistanceMeters = pickupDistanceService.calculatePickupDistanceMeters(
+                    userLatitude,
+                    userLongitude,
+                    order.getStore()
+            );
+            order.recordPickupDistanceMeters(pickupDistanceMeters);
+        }
         payment.markPaid(resolvedTransactionId, paymentDetails.amount(), paidAt);
         order.markPaid(paidAt);
         markUsedCoupons(order);

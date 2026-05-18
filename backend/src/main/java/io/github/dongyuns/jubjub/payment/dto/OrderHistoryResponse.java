@@ -1,6 +1,8 @@
 package io.github.dongyuns.jubjub.payment.dto;
 
 import io.github.dongyuns.jubjub.payment.domain.Order;
+import io.github.dongyuns.jubjub.payment.domain.OrderItem;
+import io.github.dongyuns.jubjub.payment.domain.OrderItemOption;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import io.github.dongyuns.jubjub.payment.domain.Payment;
 import io.github.dongyuns.jubjub.payment.domain.PaymentStatus;
@@ -20,6 +22,8 @@ public record OrderHistoryResponse(
         Integer finalAmount,
         Boolean useMultiUseContainer,
         List<Long> usedCouponIds,
+        Integer pickupDistanceMeters,
+        List<OrderItemResponse> items,
         Long paymentRecordId,
         PaymentStatus paymentStatus,
         String merchantUid,
@@ -39,10 +43,56 @@ public record OrderHistoryResponse(
                 order.getFinalAmount(),
                 order.getUseMultiUseContainer(),
                 order.getUsedCouponIds(),
+                order.getPickupDistanceMeters(),
+                order.getItems().stream()
+                        .map(OrderItemResponse::from)
+                        .toList(),
                 payment != null ? payment.getId() : null,
                 payment != null ? payment.getStatus() : null,
                 payment != null ? payment.getMerchantUid() : null,
                 payment != null ? payment.getPaidAt() : null
         );
+    }
+
+    public record OrderItemResponse(
+            Long orderItemId,
+            Long menuId,
+            String menuName,
+            Integer menuPrice,
+            Integer quantity,
+            String requestMemo,
+            Integer itemTotalAmount,
+            List<OrderItemOptionResponse> options
+    ) {
+        public static OrderItemResponse from(OrderItem item) {
+            return new OrderItemResponse(
+                    item.getId(),
+                    item.getMenuId(),
+                    item.getMenuName(),
+                    item.getMenuPrice(),
+                    item.getQuantity(),
+                    item.getRequestMemo(),
+                    item.getItemTotalAmount(),
+                    item.getOptions().stream()
+                            .map(OrderItemOptionResponse::from)
+                            .toList()
+            );
+        }
+    }
+
+    public record OrderItemOptionResponse(
+            Long orderItemOptionId,
+            Long menuOptionId,
+            String optionName,
+            Integer additionalPrice
+    ) {
+        public static OrderItemOptionResponse from(OrderItemOption option) {
+            return new OrderItemOptionResponse(
+                    option.getId(),
+                    option.getMenuOptionId(),
+                    option.getOptionName(),
+                    option.getAdditionalPrice()
+            );
+        }
     }
 }
