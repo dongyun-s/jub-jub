@@ -1,10 +1,11 @@
 import type { StoreListItem } from '../api/store'
 import type { FeaturedRestaurant } from '../constants'
-import { STORE_LIST_CARD_IMAGES } from '../constants'
+import { CATEGORY_TAB_TO_ID, STORE_LIST_CARD_IMAGES } from '../constants'
 
 export function mapStoreListItemToFeatured(s: StoreListItem): FeaturedRestaurant {
   const id = Number(s.storeId)
   const img = STORE_LIST_CARD_IMAGES[Math.abs(id) % STORE_LIST_CARD_IMAGES.length]
+  const categoryLabel = s.categoryName?.trim() || undefined
   return {
     id,
     image: img,
@@ -15,21 +16,17 @@ export function mapStoreListItemToFeatured(s: StoreListItem): FeaturedRestaurant
     rating: 4.8,
     reviews: 320,
     points: `+${Math.min(200, Math.round(s.minOrderAmount / 120))}`,
-    hashtags: [`#cat${s.categoryId}`, '#줍줍'],
+    hashtags: categoryLabel ? [`#${categoryLabel}`, '#줍줍'] : ['#줍줍'],
     categoryId: s.categoryId,
+    lat: s.latitude ?? undefined,
+    lng: s.longitude ?? undefined,
   }
-}
-
-const TAB_CATEGORY_IDS: Record<string, number[]> = {
-  한식: [1],
-  일식: [1],
-  패스트푸드: [2],
 }
 
 export function restaurantMatchesCategoryTab(tab: string, r: FeaturedRestaurant): boolean {
   if (tab === '전체') return true
-  const ids = TAB_CATEGORY_IDS[tab]
-  if (!ids) return true
-  if (r.categoryId == null) return true
-  return ids.includes(r.categoryId)
+  const expectedId = CATEGORY_TAB_TO_ID[tab]
+  if (expectedId == null) return true
+  if (r.categoryId == null) return false
+  return r.categoryId === expectedId
 }

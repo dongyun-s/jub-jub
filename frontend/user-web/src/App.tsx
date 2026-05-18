@@ -32,6 +32,7 @@ import {
   ReviewWritePage,
   FavoritesPage,
   NotificationsPage,
+  RankingPage,
 } from './pages'
 import { FEATURED_RESTAURANTS } from './constants'
 import { clearTokens, getAccessToken } from './lib/authStorage'
@@ -39,7 +40,7 @@ import { fetchMyCart, mapCartListToUiLines, type ServerCartLineUi } from './api/
 import type { ReviewWritePayload } from './api/reviews'
 
 /** 앱에서 사용하는 모든 페이지 식별자 */
-type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites' | 'notifications'
+type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites' | 'notifications' | 'ranking'
 
 /** 장바구니에 적용된 쿠폰 정보 */
 interface AppliedCoupon {
@@ -169,7 +170,20 @@ function App() {
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
             onStoreSelect={openStoreById}
+            onRankingClick={goTo('ranking')}
             hasActiveOrder={hasActiveOrder}
+            cartCount={cartCount}
+          />
+        )
+      case 'ranking':
+        return (
+          <RankingPage
+            onBack={goTo('home')}
+            onGoHome={goTo('home')}
+            onCartClick={goTo('cart')}
+            onOrdersClick={goTo('orders')}
+            onMapClick={goTo('map')}
+            onMypageClick={goTo('mypage')}
             cartCount={cartCount}
           />
         )
@@ -333,6 +347,7 @@ function App() {
             onMapClick={goTo('map')}
             onReviewsClick={goTo('myReviews')}
             onFavoritesClick={goTo('favorites')}
+            onRankingClick={goTo('ranking')}
             onNotificationsClick={goTo('notifications')}
             onLogout={() => {
               clearTokens()

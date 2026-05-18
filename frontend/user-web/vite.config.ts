@@ -72,6 +72,7 @@ export default defineConfig(({ mode }) => {
         '/order-tracking': backendProxy(proxyTarget),
         '/orders': backendProxy(proxyTarget),
         '/payments': backendProxy(proxyTarget),
+        '/review-notifications': backendProxy(proxyTarget),
       },
     },
   }

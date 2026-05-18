@@ -12,15 +12,27 @@ export type PaymentMethod = 'CARD' | 'EASY_PAY' | 'VBANK' | 'TRANSFER' | 'UNKNOW
 export interface CreateOrderBody {
   storeId: number
   totalAmount: number
+  /** 사용할 회원 쿠폰 ID 목록 (명세: memberCouponIds) */
+  memberCouponIds?: number[]
+  /** 다회용기 포장 선택 — 할인 금액은 서버에서 적용 */
+  useMultiUseContainer?: boolean
 }
 
+/** POST /orders 응답 (주문·결제 할인 API 명세) */
 export interface OrderResponse {
   orderId: number
   orderNo: string
   memberProfileId: number
   storeId: number
+  /** READY | PAID | COMPLETED | REFUNDED | FAILED */
   orderStatus: string
+  originalAmount: number
+  tierDiscountAmount: number
+  couponDiscountAmount: number
+  ecoDiscountAmount: number
   finalAmount: number
+  useMultiUseContainer: boolean
+  usedCouponIds: number[]
   paymentId: number | null
 }
 

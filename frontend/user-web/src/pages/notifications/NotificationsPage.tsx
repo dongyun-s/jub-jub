@@ -13,6 +13,7 @@ import {
   type OrderNotificationItem,
 } from '../../api/orderNotifications'
 import { getAccessToken } from '../../lib/authStorage'
+import { notifyNotificationsUpdated } from '../../hooks/useUnreadNotificationCount'
 
 function formatNotifyTime(isoOrRaw: string): string {
   if (!isoOrRaw.trim()) return ''
@@ -64,6 +65,7 @@ function NotificationsPage({
       const data = await fetchOrderNotifications()
       setItems(data.notifications)
       setError(null)
+      notifyNotificationsUpdated()
     } catch {
       setError('알림을 불러오지 못했습니다.')
       setItems([])
@@ -91,6 +93,7 @@ function NotificationsPage({
     setItems((prev) =>
       prev.map((n) => (n.id === id && !n.read ? { ...n, read: true } : n)),
     )
+    notifyNotificationsUpdated()
   }
 
   const markAllRead = async () => {
@@ -99,6 +102,7 @@ function NotificationsPage({
     try {
       await postOrderNotificationsReadAll()
       await load()
+      notifyNotificationsUpdated()
     } catch {
       setError('모두 읽음 처리에 실패했습니다.')
     } finally {

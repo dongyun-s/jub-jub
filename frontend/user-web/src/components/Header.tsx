@@ -6,6 +6,8 @@
  */
 
 import type { ReactNode } from 'react'
+import NotificationIconButton from './NotificationIconButton/NotificationIconButton'
+import { useUnreadNotificationCount } from '../hooks/useUnreadNotificationCount'
 import styles from './Header.module.css'
 
 interface HeaderProps {
@@ -31,6 +33,8 @@ function Header({
   onFavoriteClick,
   onNotificationsClick,
 }: HeaderProps) {
+  const unreadNotificationCount = useUnreadNotificationCount()
+
   return (
     <header className={styles.header}>
       {/* 왼쪽: 뒤로가기 또는 로고 */}
@@ -64,9 +68,10 @@ function Header({
             <button type="button" onClick={onFavoriteClick} className={styles.iconButton}>
               <span className="material-symbols-outlined">favorite</span>
             </button>
-            <button type="button" onClick={onNotificationsClick} className={styles.iconButton}>
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
+            <NotificationIconButton
+              unreadCount={unreadNotificationCount}
+              onClick={onNotificationsClick}
+            />
           </>
         ) : rightContent !== null ? (
           rightContent

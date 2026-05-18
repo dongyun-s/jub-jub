@@ -10,16 +10,26 @@ import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { useProfile } from '../../hooks/useProfile'
 import AppModal from '../../components/AppModal/AppModal'
+import AttendanceRandomBoxModal from '../../components/AttendanceRandomBoxModal/AttendanceRandomBoxModal'
+/** [삭제용] 랜덤박스 미리보기 — 배포 시 아래 import + JSX 블록 제거 */
+import AttendanceRandomBoxPreviewButton from '../../components/AttendanceRandomBoxModal/AttendanceRandomBoxPreviewButton'
+import type { AttendanceBoxPrize } from '../../lib/attendanceRandomBox'
 import { ApiError } from '../../api/authClient'
 import { createMyProfileImage, deleteMyProfileImage, updateMyProfileImage } from '../../api/profileImage'
 import { uploadImageFileViaPresigned } from '../../api/uploads'
 import {
   fetchAttendanceWeek,
   fetchAttendanceHistory,
+  fetchMyCoupons,
   fetchRewardMe,
   postAttendanceCheck,
   type RewardMeResponse,
 } from '../../api/rewards'
+import {
+  attendanceUntilNextRandomBox,
+  countServerLifetimeAttendance,
+  isAttendanceRandomBoxMilestone,
+} from '../../lib/attendanceRandomBox'
 import { getAccessToken } from '../../lib/authStorage'
 import {
   getAttendanceStreak,
@@ -30,6 +40,11 @@ import {
 } from '../../lib/rewardAttendance'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
+import { postReviewNotificationsReadAll } from '../../api/reviewNotifications'
+import {
+  notifyReviewNotificationsUpdated,
+  useUnreadReviewNotificationCount,
+} from '../../hooks/useUnreadReviewNotificationCount'
 import styles from './MyPage.module.css'
 
 interface MyPageProps {
@@ -40,6 +55,7 @@ interface MyPageProps {
   onMapClick?: () => void
   onReviewsClick?: () => void
   onFavoritesClick?: () => void
+  onRankingClick?: () => void
   onNotificationsClick?: () => void
   onLogout?: () => void
   cartCount?: number
@@ -52,7 +68,8 @@ function todayWeekIndex(): number {
   return (new Date().getDay() + 6) % 7
 }
 
-function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onNotificationsClick, onLogout, cartCount = 0 }: MyPageProps) {
+function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClick, onReviewsClick, onFavoritesClick, onRankingClick, onNotificationsClick, onLogout, cartCount = 0 }: MyPageProps) {
+  const unreadReviewNotificationCount = useUnreadReviewNotificationCount()
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile()
   const avatarFileInputRef = useRef<HTMLInputElement>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -71,6 +88,10 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
   /** 출석 완료 모달 표시 여부 */
   const [showAttendanceModal, setShowAttendanceModal] = useState(false)
   const [attendanceModalMessage, setAttendanceModalMessage] = useState('오늘의 출석체크가 완료되었습니다.')
+  const [randomBoxOpen, setRandomBoxOpen] = useState(false)
+  const [randomBoxCouponIdsBefore, setRandomBoxCouponIdsBefore] = useState<Set<number>>(() => new Set())
+  const [randomBoxMockPrize, setRandomBoxMockPrize] = useState<AttendanceBoxPrize | null>(null)
+  const [lifetimeAttendanceCount, setLifetimeAttendanceCount] = useState<number | null>(null)
 
   const questSectionRef = useRef<HTMLDivElement | null>(null)
 
@@ -95,6 +116,23 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
 
   useEffect(() => {
     void loadRewards()
+  }, [loadRewards])
+
+  useEffect(() => {
+    const onUpdated = () => {
+      void loadRewards()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void loadRewards()
+    }
+    window.addEventListener('jubjub-rewards-updated', onUpdated)
+    window.addEventListener('focus', onUpdated)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('jubjub-rewards-updated', onUpdated)
+      window.removeEventListener('focus', onUpdated)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [loadRewards])
 
   const [attendanceStreak, setAttendanceStreak] = useState(0)
@@ -132,6 +170,13 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
           }
         } catch {
           // 무시 (서버 미구현/에러 시 로컬+주간API만)
+        }
+
+        try {
+          const total = await countServerLifetimeAttendance()
+          if (!cancelled) setLifetimeAttendanceCount(total)
+        } catch {
+          if (!cancelled) setLifetimeAttendanceCount(null)
         }
       }
 
@@ -248,6 +293,14 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
     if (isTodayChecked) return
 
     void (async () => {
+      const couponIdsBefore = new Set<number>()
+      try {
+        const coupons = await fetchMyCoupons()
+        coupons.forEach((c) => couponIdsBefore.add(c.memberCouponId))
+      } catch {
+        /* 쿠폰 조회 실패 시에도 출석은 진행 */
+      }
+
       try {
         const msg = await postAttendanceCheck()
         markAttendanceDone(profile?.email)
@@ -256,9 +309,24 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
           next[todayIndex] = true
           return next
         })
-        setAttendanceModalMessage(msg || '출석체크가 완료되었습니다.')
-        setShowAttendanceModal(true)
         await loadRewards()
+
+        let total = lifetimeAttendanceCount ?? 0
+        try {
+          total = await countServerLifetimeAttendance()
+          setLifetimeAttendanceCount(total)
+        } catch {
+          total += 1
+          setLifetimeAttendanceCount(total)
+        }
+
+        if (isAttendanceRandomBoxMilestone(total)) {
+          setRandomBoxCouponIdsBefore(couponIdsBefore)
+          setRandomBoxOpen(true)
+        } else {
+          setAttendanceModalMessage(msg || '출석체크가 완료되었습니다.')
+          setShowAttendanceModal(true)
+        }
       } catch (e) {
         const msg = e instanceof ApiError ? e.message : ''
         const alreadyDone =
@@ -293,6 +361,20 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
     }
     window.sessionStorage.removeItem('fromHomeAttendance')
   }, [])
+
+  const handleReviewsMenuClick = () => {
+    void (async () => {
+      if (unreadReviewNotificationCount > 0 && getAccessToken()) {
+        try {
+          await postReviewNotificationsReadAll()
+          notifyReviewNotificationsUpdated()
+        } catch {
+          /* 배지는 리뷰 관리 화면 진입 시 한 번 더 시도 */
+        }
+      }
+      onReviewsClick?.()
+    })()
+  }
 
   return (
     <Layout showBackground={false}>
@@ -472,6 +554,20 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                 {attendanceStreak > 0 ? `${attendanceStreak}일째 연속 출석 중!` : '연속 출석을 시작해 보세요!'}
               </span>
             </div>
+            {lifetimeAttendanceCount != null && !isAttendanceRandomBoxMilestone(lifetimeAttendanceCount) && (
+              <p className={styles.randomBoxHint}>
+                누적 7회마다 랜덤박스 · 다음까지{' '}
+                {attendanceUntilNextRandomBox(lifetimeAttendanceCount)}회
+              </p>
+            )}
+            {/* [삭제용] 랜덤박스 UI 확인 — AttendanceRandomBoxPreviewButton.tsx 와 함께 제거 */}
+            <AttendanceRandomBoxPreviewButton
+              onPreview={({ couponIdsBefore, mockPrize }) => {
+                setRandomBoxCouponIdsBefore(couponIdsBefore)
+                setRandomBoxMockPrize(mockPrize ?? null)
+                setRandomBoxOpen(true)
+              }}
+            />
             <div className={styles.weekGrid}>
               {weekDays.map((day, idx) => (
                 <div
@@ -524,19 +620,21 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                   </div>
                   <span className={styles.menuLabel}>쿠폰함</span>
                 </div>
-                <div className={styles.menuRight}>
-                  <span className={styles.newBadge}>NEW</span>
-                  <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
-                </div>
+                <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
               </button>
-              <button onClick={onReviewsClick} className={styles.menuItem}>
+              <button type="button" onClick={handleReviewsMenuClick} className={styles.menuItem}>
                 <div className={styles.menuLeft}>
                   <div className={`${styles.menuIconWrap} ${styles.menuIconEmerald}`}>
                     <span className="material-symbols-outlined">rate_review</span>
                   </div>
                   <span className={styles.menuLabel}>리뷰 관리</span>
                 </div>
-                <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
+                <div className={styles.menuRight}>
+                  {unreadReviewNotificationCount > 0 && (
+                    <span className={styles.newBadge}>NEW</span>
+                  )}
+                  <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
+                </div>
               </button>
               <button type="button" onClick={() => onFavoritesClick?.()} className={styles.menuItem}>
                 <div className={styles.menuLeft}>
@@ -544,6 +642,15 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                     <span className={`material-symbols-outlined ${styles.menuIconFilled}`}>favorite</span>
                   </div>
                   <span className={styles.menuLabel}>찜 목록</span>
+                </div>
+                <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
+              </button>
+              <button type="button" onClick={() => onRankingClick?.()} className={styles.menuItem}>
+                <div className={styles.menuLeft}>
+                  <div className={`${styles.menuIconWrap} ${styles.menuIconViolet}`}>
+                    <span className="material-symbols-outlined">leaderboard</span>
+                  </div>
+                  <span className={styles.menuLabel}>회원 랭킹</span>
                 </div>
                 <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
               </button>
@@ -601,6 +708,17 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             </button>
           </div>
         </AppModal>
+
+        <AttendanceRandomBoxModal
+          open={randomBoxOpen}
+          couponIdsBefore={randomBoxCouponIdsBefore}
+          devMockPrize={randomBoxMockPrize}
+          onClose={() => {
+            setRandomBoxOpen(false)
+            setRandomBoxMockPrize(null)
+          }}
+          onGoCoupons={onCouponClick}
+        />
 
         <AppModal open={showAttendanceModal} onClose={() => setShowAttendanceModal(false)} size="sm">
           <div className={styles.attendanceModalInner}>

@@ -14,7 +14,12 @@ import SearchBar from '../../components/SearchBar'
 import { useDragScroll } from '../../hooks'
 import { fetchStores } from '../../api/store'
 import type { FeaturedRestaurant } from '../../constants'
-import { CATEGORY_TABS, FEATURED_RESTAURANTS, FILTER_OPTIONS } from '../../constants'
+import {
+  CATEGORY_TABS,
+  categoryTabToApiParam,
+  FEATURED_RESTAURANTS,
+  FILTER_OPTIONS,
+} from '../../constants'
 import { mapStoreListItemToFeatured, restaurantMatchesCategoryTab } from '../../lib/storeUi'
 import styles from './CategoryDetailPage.module.css'
 
@@ -44,25 +49,43 @@ function CategoryDetailPage({
   cartCount = 0,
 }: CategoryDetailPageProps) {
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
-
-  useEffect(() => {
-    let cancelled = false
-    fetchStores()
-      .then((list) => {
-        if (!cancelled && list.length > 0) {
-          setRestaurants(list.map(mapStoreListItemToFeatured))
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const [storesLoading, setStoresLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('전체')
   const [sortOrder, setSortOrder] = useState<'default' | 'distance' | 'rating'>('default')
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const { scrollRef, isDragging, handlers } = useDragScroll()
+  const { scrollRef, isDragging, shouldIgnoreClick, handlers } = useDragScroll()
+
+  useEffect(() => {
+    let cancelled = false
+    setStoresLoading(true)
+    void fetchStores(categoryTabToApiParam(activeTab))
+      .then((list) => {
+        if (cancelled) return
+        if (list.length > 0) {
+          setRestaurants(list.map(mapStoreListItemToFeatured))
+        } else if (activeTab === '전체') {
+          setRestaurants(FEATURED_RESTAURANTS)
+        } else {
+          setRestaurants(
+            FEATURED_RESTAURANTS.filter((r) => restaurantMatchesCategoryTab(activeTab, r)),
+          )
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRestaurants(
+            FEATURED_RESTAURANTS.filter((r) => restaurantMatchesCategoryTab(activeTab, r)),
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setStoresLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab])
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
   // 선택된 탭을 중앙으로 스크롤
@@ -84,18 +107,23 @@ function CategoryDetailPage({
 
   // 탭 선택 핸들러
   const handleTabClick = useCallback((tab: string) => {
-    if (isDragging) return
+    if (shouldIgnoreClick()) return
     setActiveTab(tab)
     scrollToCenter(tab)
-  }, [isDragging, scrollToCenter])
+  }, [shouldIgnoreClick, scrollToCenter])
 
-  // 홈 검색에서 넘어온 검색어가 있으면 초기값으로 설정
+  // 홈 검색·카테고리에서 넘어온 값 적용
   useEffect(() => {
     if (typeof window === 'undefined') return
     const q = window.sessionStorage.getItem('categorySearchQuery')
     if (q) {
       setSearchQuery(q)
       window.sessionStorage.removeItem('categorySearchQuery')
+    }
+    const tab = window.sessionStorage.getItem('categoryActiveTab')
+    if (tab && CATEGORY_TABS.includes(tab)) {
+      setActiveTab(tab)
+      window.sessionStorage.removeItem('categoryActiveTab')
     }
   }, [])
 
@@ -144,6 +172,7 @@ function CategoryDetailPage({
             <button
               key={tab}
               ref={(el) => { if (el) tabRefs.current.set(tab, el) }}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={() => handleTabClick(tab)}
               className={`${styles.tabButton} ${activeTab === tab ? styles.tabButtonActive : styles.tabButtonInactive}`}
             >
@@ -213,6 +242,14 @@ function CategoryDetailPage({
 
       {/* 맛집 리스트 - 홈과 동일한 FeaturedRestaurantList 사용 */}
       <main className={styles.main}>
+        {storesLoading && (
+          <p className="px-4 py-6 text-center text-sm text-slate-500">매장을 불러오는 중…</p>
+        )}
+        {!storesLoading && filteredRestaurants.length === 0 && (
+          <p className="px-4 py-12 text-center text-sm text-slate-500">
+            이 카테고리에 해당하는 매장이 없습니다.
+          </p>
+        )}
         <FeaturedRestaurantList
           restaurants={filteredRestaurants}
           onCardClick={(id) => onStoreSelect?.(id)}
