@@ -9,7 +9,13 @@ import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { FEATURED_RESTAURANTS } from '../../constants'
-import { getMyOrders, type MyOrderItem } from '../../api/orders'
+import {
+  formatOrderMenuSummary,
+  formatPickupDistance,
+  getMyOrders,
+  type MyOrderItem,
+} from '../../api/orders'
+import type { OrderStatus } from '../../api/payment'
 import { fetchMyReviews, type ReviewWritePayload } from '../../api/reviews'
 import { fetchStores } from '../../api/store'
 import { ApiError } from '../../api/authClient'
@@ -43,6 +49,7 @@ interface OrderItem {
   distance: string
   image: string
   status: 'completed' | 'reviewed'
+  orderStatus?: OrderStatus
 }
 
 /** 동일 orderId가 API·로컬에 중복될 때 React key 충돌 방지 — 먼저 나온 행만 유지 */
@@ -288,14 +295,15 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
       storeId: resolveStoreIdForServerOrder(o, localOrders, storeNameToId),
       storeName: o.storeName,
       date: formatDate(o.orderedAt),
-      menu: o.orderNo,
+      menu: formatOrderMenuSummary(o),
       price: o.finalAmount,
       xp: 0,
-      distance: '',
+      distance: formatPickupDistance(o.pickupDistanceMeters),
       image:
         FEATURED_RESTAURANTS.find((r) => r.title === o.storeName)?.image ||
         'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
       status: 'completed',
+      orderStatus: o.orderStatus,
     })),
     )
   }, [myOrdersApi, localOrders, storeNameToId])
@@ -340,15 +348,30 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
   }, [apiOrders, myOrders, reviewedOrderIds])
 
   const recentTabOrders = useMemo(
-    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status !== 'reviewed')),
+    () =>
+      sortOrdersByDateDesc(
+        allOrders.filter(
+          (o) =>
+            o.status !== 'reviewed' &&
+            (!o.orderStatus || o.orderStatus === 'PAID' || o.orderStatus === 'READY'),
+        ),
+      ),
     [allOrders],
   )
 
   const pastTabOrders = useMemo(() => {
     const reviewedFromLive = allOrders.filter((o) => o.status === 'reviewed')
-    const liveIds = new Set(reviewedFromLive.map((o) => o.id))
+    const completedFromLive = allOrders.filter(
+      (o) =>
+        o.status !== 'reviewed' &&
+        o.orderStatus != null &&
+        (o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED'),
+    )
+    const liveIds = new Set([...reviewedFromLive, ...completedFromLive].map((o) => o.id))
     const demoPastOnly = pastOrders.filter((p) => !liveIds.has(p.id))
-    return sortOrdersByDateDesc(dedupeOrdersById([...reviewedFromLive, ...demoPastOnly]))
+    return sortOrdersByDateDesc(
+      dedupeOrdersById([...reviewedFromLive, ...completedFromLive, ...demoPastOnly]),
+    )
   }, [allOrders])
 
   const orders = activeTab === 'recent' ? recentTabOrders : pastTabOrders

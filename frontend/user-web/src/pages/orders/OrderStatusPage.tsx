@@ -5,7 +5,7 @@
  * - 픽업 완료 시 POST /api/v1/orders/{orderId}/complete → 리워드(orderCount) 반영
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import PickupRewardModal from '../../components/PickupRewardModal/PickupRewardModal'
@@ -14,8 +14,12 @@ import type { ReviewWritePayload } from '../../api/reviews'
 import { completeOrderPickup, getMyOrders } from '../../api/orders'
 import { ApiError } from '../../api/authClient'
 import { getAccessToken } from '../../lib/authStorage'
-import { resolveUserCoords } from '../../lib/geolocation'
-import { notifyRewardsUpdated } from '../../api/rewards'
+import { fetchRewardMe, notifyRewardsUpdated } from '../../api/rewards'
+import {
+  buildPickupRewardBreakdown,
+  pollRewardAfterPickup,
+  type PickupRewardBreakdown,
+} from '../../lib/pickupReward'
 import { MapTmapCanvas } from '../map/MapPage'
 import styles from './OrderStatusPage.module.css'
 
@@ -157,6 +161,8 @@ function OrderStatusPage({
   const [orderResolving, setOrderResolving] = useState(true)
   const [orderStep, setOrderStep] = useState<OrderStep>('cooking')
   const [rewardModalOpen, setRewardModalOpen] = useState(false)
+  const [rewardModalLoading, setRewardModalLoading] = useState(false)
+  const [pickupRewards, setPickupRewards] = useState<PickupRewardBreakdown | null>(null)
   const [pickupSubmitting, setPickupSubmitting] = useState(false)
   const [pickupError, setPickupError] = useState<string | null>(null)
   const [cookingSecondsLeft, setCookingSecondsLeft] = useState(
@@ -239,35 +245,41 @@ function OrderStatusPage({
     setPickupSubmitting(true)
     setPickupError(null)
 
-    const storeFallback =
-      storeMapLat != null && storeMapLng != null
-        ? { latitude: storeMapLat, longitude: storeMapLng }
-        : null
+    const rewardBeforePromise = getAccessToken()
+      ? fetchRewardMe().catch(() => null)
+      : Promise.resolve(null)
 
-    void resolveUserCoords(storeFallback)
-      .then((coords) =>
-        completeOrderPickup(order.orderId, {
-          userLatitude: coords.latitude,
-          userLongitude: coords.longitude,
-        }),
-      )
-      .then(() => {
+    void rewardBeforePromise
+      .then((rewardBefore) => completeOrderPickup(order.orderId).then(() => rewardBefore))
+      .then(async (rewardBefore) => {
         markLocalOrderPickupCompleted(order.orderId)
         setActiveOrder(null)
         setOrderStep('completed')
+        setPickupRewards(null)
+        setRewardModalLoading(true)
         setRewardModalOpen(true)
+
+        if (rewardBefore) {
+          const rewardAfter = await pollRewardAfterPickup(rewardBefore)
+          setPickupRewards(buildPickupRewardBreakdown(rewardBefore, rewardAfter))
+        } else {
+          const after = await fetchRewardMe()
+          setPickupRewards({
+            earnedXp: 0,
+            walkedMeters: 0,
+            orderCountGain: 0,
+            totalOrderCount: after.orderCount,
+            totalWalkingDistanceM: after.totalWalkingDistance,
+            tierName: after.tierName,
+            tierUpgraded: false,
+          })
+        }
+
+        setRewardModalLoading(false)
         notifyRewardsUpdated()
         onPickupComplete?.()
       })
       .catch((e) => {
-        if (e instanceof Error && e.message === 'GEO_DENIED') {
-          setPickupError('위치 권한을 허용해 주세요. 픽업 완료에는 현재 위치가 필요합니다.')
-          return
-        }
-        if (e instanceof Error && e.message === 'GEO_UNAVAILABLE') {
-          setPickupError('이 기기에서는 위치 정보를 사용할 수 없습니다.')
-          return
-        }
         if (e instanceof ApiError && e.status === 403) {
           setPickupError(
             '접근이 거부되었습니다(403). 로그아웃 후 다시 로그인해 주세요.',
@@ -287,6 +299,8 @@ function OrderStatusPage({
 
   const handleRewardClose = () => {
     setRewardModalOpen(false)
+    setRewardModalLoading(false)
+    setPickupRewards(null)
   }
 
   const handleReviewFromModal = () => {
@@ -371,42 +385,42 @@ function OrderStatusPage({
             <div className={styles.stepsRow}>
               {steps.map((step, index) => {
                 const status = getStepStatus(index)
+                const connectorDone = status === 'completed'
                 return (
-                  <div key={step.key} className={styles.stepItem}>
-                    <div
-                      className={`${styles.stepIcon} ${
-                        status === 'completed'
-                          ? styles.stepIconCompleted
-                          : status === 'active'
-                            ? styles.stepIconActive
-                            : styles.stepIconPending
-                      }`}
-                    >
-                      <span className={`material-symbols-outlined ${styles.stepIconSpan}`}>
-                        {status === 'completed' ? 'check' : step.icon}
-                      </span>
+                  <Fragment key={step.key}>
+                    <div className={styles.stepItem}>
+                      <div
+                        className={`${styles.stepIcon} ${
+                          status === 'completed'
+                            ? styles.stepIconCompleted
+                            : status === 'active'
+                              ? styles.stepIconActive
+                              : styles.stepIconPending
+                        }`}
+                      >
+                        <span className={`material-symbols-outlined ${styles.stepIconSpan}`}>
+                          {status === 'completed' ? 'check' : step.icon}
+                        </span>
+                      </div>
+                      <p
+                        className={`${styles.stepLabel} ${
+                          status === 'active'
+                            ? styles.stepLabelActive
+                            : status === 'completed'
+                              ? styles.stepLabelCompleted
+                              : styles.stepLabelPending
+                        }`}
+                      >
+                        {step.label}
+                      </p>
                     </div>
-                    <p
-                      className={`${styles.stepLabel} ${
-                        status === 'active'
-                          ? styles.stepLabelActive
-                          : status === 'completed'
-                            ? styles.stepLabelCompleted
-                            : styles.stepLabelPending
-                      }`}
-                    >
-                      {step.label}
-                    </p>
                     {index < steps.length - 1 && (
                       <div
-                        className={`${styles.stepConnector} ${status === 'completed' ? styles.stepConnectorDone : styles.stepConnectorPending}`}
-                        style={{
-                          left: `calc(${(index + 0.5) * 25}% + 24px)`,
-                          top: '24px',
-                        }}
+                        className={`${styles.stepConnector} ${connectorDone ? styles.stepConnectorDone : styles.stepConnectorPending}`}
+                        aria-hidden
                       />
                     )}
-                  </div>
+                  </Fragment>
                 )
               })}
             </div>
@@ -484,6 +498,8 @@ function OrderStatusPage({
           open={rewardModalOpen}
           onClose={handleRewardClose}
           storeName={display.storeName}
+          loading={rewardModalLoading}
+          rewards={pickupRewards}
           onWriteReview={onReviewWriteClick ? handleReviewFromModal : undefined}
         />
       </div>

@@ -276,6 +276,78 @@
   background: linear-gradient(135deg, rgba(251, 146, 60, 0.15), rgba(251, 191, 36, 0.1));
 }
 
+.rewardIconWrapDistance {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(52, 211, 153, 0.08));
+}
+
+.rewardIconWrapDistance .rewardIcon {
+  color: rgb(5 150 105);
+}
+
+.rewardIconWrapPickup {
+  background: linear-gradient(135deg, rgba(246, 49, 154, 0.14), rgba(244, 114, 182, 0.1));
+}
+
+.rewardSub {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(107 114 128);
+}
+
+.tierUpgradeBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: rgb(180 83 9);
+  background: linear-gradient(90deg, rgba(255, 251, 235, 0.95), rgba(254, 243, 199, 0.9));
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  position: relative;
+  z-index: 1;
+}
+
+.loadingBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 6rem;
+  margin-bottom: 1rem;
+  color: rgb(107 114 128);
+  font-size: 0.875rem;
+  position: relative;
+  z-index: 1;
+}
+
+.loadingIcon {
+  font-size: 2rem;
+  color: var(--color-primary);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rewardRowMuted {
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.875rem;
+  background: rgba(249, 250, 251, 0.95);
+  border: 1px dashed rgb(209 213 219);
+  font-size: 0.8125rem;
+  color: rgb(107 114 128);
+  text-align: center;
+  line-height: 1.45;
+}
+
 .rewardIcon {
   font-size: 1.35rem;
   color: var(--color-primary);
