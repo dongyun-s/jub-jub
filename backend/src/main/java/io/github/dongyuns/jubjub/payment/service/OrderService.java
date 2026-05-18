@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.common.exception.BusinessException;
 import io.github.dongyuns.jubjub.domain.cart.entity.Cart;
 import io.github.dongyuns.jubjub.domain.cart.entity.CartOption;
 import io.github.dongyuns.jubjub.domain.cart.repository.CartRepository;
+import io.github.dongyuns.jubjub.domain.store.entity.MenuOption;
 import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.auth.repository.AccountRepository;
 import io.github.dongyuns.jubjub.domain.reward.dto.DiscountCalculateRequest;
@@ -15,6 +16,8 @@ import io.github.dongyuns.jubjub.domain.store.repository.StoreRepository;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
+import io.github.dongyuns.jubjub.payment.domain.OrderItem;
+import io.github.dongyuns.jubjub.payment.domain.OrderItemOption;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import io.github.dongyuns.jubjub.payment.domain.Payment;
 import io.github.dongyuns.jubjub.payment.dto.CreateOrderRequest;
@@ -59,7 +62,7 @@ public class OrderService {
                 .orElseThrow(() -> new BusinessException("MEMBER_PROFILE_NOT_FOUND", "회원 프로필을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         Store store = storeRepository.findById(request.storeId())
                 .orElseThrow(() -> new BusinessException("STORE_NOT_FOUND", "매장을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
-        validateCartAmount(memberProfile, store, request.totalAmount());
+        List<Cart> carts = validateCartAmount(memberProfile, store, request.totalAmount());
 
         List<Long> memberCouponIds = normalizeCouponIds(request.memberCouponIds());
         DiscountCalculateResponse discountInfo = discountCalculatorService.calculateDiscount(
@@ -86,6 +89,7 @@ public class OrderService {
                 null,
                 memberCouponIds
         );
+        carts.forEach(cart -> order.addItem(toOrderItem(cart)));
         return OrderResponse.from(orderRepository.save(order));
     }
 
@@ -135,12 +139,12 @@ public class OrderService {
                 .toList();
     }
 
-    private void validateCartAmount(MemberProfile memberProfile, Store store, Integer requestedAmount) {
+    private List<Cart> validateCartAmount(MemberProfile memberProfile, Store store, Integer requestedAmount) {
         if (requestedAmount == null || requestedAmount <= 0) {
             throw new BusinessException("INVALID_ORDER_AMOUNT", "주문 금액은 1원 이상이어야 합니다.", HttpStatus.BAD_REQUEST);
         }
 
-        java.util.List<Cart> carts = cartRepository.findAllByMemberProfileId(memberProfile.getId());
+        List<Cart> carts = cartRepository.findAllByMemberProfileId(memberProfile.getId());
         if (carts.isEmpty()) {
             throw new BusinessException("CART_EMPTY", "장바구니가 비어 있습니다.", HttpStatus.CONFLICT);
         }
@@ -161,6 +165,8 @@ public class OrderService {
                     HttpStatus.CONFLICT
             );
         }
+
+        return carts;
     }
 
     private int calculateCartItemTotalPrice(Cart cart) {
@@ -170,6 +176,34 @@ public class OrderService {
                 .sum();
 
         return (cart.getMenu().getPrice() + optionTotalPrice) * cart.getQuantity();
+    }
+
+    private OrderItem toOrderItem(Cart cart) {
+        int optionTotalPrice = cart.getCartOptions().stream()
+                .map(CartOption::getMenuOption)
+                .mapToInt(MenuOption::getAdditionalPrice)
+                .sum();
+        int itemTotalAmount = (cart.getMenu().getPrice() + optionTotalPrice) * cart.getQuantity();
+
+        OrderItem item = OrderItem.builder()
+                .menuId(cart.getMenu().getId())
+                .menuName(cart.getMenu().getName())
+                .menuPrice(cart.getMenu().getPrice())
+                .quantity(cart.getQuantity())
+                .requestMemo(cart.getRequestMemo())
+                .itemTotalAmount(itemTotalAmount)
+                .build();
+
+        cart.getCartOptions().stream()
+                .map(CartOption::getMenuOption)
+                .map(menuOption -> OrderItemOption.builder()
+                        .menuOptionId(menuOption.getId())
+                        .optionName(menuOption.getName())
+                        .additionalPrice(menuOption.getAdditionalPrice())
+                        .build())
+                .forEach(item::addOption);
+
+        return item;
     }
 
     private List<Long> normalizeCouponIds(List<Long> couponIds) {

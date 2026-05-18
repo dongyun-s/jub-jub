@@ -8,11 +8,14 @@ import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.util.ArrayList;
@@ -70,10 +73,15 @@ public class Order extends BaseTimeEntity {
 
     private Double userLongitude;
 
+    private Integer pickupDistanceMeters;
+
     @ElementCollection
     @CollectionTable(name = "order_used_coupon", joinColumns = @JoinColumn(name = "order_id"))
     @Column(name = "member_coupon_id", nullable = false)
     private List<Long> usedCouponIds = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<OrderItem> items = new ArrayList<>();
 
     @Column(nullable = false)
     private LocalDateTime requestedAt;
@@ -160,6 +168,16 @@ public class Order extends BaseTimeEntity {
         this.userLatitude = userLatitude;
         this.userLongitude = userLongitude;
     }
+
+    public void recordPickupDistanceMeters(Integer pickupDistanceMeters) {
+        this.pickupDistanceMeters = pickupDistanceMeters;
+    }
+
+    public void addItem(OrderItem item) {
+        items.add(item);
+        item.assignOrder(this);
+    }
+
     public void markRefunded() {
         this.status = OrderStatus.REFUNDED;
     }
