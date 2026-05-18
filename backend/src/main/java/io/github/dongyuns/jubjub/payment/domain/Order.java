@@ -66,6 +66,10 @@ public class Order extends BaseTimeEntity {
     @Column(nullable = false)
     private Boolean useMultiUseContainer;
 
+    private Double userLatitude;
+
+    private Double userLongitude;
+
     @ElementCollection
     @CollectionTable(name = "order_used_coupon", joinColumns = @JoinColumn(name = "order_id"))
     @Column(name = "member_coupon_id", nullable = false)
@@ -92,6 +96,8 @@ public class Order extends BaseTimeEntity {
             Integer couponDiscountAmount,
             Integer ecoDiscountAmount,
             Boolean useMultiUseContainer,
+            Double userLatitude,
+            Double userLongitude,
             List<Long> usedCouponIds,
             LocalDateTime requestedAt
     ) {
@@ -105,6 +111,8 @@ public class Order extends BaseTimeEntity {
         this.couponDiscountAmount = couponDiscountAmount;
         this.ecoDiscountAmount = ecoDiscountAmount;
         this.useMultiUseContainer = useMultiUseContainer;
+        this.userLatitude = userLatitude;
+        this.userLongitude = userLongitude;
         this.usedCouponIds = usedCouponIds != null ? new ArrayList<>(usedCouponIds) : new ArrayList<>();
         this.requestedAt = requestedAt;
     }
@@ -119,6 +127,8 @@ public class Order extends BaseTimeEntity {
             Integer ecoDiscountAmount,
             Integer finalAmount,
             Boolean useMultiUseContainer,
+            Double userLatitude,
+            Double userLongitude,
             List<Long> usedCouponIds
     ) {
         // 주문 생성 시점에는 결제 전 상태와 최종 결제 금액을 같이 고정한다.
@@ -133,6 +143,8 @@ public class Order extends BaseTimeEntity {
                 .ecoDiscountAmount(ecoDiscountAmount)
                 .finalAmount(finalAmount)
                 .useMultiUseContainer(useMultiUseContainer)
+                .userLatitude(userLatitude)
+                .userLongitude(userLongitude)
                 .usedCouponIds(usedCouponIds)
                 .requestedAt(LocalDateTime.now())
                 .build();
@@ -142,6 +154,11 @@ public class Order extends BaseTimeEntity {
         // 주문은 결제가 실제 승인된 뒤에만 PAID로 바뀐다.
         this.status = OrderStatus.PAID;
         this.paidAt = paidAt;
+    }
+
+    public void recordUserLocation(Double userLatitude, Double userLongitude) {
+        this.userLatitude = userLatitude;
+        this.userLongitude = userLongitude;
     }
     public void markRefunded() {
         this.status = OrderStatus.REFUNDED;

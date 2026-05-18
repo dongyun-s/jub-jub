@@ -17,7 +17,6 @@ import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import io.github.dongyuns.jubjub.payment.domain.Payment;
-import io.github.dongyuns.jubjub.payment.dto.CompletePickupRequest;
 import io.github.dongyuns.jubjub.payment.dto.CreateOrderRequest;
 import io.github.dongyuns.jubjub.payment.dto.OrderHistoryResponse;
 import io.github.dongyuns.jubjub.payment.dto.OrderResponse;
@@ -83,6 +82,8 @@ public class OrderService {
                 ecoDiscountAmount,
                 finalAmount,
                 Boolean.TRUE.equals(request.useMultiUseContainer()),
+                null,
+                null,
                 memberCouponIds
         );
         return OrderResponse.from(orderRepository.save(order));
@@ -90,7 +91,7 @@ public class OrderService {
 
     // 픽업 완료 처리 및 리워드 이벤트 발행
     @Transactional
-    public void completePickup(Long orderId, CompletePickupRequest request) {
+    public void completePickup(Long orderId) {
         // 1. 주문 조회
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException("ORDER_NOT_FOUND", "주문을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -100,8 +101,8 @@ public class OrderService {
         }
 
         int walkedDistanceMeters = pickupDistanceService.calculatePickupDistanceMeters(
-                request.userLatitude(),
-                request.userLongitude(),
+                requireOrderLatitude(order),
+                requireOrderLongitude(order),
                 order.getStore()
         );
 
@@ -184,4 +185,19 @@ public class OrderService {
     private Payment findLatestPayment(Long orderId) {
         return paymentRepository.findTopByOrderIdOrderByIdDesc(orderId).orElse(null);
     }
+
+    private double requireOrderLatitude(Order order) {
+        if (order.getUserLatitude() == null) {
+            throw new BusinessException("ORDER_COORDINATE_MISSING", "주문 시점 위치 정보가 없습니다.", HttpStatus.CONFLICT);
+        }
+        return order.getUserLatitude();
+    }
+
+    private double requireOrderLongitude(Order order) {
+        if (order.getUserLongitude() == null) {
+            throw new BusinessException("ORDER_COORDINATE_MISSING", "주문 시점 위치 정보가 없습니다.", HttpStatus.CONFLICT);
+        }
+        return order.getUserLongitude();
+    }
+
 }

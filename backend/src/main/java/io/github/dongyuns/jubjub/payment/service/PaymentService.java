@@ -74,13 +74,14 @@ public class PaymentService {
     public PaymentResponse confirmPayment(String accountEmail, ConfirmPaymentRequest request) {
         String merchantUid = request.merchantUid();
         validateMerchantUid(merchantUid);
+        validateCoordinate(request.userLatitude(), request.userLongitude());
 
         PortOnePaymentDetails paymentDetails = portOneClient.getPayment(merchantUid);
         Payment payment = paymentRepository.findByMerchantUidForUpdate(merchantUid)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
         validateOrderOwnership(accountEmail, payment.getOrder());
         try {
-            return confirmPaymentInternal(payment, request.transactionId(), paymentDetails);
+            return confirmPaymentInternal(payment, request.transactionId(), request.userLatitude(), request.userLongitude(), paymentDetails);
         } catch (ObjectOptimisticLockingFailureException | OptimisticLockException exception) {
             return resolveAlreadyConfirmedPayment(merchantUid, request.transactionId());
         }
@@ -92,7 +93,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findByMerchantUidForUpdate(paymentId)
                 .orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "결제 준비 이력이 없습니다.", HttpStatus.NOT_FOUND));
         try {
-            return confirmPaymentInternal(payment, transactionId, paymentDetails);
+            return confirmPaymentInternal(payment, transactionId, null, null, paymentDetails);
         } catch (ObjectOptimisticLockingFailureException | OptimisticLockException exception) {
             return resolveAlreadyConfirmedPayment(paymentId, transactionId);
         }
@@ -161,7 +162,13 @@ public class PaymentService {
         return RefundResponse.from(paymentCancellationRepository.save(refund));
     }
 
-    private PaymentResponse confirmPaymentInternal(Payment payment, String transactionId, PortOnePaymentDetails paymentDetails) {
+    private PaymentResponse confirmPaymentInternal(
+            Payment payment,
+            String transactionId,
+            Double userLatitude,
+            Double userLongitude,
+            PortOnePaymentDetails paymentDetails
+    ) {
         Order order = payment.getOrder();
 
         if (payment.getStatus() == PaymentStatus.PAID && order.getStatus() == OrderStatus.PAID) {
@@ -197,6 +204,7 @@ public class PaymentService {
         // PortOne 조회 결과와 내부 주문 정보가 모두 맞을 때만 결제를 확정한다.
         LocalDateTime paidAt = paymentDetails.paidAt() != null ? paymentDetails.paidAt() : LocalDateTime.now();
         String resolvedTransactionId = paymentDetails.transactionId() != null ? paymentDetails.transactionId() : transactionId;
+        order.recordUserLocation(userLatitude, userLongitude);
         payment.markPaid(resolvedTransactionId, paymentDetails.amount(), paidAt);
         order.markPaid(paidAt);
         markUsedCoupons(order);
@@ -304,6 +312,15 @@ public class PaymentService {
                     "결제 확인에는 prepare 응답의 merchantUid를 사용해야 합니다.",
                     HttpStatus.BAD_REQUEST
             );
+        }
+    }
+
+    private void validateCoordinate(double latitude, double longitude) {
+        if (latitude < -90 || latitude > 90) {
+            throw new BusinessException("INVALID_LATITUDE", "위도 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+        }
+        if (longitude < -180 || longitude > 180) {
+            throw new BusinessException("INVALID_LONGITUDE", "경도 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
     }
 }
