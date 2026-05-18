@@ -108,16 +108,135 @@
 }
 
 .sectionTitleRow {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 0.75rem;
+  align-items: center;
+  padding: 1.25rem 1rem 0.5rem;
+}
+
+.sectionTitleLeft {
+  grid-column: span 7;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 1.25rem 1rem 0.5rem;
+  min-width: 0;
 }
 
 .sectionTitle {
   color: #111827;
   font-size: 1.125rem;
   font-weight: 700;
+}
+
+.rankingStrip {
+  position: relative;
+  grid-column: span 5;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  /* distanceCard와 동일 padding — 텍스트·화살표 각각 카드 안쪽 선에 맞춤 */
+  padding: 0.25rem 0.625rem;
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.rankingCarouselViewport {
+  flex: 1;
+  min-width: 0;
+  height: 1.375rem;
+  padding-right: 1.25rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.rankingStripChevron {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.125rem;
+  color: rgb(156 163 175);
+  pointer-events: none;
+}
+
+.rankingStripItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.25rem;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 0.6875rem;
+  color: rgb(71 85 105);
+  white-space: nowrap;
+  animation: rankingSlideIn 0.45s ease both;
+}
+
+.rankingStripTier {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-variation-settings: 'FILL' 1;
+  line-height: 1;
+}
+
+@keyframes rankingSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rankingStripRank {
+  flex-shrink: 0;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.rankingStripName {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 5.5rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rankingStripMeta {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: rgb(100 116 139);
+}
+
+.rankingStripMetaSep {
+  font-size: 0.625rem;
+  color: rgb(203 213 225);
+}
+
+.distanceCard,
+.attendanceCard {
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #f3f4f6;
+  padding: 0.625rem;
+  box-shadow: 0 1px 2px rgba(148, 163, 184, 0.25);
+  text-align: left;
+  width: 100%;
 }
 
 .statsGrid {
@@ -216,17 +335,6 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.5rem;
-}
-
-.distanceCard,
-.attendanceCard {
-  display: flex;
-  flex-direction: column;
-  background-color: #ffffff;
-  border-radius: 0.75rem;
-  border: 1px solid #f3f4f6;
-  padding: 0.625rem;
-  box-shadow: 0 1px 2px rgba(148, 163, 184, 0.25);
 }
 
 .distanceMeta {

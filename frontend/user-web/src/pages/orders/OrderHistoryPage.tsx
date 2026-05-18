@@ -10,9 +10,11 @@ import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { FEATURED_RESTAURANTS } from '../../constants'
 import { getMyOrders, type MyOrderItem } from '../../api/orders'
-import type { ReviewWritePayload } from '../../api/reviews'
+import { fetchMyReviews, type ReviewWritePayload } from '../../api/reviews'
 import { fetchStores } from '../../api/store'
 import { ApiError } from '../../api/authClient'
+import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
+import { useProfile } from '../../hooks/useProfile'
 import styles from './OrderHistoryPage.module.css'
 
 interface OrderHistoryPageProps {
@@ -172,13 +174,33 @@ const pastOrders: OrderItem[] = [
   },
 ]
 
+function applyReviewedStatus(orders: OrderItem[], reviewedOrderIds: Set<number>): OrderItem[] {
+  return orders.map((o) =>
+    reviewedOrderIds.has(o.id) ? { ...o, status: 'reviewed' as const } : o,
+  )
+}
+
+function parseOrderDisplayDate(date: string): number {
+  const parts = date.split('.')
+  if (parts.length === 3) {
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime()
+  }
+  return 0
+}
+
+function sortOrdersByDateDesc(items: OrderItem[]): OrderItem[] {
+  return [...items].sort((a, b) => parseOrderDisplayDate(b.date) - parseOrderDisplayDate(a.date))
+}
+
 function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatusClick, onMapClick, onMypageClick, onFavoritesClick, onNotificationsClick, onReviewWriteClick, hasActiveOrder, cartCount = 0 }: OrderHistoryPageProps) {
+  const { profile } = useProfile()
   const [activeTab, setActiveTab] = useState<'recent' | 'past'>('recent')
   const [myOrdersApi, setMyOrdersApi] = useState<MyOrderItem[]>([])
   const [myOrdersLoading, setMyOrdersLoading] = useState(false)
   const [myOrdersError, setMyOrdersError] = useState<string | null>(null)
   const [localOrders, setLocalOrders] = useState<LocalOrder[]>([])
   const [storeNameToId, setStoreNameToId] = useState<Record<string, number>>({})
+  const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<number>>(() => new Set())
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
 
@@ -213,6 +235,26 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
       setLocalOrders([])
     }
   }, [])
+
+  useEffect(() => {
+    const loadReviewedOrderIds = () => {
+      if (!getAccessToken()) {
+        setReviewedOrderIds(new Set())
+        return
+      }
+      const mpid = profile?.memberProfileId ?? getCachedMemberProfileId()
+      if (mpid == null) {
+        setReviewedOrderIds(new Set())
+        return
+      }
+      void fetchMyReviews(Number(mpid))
+        .then((list) => setReviewedOrderIds(new Set(list.map((r) => r.orderId))))
+        .catch(() => setReviewedOrderIds(new Set()))
+    }
+    loadReviewedOrderIds()
+    window.addEventListener('focus', loadReviewedOrderIds)
+    return () => window.removeEventListener('focus', loadReviewedOrderIds)
+  }, [profile?.memberProfileId])
 
   useEffect(() => {
     void (async () => {
@@ -292,14 +334,24 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
     )
   }, [localOrders])
 
-  const orders =
-    activeTab === 'recent'
-      ? apiOrders.length
-        ? apiOrders
-        : myOrders.length
-          ? myOrders
-          : recentOrders
-      : pastOrders
+  const allOrders = useMemo(() => {
+    const base = apiOrders.length ? apiOrders : myOrders.length ? myOrders : recentOrders
+    return applyReviewedStatus(base, reviewedOrderIds)
+  }, [apiOrders, myOrders, reviewedOrderIds])
+
+  const recentTabOrders = useMemo(
+    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status !== 'reviewed')),
+    [allOrders],
+  )
+
+  const pastTabOrders = useMemo(() => {
+    const reviewedFromLive = allOrders.filter((o) => o.status === 'reviewed')
+    const liveIds = new Set(reviewedFromLive.map((o) => o.id))
+    const demoPastOnly = pastOrders.filter((p) => !liveIds.has(p.id))
+    return sortOrdersByDateDesc(dedupeOrdersById([...reviewedFromLive, ...demoPastOnly]))
+  }, [allOrders])
+
+  const orders = activeTab === 'recent' ? recentTabOrders : pastTabOrders
 
   return (
     <Layout showBackground={false}>
@@ -326,7 +378,7 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
               activeTab === 'past' ? styles.tabActive : styles.tabInactive
             }`}
           >
-            과거 주문
+            지난 주문
           </button>
         </div>
 
@@ -443,7 +495,11 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
             {orders.length === 0 && (
               <div className={styles.emptyState}>
                 <span className={`material-symbols-outlined ${styles.emptyStateIcon}`}>receipt_long</span>
-                <p className={styles.emptyStateText}>주문 내역이 없습니다.</p>
+                <p className={styles.emptyStateText}>
+                  {activeTab === 'recent'
+                    ? '리뷰를 남길 수 있는 최근 주문이 없습니다.'
+                    : '지난 주문 내역이 없습니다.'}
+                </p>
               </div>
             )}
           </div>

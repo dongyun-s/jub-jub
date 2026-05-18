@@ -9,6 +9,7 @@ import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
+import SimpleAlertModal, { type SimpleAlertVariant } from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { FEATURED_RESTAURANTS } from '../../constants'
 import {
   addCartItem,
@@ -29,6 +30,14 @@ interface AppliedCoupon {
 }
 
 type CartItem = ServerCartLineUi
+
+type CartAlertState = {
+  title?: string
+  message: string
+  variant?: SimpleAlertVariant
+  confirmLabel?: string
+  onAfterClose?: () => void
+}
 
 interface CartPageProps {
   onBack: () => void
@@ -105,6 +114,20 @@ function CartPage({
   const [isProcessing, setIsProcessing] = useState(false)
   const [cartSyncing, setCartSyncing] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [cartAlert, setCartAlert] = useState<CartAlertState | null>(null)
+
+  const showCartAlert = (alert: CartAlertState) => setCartAlert(alert)
+  const closeCartAlert = () => {
+    setCartAlert((current) => {
+      const afterClose = current?.onAfterClose
+      // setState 업데이트 함수 안에서 App(setCurrentPage 등)을 바로 호출하면
+      // "Cannot update App while rendering CartPage" 경고가 난다.
+      if (afterClose) queueMicrotask(afterClose)
+      return null
+    })
+  }
+  /** 고객 웹: 다회용기 포장 선택 — 실제 할인은 POST /orders 시 서버에서 반영 */
+  const [useMultiUseContainer, setUseMultiUseContainer] = useState(false)
   /** 로그인 시 POST /rewards/calculate 미리보기 (주문 생성 금액은 장바구니 합계와 일치해야 함) */
   const [pricingPreview, setPricingPreview] = useState<RewardCalculateResponse | null>(null)
   const pricingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -130,9 +153,12 @@ function CartPage({
         await clearCart()
         await onRefreshCart()
       } catch (e) {
-        alert(
-          e instanceof ApiError ? e.message : '장바구니를 비우지 못했습니다. 잠시 후 다시 시도해 주세요.',
-        )
+        showCartAlert({
+          title: '장바구니',
+          message:
+            e instanceof ApiError ? e.message : '장바구니를 비우지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          variant: 'error',
+        })
       } finally {
         setCartSyncing(false)
       }
@@ -142,18 +168,31 @@ function CartPage({
   // PortOne V2 결제 요청
   const handlePayment = () => {
     if (!useApiCart || !onRefreshCart) {
-      alert('로그인 후 결제를 진행해 주세요.')
+      showCartAlert({
+        title: '로그인 필요',
+        message: '로그인 후 결제를 진행해 주세요.',
+        variant: 'info',
+      })
       return
     }
     if (cartStoreId == null) {
-      alert('픽업 매장을 확인할 수 없습니다. 메뉴를 다시 담아주세요.')
+      showCartAlert({
+        title: '매장 정보 없음',
+        message: '픽업 매장을 확인할 수 없습니다. 메뉴를 다시 담아주세요.',
+        variant: 'info',
+      })
       return
     }
 
     const storeId = (import.meta.env.VITE_PORTONE_STORE_ID as string | undefined)?.trim()
     const channelKey = (import.meta.env.VITE_PORTONE_CHANNEL_KEY as string | undefined)?.trim()
     if (!storeId || !channelKey) {
-      alert('PortOne 설정값이 없습니다. frontend/.env에 VITE_PORTONE_STORE_ID / VITE_PORTONE_CHANNEL_KEY를 넣어주세요.')
+      showCartAlert({
+        title: '결제 설정',
+        message:
+          'PortOne 설정값이 없습니다. frontend/.env에 VITE_PORTONE_STORE_ID / VITE_PORTONE_CHANNEL_KEY를 넣어주세요.',
+        variant: 'error',
+      })
       return
     }
 
@@ -171,6 +210,8 @@ function CartPage({
         const order = await createOrder({
           storeId: cartStoreId,
           totalAmount: subtotal,
+          memberCouponIds: appliedCoupon ? [appliedCoupon.id] : [],
+          useMultiUseContainer,
         })
         if (order.memberProfileId != null) {
           setCachedMemberProfileId(order.memberProfileId)
@@ -198,11 +239,12 @@ function CartPage({
               storeId: cartStoreId,
               storeName: pickupStoreName?.trim() || `매장 #${cartStoreId}`,
               menuSummary,
-              totalAmount: subtotal,
-              finalAmount: subtotal,
+              totalAmount: order.originalAmount ?? subtotal,
+              finalAmount: order.finalAmount,
               image: storeImage,
               createdAt: new Date().toISOString(),
-              paymentStatus: 'CREATED',
+              orderStatus: order.orderStatus,
+              paymentStatus: 'READY',
               memberProfileId: order.memberProfileId,
             },
             ...prev,
@@ -249,16 +291,26 @@ function CartPage({
         if (!txId) {
           // PortOne이 실패 사유를 내려주는 경우
           if (paymentResult?.code || paymentResult?.message) {
-            alert(
-              `결제에 실패했습니다.\n${paymentResult.code ? `코드: ${paymentResult.code}\n` : ''}${
-                paymentResult.message ? `메시지: ${paymentResult.message}` : ''
-              }`,
-            )
+            const detail = [
+              paymentResult.code ? `코드: ${paymentResult.code}` : '',
+              paymentResult.message ? `메시지: ${paymentResult.message}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n')
+            showCartAlert({
+              title: '결제 실패',
+              message: detail ? `결제에 실패했습니다.\n${detail}` : '결제에 실패했습니다.',
+              variant: 'error',
+            })
             setIsProcessing(false)
             return
           }
 
-          alert('결제창이 닫혔습니다. 결제 완료 여부는 주문내역에서 확인해 주세요.')
+          showCartAlert({
+            title: '결제창 닫힘',
+            message: '결제창이 닫혔습니다. 결제 완료 여부는 주문내역에서 확인해 주세요.',
+            variant: 'info',
+          })
           setIsProcessing(false)
           return
         }
@@ -280,7 +332,9 @@ function CartPage({
             o?.orderId === order.orderId
               ? {
                   ...o,
+                  orderStatus: 'PAID',
                   paymentStatus: confirmed.paymentStatus,
+                  finalAmount: confirmed.requestedAmount ?? o.finalAmount,
                   paidAt: confirmed.paidAt,
                   paymentRecordId: confirmed.paymentRecordId,
                   transactionId: confirmed.transactionId,
@@ -300,16 +354,24 @@ function CartPage({
         }
         await onRefreshCart()
 
-        alert(`결제가 완료되었습니다!\n주문번호: ${prepared.merchantUid}`)
-        onCheckout?.()
+        showCartAlert({
+          title: '결제 완료',
+          message: `결제가 완료되었습니다.\n주문번호: ${prepared.merchantUid}`,
+          variant: 'success',
+          confirmLabel: onCheckout ? '주문 현황 보기' : '확인',
+          onAfterClose: () => onCheckout?.(),
+        })
         setIsProcessing(false)
       } catch (e) {
         setIsProcessing(false)
-        alert(
-          e instanceof ApiError
-            ? e.message
-            : '결제를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-        )
+        showCartAlert({
+          title: '결제 오류',
+          message:
+            e instanceof ApiError
+              ? e.message
+              : '결제를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          variant: 'error',
+        })
       }
     })()
   }
@@ -340,11 +402,14 @@ function CartPage({
           })
           await onRefreshCart()
         } catch (e) {
-          alert(
-            e instanceof ApiError
-              ? e.message
-              : '수량을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-          )
+          showCartAlert({
+            title: '수량 변경',
+            message:
+              e instanceof ApiError
+                ? e.message
+                : '수량을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+            variant: 'error',
+          })
         } finally {
           setCartSyncing(false)
         }
@@ -368,11 +433,14 @@ function CartPage({
           await deleteCartItem(id)
           await onRefreshCart()
         } catch (e) {
-          alert(
-            e instanceof ApiError
-              ? e.message
-              : '삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-          )
+          showCartAlert({
+            title: '삭제',
+            message:
+              e instanceof ApiError
+                ? e.message
+                : '삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+            variant: 'error',
+          })
         } finally {
           setCartSyncing(false)
         }
@@ -420,6 +488,14 @@ function CartPage({
           confirmLabel="비우기"
           onCancel={() => setClearConfirmOpen(false)}
           onConfirm={confirmClearCart}
+        />
+        <SimpleAlertModal
+          open={cartAlert != null}
+          title={cartAlert?.title}
+          message={cartAlert?.message ?? ''}
+          variant={cartAlert?.variant ?? 'error'}
+          confirmLabel={cartAlert?.confirmLabel}
+          onClose={closeCartAlert}
         />
         <Header
           title="장바구니"
@@ -580,6 +656,24 @@ function CartPage({
                 </button>
               </div>
             )}
+          </section>
+
+          {/* 다회용기 포장 (할인은 서버 적용) */}
+          <section className={styles.ecoSection}>
+            <label className={styles.ecoLabel}>
+              <input
+                type="checkbox"
+                checked={useMultiUseContainer}
+                onChange={(e) => setUseMultiUseContainer(e.target.checked)}
+                className={styles.ecoCheckbox}
+              />
+              <span className={styles.ecoTextWrap}>
+                <span className={styles.ecoTitle}>다회용기 포장으로 받을게요</span>
+                <span className={styles.ecoHint}>
+                  선택 시 200원 할인이 적용됩니다. 할인 반영은 결제 단계에서 서버 기준입니다.
+                </span>
+              </span>
+            </label>
           </section>
 
           {/* 결제 금액 */}

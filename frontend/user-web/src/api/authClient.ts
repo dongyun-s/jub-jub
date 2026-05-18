@@ -15,7 +15,9 @@ function isNgrokBaseUrl(url: string): boolean {
   }
 }
 
-const NGROK_SKIP_WARN = isNgrokBaseUrl(API_BASE)
+/** Vite 프록시로 ngrok 백엔드를 쓸 때도 브라우저 요청에 경고 스킵 헤더를 붙인다 */
+const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET as string | undefined)?.trim() ?? ''
+const NGROK_SKIP_WARN = isNgrokBaseUrl(API_BASE) || isNgrokBaseUrl(DEV_PROXY_TARGET)
 
 /** 통합 API 베이스 `…/api/v1` */
 export const API_V1_BASE = `${API_BASE}/api/v1`

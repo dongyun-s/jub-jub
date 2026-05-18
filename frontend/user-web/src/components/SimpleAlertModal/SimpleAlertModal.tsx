@@ -14,34 +14,33 @@ import styles from './SimpleAlertModal.module.css'
 
 
 
+export type SimpleAlertVariant = 'info' | 'success' | 'error'
+
+const ICON_BY_VARIANT: Record<SimpleAlertVariant, string> = {
+  error: 'error',
+  success: 'check_circle',
+  info: 'info',
+}
+
 interface SimpleAlertModalProps {
-
   open: boolean
-
   title?: string
-
   message: string
-
   confirmLabel?: string
-
+  /** 기본 error — 결제 완료 등은 success */
+  variant?: SimpleAlertVariant
   onClose: () => void
-
 }
 
 
 
 export default function SimpleAlertModal({
-
   open,
-
   title = '알림',
-
   message,
-
   confirmLabel = '확인',
-
+  variant = 'error',
   onClose,
-
 }: SimpleAlertModalProps) {
 
   const titleId = useId()
@@ -70,7 +69,13 @@ export default function SimpleAlertModal({
 
       <div className={styles.iconWrap} aria-hidden>
 
-        <span className={`material-symbols-outlined ${styles.icon}`}>error</span>
+        <span
+          className={`material-symbols-outlined ${styles.icon} ${
+            variant === 'success' ? styles.iconSuccess : variant === 'info' ? styles.iconInfo : ''
+          }`}
+        >
+          {ICON_BY_VARIANT[variant]}
+        </span>
 
       </div>
 

@@ -120,6 +120,12 @@ export async function fetchRewardMe(): Promise<RewardMeResponse> {
   return normalizeRewardMePayload(inner)
 }
 
+/** 픽업 완료 등으로 리워드 프로필이 바뀐 뒤 홈·마이페이지가 다시 조회하도록 */
+export function notifyRewardsUpdated() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('jubjub-rewards-updated'))
+}
+
 export async function fetchMyCoupons(): Promise<MemberCouponDto[]> {
   const raw = await apiV1FetchPlain<unknown>('/rewards/coupons')
   const inner = unwrapApiEnvelope(raw)

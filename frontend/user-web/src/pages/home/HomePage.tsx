@@ -5,7 +5,7 @@
  * - 하단 네비로 장바구니/주문내역/지도/내정보 이동
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
@@ -13,7 +13,14 @@ import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
 import SearchBar from '../../components/SearchBar'
 import { fetchStores } from '../../api/store'
 import type { FeaturedRestaurant } from '../../constants'
-import { FEATURED_RESTAURANTS, HOME_CATEGORIES } from '../../constants'
+import { getTierLabelColors } from '../../components/TierBadge/TierBadge'
+import {
+  FEATURED_RESTAURANTS,
+  HOME_CATEGORIES,
+  getWeeklyRankingsByWalkingDistance,
+  type RankingEntry,
+} from '../../constants'
+import { formatRankingStripDistanceKm, formatRankingStripMeta } from '../../lib/rankingDisplay'
 import { mapStoreListItemToFeatured } from '../../lib/storeUi'
 import { getAttendanceStreak, isAttendanceMarkedDone } from '../../lib/rewardAttendance'
 import { useProfile } from '../../hooks/useProfile'
@@ -22,6 +29,26 @@ import { getAccessToken } from '../../lib/authStorage'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './HomePage.module.css'
+
+function RankingStripLine({ entry }: { entry: RankingEntry }) {
+  const tierColors = getTierLabelColors(entry.tierLabel)
+  return (
+    <span className={styles.rankingStripItem}>
+      <span className={styles.rankingStripRank}>{entry.rank}위</span>
+      <span
+        className={`material-symbols-outlined ${styles.rankingStripTier}`}
+        style={{ color: tierColors.iconColor }}
+        aria-hidden
+      >
+        military_tech
+      </span>
+      <span className={styles.rankingStripName}>{entry.nickname}</span>
+      <span className={styles.rankingStripMeta}>
+        {formatRankingStripDistanceKm(entry.walkingDistanceM)}
+      </span>
+    </span>
+  )
+}
 
 interface HomePageProps {
   onCategoryClick?: () => void
@@ -33,6 +60,7 @@ interface HomePageProps {
   onFavoritesClick?: () => void
   onNotificationsClick?: () => void
   onStoreSelect?: (storeId: number) => void
+  onRankingClick?: () => void
   /** 진행 중 주문이 있으면 상단 배너 표시 */
   hasActiveOrder?: boolean
   cartCount?: number
@@ -48,6 +76,7 @@ function HomePage({
   onFavoritesClick,
   onNotificationsClick,
   onStoreSelect,
+  onRankingClick,
   hasActiveOrder,
   cartCount = 0,
 }: HomePageProps) {
@@ -59,6 +88,8 @@ function HomePage({
   const [rewardFetchFailed, setRewardFetchFailed] = useState(false)
   const [attendanceDoneToday, setAttendanceDoneToday] = useState(false)
   const [attendanceStreak, setAttendanceStreak] = useState(0)
+  const [rankingCarouselIndex, setRankingCarouselIndex] = useState(0)
+  const weeklyRankings = useMemo(() => getWeeklyRankingsByWalkingDistance(), [])
 
   const greetingName =
     rewardMe?.nickname?.trim() ||
@@ -83,6 +114,29 @@ function HomePage({
         setRewardFetchFailed(true)
       })
       .finally(() => setRewardLoading(false))
+  }, [profile?.email])
+
+  useEffect(() => {
+    if (!getAccessToken()) return
+    const refetch = () => {
+      void fetchRewardMe()
+        .then((data) => {
+          setRewardMe(data)
+          setRewardFetchFailed(false)
+        })
+        .catch(() => setRewardFetchFailed(true))
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refetch()
+    }
+    window.addEventListener('jubjub-rewards-updated', refetch)
+    window.addEventListener('focus', refetch)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('jubjub-rewards-updated', refetch)
+      window.removeEventListener('focus', refetch)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [profile?.email])
 
   useEffect(() => {
@@ -115,6 +169,16 @@ function HomePage({
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (weeklyRankings.length <= 1) return
+    const timer = window.setInterval(() => {
+      setRankingCarouselIndex((prev) => (prev + 1) % weeklyRankings.length)
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [weeklyRankings.length])
+
+  const rankingDisplayEntry = weeklyRankings[rankingCarouselIndex]
 
   const ordersForNext =
     rewardMe != null && rewardMe.nextTierRequiredCount > 0
@@ -157,10 +221,18 @@ function HomePage({
     }
     onMypageClick?.()
   }
+  const goToCategory = (tab: string) => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('categoryActiveTab', tab)
+    }
+    onCategoryClick?.()
+  }
+
   const handleSearchSubmit = () => {
     const q = searchQuery.trim()
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('categorySearchQuery', q)
+      window.sessionStorage.setItem('categoryActiveTab', '전체')
     }
     onCategoryClick?.()
   }
@@ -200,8 +272,27 @@ function HomePage({
 
       <main className={styles.main}>
         <div className={styles.sectionTitleRow}>
-          <span className="material-symbols-outlined text-primary">home</span>
-          <span className={styles.sectionTitle}>리워드 줍줍</span>
+          <div className={styles.sectionTitleLeft}>
+            <span className="material-symbols-outlined text-primary">home</span>
+            <span className={styles.sectionTitle}>리워드 줍줍</span>
+          </div>
+          <button
+            type="button"
+            className={styles.rankingStrip}
+            onClick={() => onRankingClick?.()}
+            aria-label={
+              rankingDisplayEntry
+                ? `회원 랭킹 ${formatRankingStripMeta(rankingDisplayEntry)}, 전체 보기`
+                : '회원 랭킹 전체 보기'
+            }
+          >
+            <span className={styles.rankingCarouselViewport} aria-live="polite">
+              {rankingDisplayEntry ? (
+                <RankingStripLine key={rankingCarouselIndex} entry={rankingDisplayEntry} />
+              ) : null}
+            </span>
+            <span className={`material-symbols-outlined ${styles.rankingStripChevron}`}>chevron_right</span>
+          </button>
         </div>
 
         {/* 사용자 스탯 (RPG 스타일) */}
@@ -354,8 +445,9 @@ function HomePage({
             {HOME_CATEGORIES.map((cat, idx) => (
               <button
                 key={idx}
+                type="button"
                 className={styles.categoryButton}
-                onClick={onCategoryClick}
+                onClick={() => goToCategory(cat.label === '더보기' ? '전체' : cat.label)}
               >
                 <div className={styles.categoryIconWrapper}>
                   <span className="material-symbols-outlined text-3xl text-gray-700 group-hover:text-primary">{cat.icon}</span>
@@ -395,7 +487,7 @@ function HomePage({
             <button
               type="button"
               className={styles.listMoreButton}
-              onClick={onCategoryClick}
+              onClick={() => goToCategory('전체')}
             >
               전체보기
             </button>

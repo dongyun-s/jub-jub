@@ -71,20 +71,6 @@
   text-overflow: ellipsis;
 }
 
-.iconButton {
-  width: 2.5rem;
-  height: 2.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgb(55 65 81);
-  transition: color 150ms ease;
-}
-
-.iconButton:hover {
-  color: var(--color-primary);
-}
-
 .spacer {
   width: 2.5rem;
 }

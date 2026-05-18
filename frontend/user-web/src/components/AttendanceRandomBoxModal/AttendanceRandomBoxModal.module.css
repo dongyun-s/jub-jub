@@ -1,0 +1,232 @@
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
+  margin: 0 0 0.35rem;
+}
+
+.subtitle {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: rgb(100 116 139);
+  margin: 0 0 1.25rem;
+}
+
+.boxRow {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.boxBtn {
+  flex: 1;
+  max-width: 6.5rem;
+  aspect-ratio: 0.85;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.boxBtn:disabled {
+  cursor: default;
+}
+
+.boxBtn:not(:disabled):hover {
+  transform: translateY(-4px) scale(1.03);
+}
+
+.boxShell {
+  width: 100%;
+  height: 100%;
+  border-radius: 1rem;
+  background: linear-gradient(145deg, #fdf2f8 0%, #fce7f3 45%, #fbcfe8 100%);
+  border: 2px solid rgba(246, 49, 154, 0.35);
+  box-shadow:
+    0 8px 20px rgba(236, 72, 153, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.boxShellIdle {
+  animation: boxWobble 2.2s ease-in-out infinite;
+}
+
+.boxBtn:nth-child(2) .boxShellIdle {
+  animation-delay: 0.25s;
+}
+
+.boxBtn:nth-child(3) .boxShellIdle {
+  animation-delay: 0.5s;
+}
+
+@keyframes boxWobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-2deg) translateY(-2px);
+  }
+  75% {
+    transform: rotate(2deg) translateY(-2px);
+  }
+}
+
+.boxIcon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.boxLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+}
+
+.boxShellSelected {
+  border-color: var(--color-primary);
+  box-shadow:
+    0 12px 28px rgba(236, 72, 153, 0.4),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+  animation: boxOpen 0.55s ease forwards;
+}
+
+@keyframes boxOpen {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1.02);
+  }
+}
+
+.boxShellDim {
+  opacity: 0.45;
+  filter: grayscale(0.35);
+  animation: none;
+}
+
+.boxShellWin {
+  background: linear-gradient(145deg, #fff7ed 0%, #ffedd5 50%, #fed7aa 100%);
+  border-color: rgb(249 115 22);
+}
+
+.boxShellLose {
+  background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: rgb(203 213 225);
+}
+
+.prizeAmount {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: rgb(194 65 12);
+}
+
+.prizeDecoy {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgb(180 83 9);
+}
+
+.prizeMiss {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgb(100 116 139);
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+  margin: 0 0 1rem;
+  min-height: 1.125rem;
+}
+
+.resultTitle {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
+  margin: 0 0 0.35rem;
+}
+
+.resultDesc {
+  font-size: 0.8125rem;
+  color: rgb(100 116 139);
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.primaryBtn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 9999px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: #fff;
+  background: linear-gradient(to right, var(--color-primary), #ec4899);
+  box-shadow: 0 8px 16px rgba(236, 72, 153, 0.35);
+  cursor: pointer;
+}
+
+.secondaryBtn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(226 232 240);
+  background: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: rgb(71 85 105);
+  cursor: pointer;
+}
+
+.opening {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 8rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

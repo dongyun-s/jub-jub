@@ -1,12 +1,13 @@
 /**
  * 매장·메뉴 API — GET /api/v1/stores, GET /api/v1/stores/{storeId}
  */
-import { apiV1Fetch } from './authClient'
+import { apiV1Fetch, apiV1FetchPlain } from './authClient'
 
 export interface StoreListItem {
   storeId: number
   name: string
   categoryId: number
+  categoryName?: string
   cookingTimeMinutes: number
   minOrderAmount: number
   latitude: number | null
@@ -41,8 +42,84 @@ export interface StoreDetailDto {
   menus: MenuDto[]
 }
 
-export function fetchStores() {
-  return apiV1Fetch<StoreListItem[]>('/stores')
+function num(v: unknown, fallback = 0): number {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v)
+    if (!Number.isNaN(n)) return n
+  }
+  return fallback
+}
+
+function normalizeStoreListItem(raw: unknown): StoreListItem | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const p = raw as Record<string, unknown>
+  const storeId = num(p.storeId ?? p.store_id ?? p.id)
+  const name = String(p.name ?? '').trim()
+  if (!storeId || !name) return null
+  return {
+    storeId,
+    name,
+    categoryId: num(p.categoryId ?? p.category_id),
+    categoryName: String(p.categoryName ?? p.category_name ?? '').trim() || undefined,
+    cookingTimeMinutes: num(p.cookingTimeMinutes ?? p.cooking_time_minutes, 15),
+    minOrderAmount: num(p.minOrderAmount ?? p.min_order_amount),
+    latitude:
+      p.latitude != null && p.latitude !== ''
+        ? num(p.latitude)
+        : p.lat != null
+          ? num(p.lat)
+          : null,
+    longitude:
+      p.longitude != null && p.longitude !== ''
+        ? num(p.longitude)
+        : p.lng != null
+          ? num(p.lng)
+          : null,
+  }
+}
+
+function parseStoreList(body: unknown): StoreListItem[] {
+  if (Array.isArray(body)) {
+    return body.map(normalizeStoreListItem).filter(Boolean) as StoreListItem[]
+  }
+  if (typeof body === 'object' && body !== null) {
+    const o = body as Record<string, unknown>
+    if (o.success === true && Array.isArray(o.data)) {
+      return parseStoreList(o.data)
+    }
+    const arr = o.data ?? o.stores ?? o.items
+    if (Array.isArray(arr)) return parseStoreList(arr)
+  }
+  return []
+}
+
+export type FetchStoresParams = {
+  categoryId?: number
+  category?: string
+}
+
+/** GET /api/v1/stores — 카테고리 필터 optional */
+export async function fetchStores(params?: FetchStoresParams): Promise<StoreListItem[]> {
+  const q = new URLSearchParams()
+  if (params?.categoryId != null) q.set('categoryId', String(params.categoryId))
+  if (params?.category?.trim()) q.set('category', params.category.trim())
+  const suffix = q.toString() ? `?${q.toString()}` : ''
+
+  try {
+    const wrapped = await apiV1Fetch<unknown>(`/stores${suffix}`)
+    const list = parseStoreList(wrapped)
+    if (list.length > 0) return list
+  } catch {
+    /* plain 응답·래핑 차이 폴백 */
+  }
+
+  try {
+    const plain = await apiV1FetchPlain<unknown>(`/stores${suffix}`)
+    return parseStoreList(plain)
+  } catch {
+    return []
+  }
 }
 
 export function fetchStoreDetail(storeId: number) {
