@@ -11,7 +11,6 @@ import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
-import io.github.dongyuns.jubjub.payment.dto.CompletePickupRequest;
 import io.github.dongyuns.jubjub.payment.repository.OrderRepository;
 import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +65,7 @@ class OrderServiceTest {
         when(orderRepository.findById(101L)).thenReturn(Optional.of(order));
         when(pickupDistanceService.calculatePickupDistanceMeters(37.5572, 126.9245, order.getStore())).thenReturn(1730);
 
-        orderService.completePickup(101L, new CompletePickupRequest(37.5572, 126.9245));
+        orderService.completePickup(101L);
 
         ArgumentCaptor<PickupCompletedEvent> eventCaptor = ArgumentCaptor.forClass(PickupCompletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -117,6 +116,8 @@ class OrderServiceTest {
                 0,
                 15000,
                 false,
+                37.5572,
+                126.9245,
                 List.of()
         );
         order.markPaid(LocalDateTime.now());
