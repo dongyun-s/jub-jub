@@ -16,8 +16,6 @@ public class RewardProfileResponse {
     private RewardTier tier;
     @Schema(description = "등급 이름 (한글)", example = "브론즈")
     private String tierName; // 프론트엔드 노출용 (예: "브론즈")
-    @Schema(description = "누적 경험치", example = "0")
-    private int cumulativeXp;
     @Schema(description = "누적 도보 거리 (m)", example = "0")
     private int totalWalkingDistance;
     @Schema(description = "누적 주문 횟수", example = "0")
@@ -41,7 +39,6 @@ public class RewardProfileResponse {
                 .nickname(profile.getNickname())
                 .tier(currentTier)
                 .tierName(currentTier.getLabel())
-                .cumulativeXp(profile.getCumulativeXp())
                 .totalWalkingDistance(profile.getTotalWalkingDistance())
                 .orderCount(profile.getOrderCount())
                 .nextTierRequiredCount(nextRequired)

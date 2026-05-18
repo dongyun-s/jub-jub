@@ -37,7 +37,6 @@ public class MemberProfile extends BaseTimeEntity {
     private RewardTier tier = RewardTier.BRONZE;  // 기본 등급은 브론즈
 
     private int pointBalance = 0;         // 포인트 잔액
-    private int cumulativeXp = 0;         // 누적 경험치
     private int totalWalkingDistance = 0; // 누적 도보 거리
     private int orderCount = 0;           // 누적 주문(픽업) 횟수 - 원본 유지
     private boolean pushAgree = true;     // 푸시 알림 동의 여부
@@ -57,10 +56,9 @@ public class MemberProfile extends BaseTimeEntity {
 
     /**
      * 픽업 뿐만 아니라 다양한 보상 이벤트에서 재사용 가능하도록 개편
-     * 경험치와 도보 거리를 누적하고, 픽업(isPickup)인 경우에만 횟수를 1 증가시킨 뒤 등급을 갱신합니다.
+     * 도보 거리를 누적하고, 픽업(isPickup)인 경우에만 횟수를 1 증가시킨 뒤 등급을 갱신합니다.
      */
-    public void addReward(int earnedXp, int walkedDistanceMeters, boolean isPickup) {
-        this.cumulativeXp += earnedXp;
+    public void addReward(int walkedDistanceMeters, boolean isPickup) {
         this.totalWalkingDistance += walkedDistanceMeters;
 
         // 픽업으로 인한 보상일 때만 orderCount 증가 및 승급 심사

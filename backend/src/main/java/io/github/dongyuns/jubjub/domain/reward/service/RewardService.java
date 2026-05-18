@@ -49,7 +49,7 @@ public class RewardService {
 
         // 1) 프로필 수치 업데이트 (픽업일 경우에만 횟수 증가 및 승급 심사)
         boolean isPickup = (source == RewardSource.EARN_PICKUP);
-        profile.addReward(xp, distance, isPickup);
+        profile.addReward(distance, isPickup);
 
         // 2) 최신화된 RewardHistory 엔티티 구조에 맞춰 적립 내역 저장
         RewardHistory history = RewardHistory.builder()

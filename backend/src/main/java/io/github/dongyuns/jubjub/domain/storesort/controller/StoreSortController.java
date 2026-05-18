@@ -23,7 +23,7 @@ public class StoreSortController {
 
     @Operation(
             summary = "현재 위치 기준 매장 정렬 조회",
-            description = "현재 위치 기준 반경 2km 이내 매장을 거리순 또는 리뷰 평점순으로 조회합니다."
+            description = "현재 위치 기준 반경 3km 이내 매장을 거리순 또는 리뷰 평점순으로 조회합니다."
     )
     @GetMapping("/sorted")
     public ApiResponse<List<SortedStoreResponse>> getSortedStores(

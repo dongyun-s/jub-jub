@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class StoreSortService {
 
-    static final double SEARCH_RADIUS_METERS = 2_000d;
+    static final double SEARCH_RADIUS_METERS = 3_000d;
     private static final double METERS_PER_LATITUDE_DEGREE = 111_320d;
 
     private final StoreRepository storeRepository;

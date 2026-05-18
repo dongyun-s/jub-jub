@@ -1,0 +1,136 @@
+package io.github.dongyuns.jubjub.payment.service;
+
+import io.github.dongyuns.jubjub.domain.auth.entity.Account;
+import io.github.dongyuns.jubjub.domain.auth.repository.AccountRepository;
+import io.github.dongyuns.jubjub.domain.cart.repository.CartRepository;
+import io.github.dongyuns.jubjub.domain.reward.dto.PickupCompletedEvent;
+import io.github.dongyuns.jubjub.domain.reward.service.DiscountCalculatorService;
+import io.github.dongyuns.jubjub.domain.store.entity.Store;
+import io.github.dongyuns.jubjub.domain.store.repository.StoreRepository;
+import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
+import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
+import io.github.dongyuns.jubjub.payment.domain.Order;
+import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
+import io.github.dongyuns.jubjub.payment.dto.CompletePickupRequest;
+import io.github.dongyuns.jubjub.payment.repository.OrderRepository;
+import io.github.dongyuns.jubjub.payment.repository.PaymentRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @Mock private OrderRepository orderRepository;
+    @Mock private CartRepository cartRepository;
+    @Mock private AccountRepository accountRepository;
+    @Mock private MemberProfileRepository memberProfileRepository;
+    @Mock private StoreRepository storeRepository;
+    @Mock private PaymentRepository paymentRepository;
+    @Mock private DiscountCalculatorService discountCalculatorService;
+    @Mock private PickupDistanceService pickupDistanceService;
+    @Mock private ApplicationEventPublisher eventPublisher;
+
+    private OrderService orderService;
+
+    @BeforeEach
+    void setUp() {
+        orderService = new OrderService(
+                orderRepository,
+                cartRepository,
+                accountRepository,
+                memberProfileRepository,
+                storeRepository,
+                paymentRepository,
+                discountCalculatorService,
+                pickupDistanceService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    void publishesPickupCompletedEventWithCalculatedDistance() {
+        Order order = createPaidOrder();
+        when(orderRepository.findById(101L)).thenReturn(Optional.of(order));
+        when(pickupDistanceService.calculatePickupDistanceMeters(37.5572, 126.9245, order.getStore())).thenReturn(1730);
+
+        orderService.completePickup(101L, new CompletePickupRequest(37.5572, 126.9245));
+
+        ArgumentCaptor<PickupCompletedEvent> eventCaptor = ArgumentCaptor.forClass(PickupCompletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+        PickupCompletedEvent event = eventCaptor.getValue();
+        assertThat(event.getEmail()).isEqualTo("user@example.com");
+        assertThat(event.getEarnedXp()).isEqualTo(100);
+        assertThat(event.getWalkedDistance()).isEqualTo(1730);
+        assertThat(event.getOrderId()).isEqualTo(101L);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    private Order createPaidOrder() {
+        Account account = Account.builder()
+                .email("user@example.com")
+                .password("password")
+                .build();
+
+        MemberProfile memberProfile = MemberProfile.builder()
+                .account(account)
+                .name("테스트 사용자")
+                .phone("01012345678")
+                .nickname("사용자")
+                .pointBalance(0)
+                .build();
+
+        Store store = Store.builder()
+                .ownerProfileId(1L)
+                .categoryId(1)
+                .name("테스트 매장")
+                .address("서울시 강남구")
+                .phoneNumber("02-0000-0000")
+                .latitude(37.4980)
+                .longitude(127.0276)
+                .cookingTimeMinutes(15)
+                .status("OPEN")
+                .originInfo("원산지")
+                .minOrderAmount(10000)
+                .build();
+
+        Order order = Order.ready(
+                memberProfile,
+                store,
+                "ORD-101",
+                15000,
+                0,
+                0,
+                0,
+                15000,
+                false,
+                List.of()
+        );
+        order.markPaid(LocalDateTime.now());
+        setField(order, "id", 101L);
+        return order;
+    }
+
+    private void setField(Object target, String fieldName, Object value) {
+        try {
+            java.lang.reflect.Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(fieldName + " 필드 설정에 실패했습니다.", exception);
+        }
+    }
+}
