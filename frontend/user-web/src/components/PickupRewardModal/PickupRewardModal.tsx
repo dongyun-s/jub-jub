@@ -6,6 +6,7 @@ import { useId } from 'react'
 import AppModal from '../AppModal/AppModal'
 import type { PickupRewardBreakdown } from '../../lib/pickupReward'
 import { formatWalkedDistance } from '../../lib/pickupReward'
+import TierIcon from '../TierIcon/TierIcon'
 import styles from './PickupRewardModal.module.css'
 
 interface PickupRewardModalProps {
@@ -73,7 +74,7 @@ function PickupRewardModal({
 
       {rewards?.tierUpgraded && rewards.previousTierName && !loading && (
         <p className={styles.tierUpgradeBanner}>
-          <span className="material-symbols-outlined">military_tech</span>
+          <TierIcon tierName={rewards.tierName} size="sm" glow alt="" />
           {rewards.previousTierName} → {rewards.tierName} 등급 달성!
         </p>
       )}

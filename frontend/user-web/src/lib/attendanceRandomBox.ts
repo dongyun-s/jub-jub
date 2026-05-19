@@ -6,28 +6,70 @@ import { fetchAttendanceHistory, fetchMyCoupons } from '../api/rewards'
 
 export type AttendanceBoxPrize = '1000' | '100' | 'NONE'
 
-/** 백엔드 countByMemberProfile 과 맞추기 위해 서버 출석 날짜를 합산(중복 일자 제거) */
-export async function countServerLifetimeAttendance(): Promise<number> {
-  const year = new Date().getFullYear()
-  const years = [year, year - 1]
-  const dates = new Set<string>()
+const LIFETIME_CACHE_MS = 10 * 60 * 1000
+const MONTH_FETCH_CONCURRENCY = 2
 
-  await Promise.all(
-    years.flatMap((y) =>
-      Array.from({ length: 12 }, (_, i) => {
-        const month = i + 1
-        return fetchAttendanceHistory({ year: y, month })
-          .then((res) => {
+let lifetimeCache: { count: number; cachedAt: number } | null = null
+let lifetimeInflight: Promise<number> | null = null
+
+export function invalidateLifetimeAttendanceCache(): void {
+  lifetimeCache = null
+  lifetimeInflight = null
+}
+
+function monthTasksForLifetimeCount(): { year: number; month: number }[] {
+  const now = new Date()
+  const year = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  const tasks: { year: number; month: number }[] = []
+  for (const y of [year, year - 1]) {
+    const lastMonth = y === year ? currentMonth : 12
+    for (let month = 1; month <= lastMonth; month++) {
+      tasks.push({ year: y, month })
+    }
+  }
+  return tasks
+}
+
+/**
+ * 누적 출석 일수(서로 다른 날짜 기준).
+ * 과거: 24개월 동시 요청 → ngrok/서버 과부하·401 연쇄 가능.
+ * 현재: 캐시 + in-flight 공유 + 소량 동시(2)만 허용.
+ */
+export async function countServerLifetimeAttendance(force = false): Promise<number> {
+  if (!force && lifetimeCache && Date.now() - lifetimeCache.cachedAt < LIFETIME_CACHE_MS) {
+    return lifetimeCache.count
+  }
+  if (lifetimeInflight) {
+    return lifetimeInflight
+  }
+
+  lifetimeInflight = (async () => {
+    const dates = new Set<string>()
+    const tasks = monthTasksForLifetimeCount()
+
+    for (let i = 0; i < tasks.length; i += MONTH_FETCH_CONCURRENCY) {
+      const batch = tasks.slice(i, i + MONTH_FETCH_CONCURRENCY)
+      await Promise.all(
+        batch.map(async ({ year, month }) => {
+          try {
+            const res = await fetchAttendanceHistory({ year, month })
             for (const d of res.attendedDates) dates.add(d)
-          })
-          .catch(() => {
+          } catch {
             /* 월별 조회 실패는 무시 */
-          })
-      }),
-    ),
-  )
+          }
+        }),
+      )
+    }
 
-  return dates.size
+    const count = dates.size
+    lifetimeCache = { count, cachedAt: Date.now() }
+    return count
+  })().finally(() => {
+    lifetimeInflight = null
+  })
+
+  return lifetimeInflight
 }
 
 /** 백엔드 AttendanceService: totalAttendanceCount % 7 == 0 */
@@ -55,5 +97,5 @@ export async function resolveAttendanceBoxPrizeFromCoupons(
 export function prizeLabel(prize: AttendanceBoxPrize): string {
   if (prize === '1000') return '1,000원 쿠폰'
   if (prize === '100') return '100원 쿠폰'
-  return '꽝'
+  return '꽁'
 }

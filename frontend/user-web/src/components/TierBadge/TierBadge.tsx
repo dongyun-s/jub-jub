@@ -1,4 +1,5 @@
 import { getTierTheme, type TierTheme } from '../../lib/rewardTierTheme'
+import TierIcon from '../TierIcon/TierIcon'
 import styles from './TierBadge.module.css'
 
 export interface TierLabelColors {
@@ -47,9 +48,7 @@ export default function TierBadge({
           color: '#fff',
         }}
       >
-        <span className="material-symbols-outlined" style={{ fontSize: size === 'md' ? '0.875rem' : '0.75rem' }}>
-          military_tech
-        </span>
+        <TierIcon label={label} size={size === 'md' ? 'sm' : 'xs'} alt="" />
         {label}
       </span>
     )
@@ -64,6 +63,7 @@ export default function TierBadge({
         backgroundColor: colors.backgroundColor,
       }}
     >
+      <TierIcon label={label} size={size === 'md' ? 'sm' : 'xs'} alt="" />
       {label}
     </span>
   )

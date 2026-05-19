@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" aria-label="Gold">
+  <defs>
+    <linearGradient id="g1" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB"/><stop offset="40%" stop-color="#FACC15"/><stop offset="100%" stop-color="#78350F"/>
+    </linearGradient>
+    <radialGradient id="g2" cx="35%" cy="28%" r="58%">
+      <stop offset="0%" stop-color="#FEF08A"/><stop offset="50%" stop-color="#CA8A04"/><stop offset="100%" stop-color="#3d1504"/>
+    </radialGradient>
+    <linearGradient id="g3" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#FDE047"/><stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <filter id="gs" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#1c0702" flood-opacity="0.92"/>
+    </filter>
+    <filter id="gf" x="-130%" y="-130%" width="360%" height="360%">
+      <feGaussianBlur stdDeviation="14" result="a"/><feFlood flood-color="#fbbf24" flood-opacity="0.6" result="f"/>
+      <feComposite in="f" in2="a" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gf2" x="-90%" y="-90%" width="280%" height="280%">
+      <feGaussianBlur stdDeviation="6" result="a"/><feFlood flood-color="#fff7ed" flood-opacity="0.25" result="f"/>
+      <feComposite in="f" in2="a" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#gs)">
+    <circle cx="128" cy="120" r="118" fill="none" stroke="#92400e" stroke-width="2" opacity="0.4"/>
+    <path fill="#1a0a02" stroke="#B45309" stroke-width="3" filter="url(#gf)"
+          d="M128 2 L150 58 L210 30 L182 90 L250 104 L190 134 L238 188 L168 170 L196 230 L128 200 L60 230 L88 170 L18 188 L66 134 L6 104 L74 90 L46 30 L106 58 Z"/>
+    <path fill="url(#g1)" stroke="#92400e" stroke-width="3" filter="url(#gf2)"
+          d="M128 26 L146 74 L198 50 L176 100 L230 114 L178 140 L220 188 L158 172 L128 218 L98 172 L36 188 L78 140 L26 114 L80 100 L58 50 L110 74 Z"/>
+    <circle cx="128" cy="118" r="66" fill="url(#g2)" stroke="#FDE047" stroke-width="5"/>
+    <circle cx="128" cy="118" r="66" fill="none" stroke="url(#g3)" stroke-width="2" opacity="0.55"/>
+    <circle cx="128" cy="118" r="50" fill="#2a1204" stroke="#a16207" stroke-width="2"/>
+    <path fill="none" stroke="#FDE68A" stroke-width="2.5" opacity="0.9" d="M128 80 L128 156 M88 118 L168 118 M96 96 L160 140 M160 96 L96 140"/>
+    <circle cx="104" cy="94" r="12" fill="#FFFBEB" fill-opacity="0.4"/>
+    <path fill="#78350f" stroke="#FBBF24" stroke-width="2" d="M128 92 L140 118 L128 114 L116 118 Z M114 126 L142 126 L128 146 Z"/>
+    <circle cx="188" cy="72" r="2.5" fill="#FDE047" opacity="0.9"/>
+    <circle cx="56" cy="160" r="2" fill="#F59E0B" opacity="0.75"/>
+  </g>
+</svg>

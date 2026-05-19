@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" aria-label="Platinum">
+  <defs>
+    <linearGradient id="p1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/><stop offset="30%" stop-color="#5EEAD4"/><stop offset="100%" stop-color="#042F2E"/>
+    </linearGradient>
+    <linearGradient id="p2" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ECFEFF"/><stop offset="45%" stop-color="#14B8A6"/><stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <radialGradient id="p3" cx="42%" cy="32%" r="55%">
+      <stop offset="0%" stop-color="#5EEAD4" stop-opacity="0.55"/><stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="ps" x="-55%" y="-55%" width="210%" height="210%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#000" flood-opacity="0.82"/>
+    </filter>
+    <filter id="pe" x="-140%" y="-140%" width="380%" height="380%">
+      <feGaussianBlur stdDeviation="12" result="a"/><feFlood flood-color="#2dd4bf" flood-opacity="0.6" result="f"/>
+      <feComposite in="f" in2="a" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="pe2" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6" result="a"/><feFlood flood-color="#ecfeff" flood-opacity="0.35" result="f"/>
+      <feComposite in="f" in2="a" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#ps)">
+    <circle cx="128" cy="128" r="124" fill="none" stroke="#134E4A" stroke-width="2" opacity="0.45"/>
+    <ellipse cx="128" cy="128" rx="118" ry="116" fill="#020a0a" stroke="#0f766e" stroke-width="3"/>
+    <path fill="#031010" stroke="url(#p1)" stroke-width="11" filter="url(#pe)"
+          d="M128 12 C200 12 240 50 240 120 C240 192 128 250 128 250 C128 250 16 192 16 120 C16 50 56 12 128 12 Z"/>
+    <path fill="none" stroke="#67E8F9" stroke-width="3.5" opacity="0.5" filter="url(#pe2)" d="M128 24 A104 104 0 1 1 127.9 24"/>
+    <path fill="#042f2e" stroke="#115e59" stroke-width="2"
+          d="M128 36 L204 76 L204 148 L128 224 L52 148 L52 76 Z"/>
+    <path fill="none" stroke="#134E4A" stroke-width="1.5" opacity="0.65" d="M40 104h176M40 136h176"/>
+    <circle cx="128" cy="128" r="62" fill="url(#p3)" opacity="0.9"/>
+    <path fill="url(#p2)" stroke="#CCFBF1" stroke-width="2.5"
+          d="M128 58 L190 98 L160 188 L96 188 L66 98 Z"/>
+    <path fill="#ffffff" fill-opacity="0.4" d="M128 66 L178 100 L128 122 L78 100 Z"/>
+    <path fill="#0e7490" opacity="0.6" d="M190 98 L128 188 L128 122 Z"/>
+    <path fill="#134E4A" opacity="0.5" d="M66 98 L128 122 L96 188 Z"/>
+    <circle cx="128" cy="82" r="9" fill="#fff" opacity="0.9"/>
+    <path fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.55" d="M128 44 A76 76 0 1 1 127.9 44"/>
+    <circle cx="52" cy="72" r="2.5" fill="#99F6E4" opacity="0.9"/>
+    <circle cx="210" cy="168" r="2" fill="#2DD4BF" opacity="0.8"/>
+  </g>
+</svg>

@@ -28,6 +28,7 @@ import {
 import {
   attendanceUntilNextRandomBox,
   countServerLifetimeAttendance,
+  invalidateLifetimeAttendanceCache,
   isAttendanceRandomBoxMilestone,
 } from '../../lib/attendanceRandomBox'
 import { getAccessToken } from '../../lib/authStorage'
@@ -38,6 +39,7 @@ import {
   markAttendanceDone,
   weekIsoDatesMondayFirst,
 } from '../../lib/rewardAttendance'
+import TierIcon from '../../components/TierIcon/TierIcon'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { postReviewNotificationsReadAll } from '../../api/reviewNotifications'
@@ -137,9 +139,9 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
 
   const [attendanceStreak, setAttendanceStreak] = useState(0)
 
-  /** 주간 그리드: 로컬 과거 일별 출석 + 서버 주간 API(선택) + 오늘 플래그 */
+  /** 주간 그리드: 로컬 + 이번 달 history 1회만 (누적 출석 집계는 별도 effect) */
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || profileLoading) return
     let cancelled = false
 
     const mergeWeek = (local: boolean[], api: boolean[] | null): boolean[] => {
@@ -155,7 +157,6 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
         const apiWeek = await fetchAttendanceWeek()
         if (!cancelled) merged = mergeWeek(merged, apiWeek)
 
-        // 월별 출석 내역 API가 있으면 이번 주 날짜와 교집합으로 주간 칸 채우기
         try {
           const now = new Date()
           const history = await fetchAttendanceHistory({
@@ -169,14 +170,7 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             merged = mergeWeek(merged, fromHistory)
           }
         } catch {
-          // 무시 (서버 미구현/에러 시 로컬+주간API만)
-        }
-
-        try {
-          const total = await countServerLifetimeAttendance()
-          if (!cancelled) setLifetimeAttendanceCount(total)
-        } catch {
-          if (!cancelled) setLifetimeAttendanceCount(null)
+          /* 이번 달 history 실패 시 로컬만 */
         }
       }
 
@@ -198,7 +192,29 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
       cancelled = true
       window.removeEventListener('jubjub-attendance-local', onLocal)
     }
-  }, [profile?.email, todayIndex])
+  }, [profile?.email, todayIndex, profileLoading])
+
+  /** 누적 출석(랜덤박스 안내) — 로그인·프로필 준비 후 지연 로드, 과도한 동시 API 방지 */
+  useEffect(() => {
+    if (profileLoading || !getAccessToken()) {
+      setLifetimeAttendanceCount(null)
+      return
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void countServerLifetimeAttendance()
+        .then((total) => {
+          if (!cancelled) setLifetimeAttendanceCount(total)
+        })
+        .catch(() => {
+          if (!cancelled) setLifetimeAttendanceCount(null)
+        })
+    }, 1200)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [profile?.email, profileLoading])
 
   const displayNickname =
     rewardMe?.nickname?.trim() ||
@@ -311,9 +327,10 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
         })
         await loadRewards()
 
+        invalidateLifetimeAttendanceCache()
         let total = lifetimeAttendanceCount ?? 0
         try {
-          total = await countServerLifetimeAttendance()
+          total = await countServerLifetimeAttendance(true)
           setLifetimeAttendanceCount(total)
         } catch {
           total += 1
@@ -430,6 +447,12 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                 className={styles.gradeBadge}
                 style={{ backgroundImage: tierTheme.myBadgeGradient }}
               >
+                <TierIcon
+                  tier={rewardMe?.tier}
+                  tierName={rewardMe?.tierName}
+                  size="xs"
+                  alt=""
+                />
                 {profileGradeBadge}
               </div>
             </div>
@@ -515,12 +538,14 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             <div className={styles.distanceGoalCard}>
               <div className={styles.distanceGoalHeader}>
                 <h3 className={styles.distanceGoalTitle}>
-                  <span
-                    className={`material-symbols-outlined ${styles.distanceGoalIcon}`}
-                    style={{ color: tierTheme.myGoalIcon }}
-                  >
-                    military_tech
-                  </span>
+                  <TierIcon
+                    tier={rewardMe?.tier}
+                    tierName={rewardMe?.tierName}
+                    size="sm"
+                    glow
+                    className={styles.distanceGoalIcon}
+                    alt=""
+                  />
                   리워드 요약
                 </h3>
                 <span className={styles.distanceGoalBadge} style={{ color: tierTheme.myGoalBadgeColor }}>
