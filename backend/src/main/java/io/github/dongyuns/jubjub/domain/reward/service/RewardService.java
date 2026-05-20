@@ -29,6 +29,7 @@ public class RewardService {
     // 프론트엔드 쿠폰 조회를 위해 새로 추가된 레포지토리 의존성
     private final MemberCouponRepository memberCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;
+    private final CouponIssueService couponIssueService;
 
     // ==========================================
     // 1. [조회]
@@ -49,7 +50,7 @@ public class RewardService {
 
         // 1) 프로필 수치 업데이트 (픽업일 경우에만 횟수 증가 및 승급 심사)
         boolean isPickup = (source == RewardSource.EARN_PICKUP);
-        profile.addReward(distance, isPickup);
+        int earnedDistanceCoupons = profile.addReward(distance, isPickup);
 
         // 2) 최신화된 RewardHistory 엔티티 구조에 맞춰 적립 내역 저장
         RewardHistory history = RewardHistory.builder()
@@ -63,6 +64,14 @@ public class RewardService {
                 .build();
 
         rewardHistoryRepository.save(history);
+
+        // 3) 🎯 10km 돌파 횟수만큼 거리 보상(DISTANCE) 1000원 쿠폰 발급!
+        if (earnedDistanceCoupons > 0) {
+            for (int i = 0; i < earnedDistanceCoupons; i++) {
+                // DB의 condition_type="DISTANCE", amount=1000 인 정책을 찾아 발급합니다.
+                couponIssueService.issueCoupon(profile.getId(), "DISTANCE", 1000);
+            }
+        }
     }
 
     // ==========================================

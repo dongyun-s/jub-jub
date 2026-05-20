@@ -58,14 +58,24 @@ public class MemberProfile extends BaseTimeEntity {
      * 픽업 뿐만 아니라 다양한 보상 이벤트에서 재사용 가능하도록 개편
      * 도보 거리를 누적하고, 픽업(isPickup)인 경우에만 횟수를 1 증가시킨 뒤 등급을 갱신합니다.
      */
-    public void addReward(int walkedDistanceMeters, boolean isPickup) {
+    public int addReward(int walkedDistanceMeters, boolean isPickup) {
+        // 1. 기존 거리 저장 (10km 단위 계산용)
+        int previousDistance = this.totalWalkingDistance;
+
+        // 2. 거리 누적
         this.totalWalkingDistance += walkedDistanceMeters;
 
-        // 픽업으로 인한 보상일 때만 orderCount 증가 및 승급 심사
+        // 3. 픽업으로 인한 보상일 때만 orderCount 증가 및 승급 심사
         if (isPickup) {
             this.orderCount += 1;
             updateTier();
         }
+
+        // 4. 돌파한 10km 구간 개수 계산 (예: 9,000m -> 11,000m 이면 (1 - 0) = 1개 반환)
+        int previousMilestone = previousDistance / 10000;
+        int currentMilestone = this.totalWalkingDistance / 10000;
+
+        return currentMilestone - previousMilestone;
     }
 
     /**

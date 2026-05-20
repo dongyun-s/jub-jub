@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -39,22 +40,35 @@ public class CouponIssueService {
                 .build();
 
         memberCouponRepository.save(memberCoupon);
-        log.info("쿠폰 발급 완료: 유저 ID = {}, 쿠폰명 = {}", memberProfileId, policy.getName());
+        log.info("✅ 쿠폰 발급 완료: 유저 ID = {}, 쿠폰명 = {}", memberProfileId, policy.getName());
     }
 
+    /**
+     * 7일 연속 출석 랜덤박스 오픈 및 결과 반환 로직
+     */
     @Transactional
-    public void issueAttendanceRandomBox(Long memberProfileId) {
-        double random = Math.random() * 100; // 0.0 ~ 99.99.. 생성
+    public String openAttendanceRandomBox(Long memberProfileId) {
+        // 1. 보안과 무작위성이 뛰어난 SecureRandom 객체 생성
+        SecureRandom secureRandom = new SecureRandom();
+        double random = secureRandom.nextDouble() * 100; // 0.0 ~ 99.99...
 
-        if (random < 5.0) { // 상위 5% 확률 (0.0 ~ 4.99)
+        // 2. 확률 구간에 따른 쿠폰 발급 및 프론트엔드 연출용 결과 반환
+        if (random < 5.0) {
+            // 0.0 ~ 4.99 (5% 확률)
             issueCoupon(memberProfileId, "ATTENDANCE", 1000);
-            log.info("🎉 5% 확률 당첨! 1000원 쿠폰 발급");
-        } else if (random < 50.0) { // 45% 확률 (5.0 ~ 49.99)
+            log.info("🎉 [랜덤박스 당첨] 5% 대박! 1000원 할인쿠폰 발급 완료 (User ID: {})", memberProfileId);
+            return "WIN_1000";
+
+        } else if (random < 50.0) {
+            // 5.0 ~ 49.99 (45% 확률)
             issueCoupon(memberProfileId, "ATTENDANCE", 100);
-            log.info("🎉 45% 확률 당첨! 100원 쿠폰 발급");
+            log.info("🎉 [랜덤박스 당첨] 45% 당첨! 100원 할인쿠폰 발급 완료 (User ID: {})", memberProfileId);
+            return "WIN_100";
+
         } else {
-            // 나머지 50%는 꽝
-            log.info("💣 아쉽게도 꽝입니다.");
+            // 50.0 ~ 99.99 (50% 확률)
+            log.info("💀 [랜덤박스 결과] 50% 꽝입니다. 아쉽지만 다음 기회를 노려보세요! (User ID: {})", memberProfileId);
+            return "LOSE";
         }
     }
 }

@@ -33,11 +33,18 @@ public class Attendance extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDate attendanceDate;
 
-    // BaseTimeEntity를 상속받으므로 createdAt 필드는 삭제해도 자동으로 생성됩니다.
+    // 랜덤박스 오픈 여부 (기본값 false)
+    @Column(nullable = false)
+    private boolean isRandomBoxOpened = false;
 
     @Builder
     public Attendance(MemberProfile memberProfile, LocalDate attendanceDate) {
         this.memberProfile = memberProfile;
         this.attendanceDate = attendanceDate;
+    }
+
+    // 랜덤박스 오픈 시 상태를 true로 변경하는 메서드
+    public void markAsOpened() {
+        this.isRandomBoxOpened = true;
     }
 }

@@ -44,6 +44,7 @@ public class RewardEventListener {
                 log.info("[RewardEventListener] 🌿 다회용기 에코 쿠폰(200원) 발급 완료!");
             }
 
+            /* 10km 거리 보상 쿠폰 발급 로직은 중복 발급을 방지하기 위해 RewardService.earnReward() 내부로 이관되어 중앙 통제됩니다.
             // 4. 5km(5000m) 누적 달성 시 거리 보상 쿠폰(1000원) 발급 로직
             // 현재 누적 거리에서 방금 걸은 거리를 빼면 '기존 누적 거리'가 나옵니다.
             int currentTotalDistance = member.getTotalWalkingDistance();
@@ -54,6 +55,7 @@ public class RewardEventListener {
                 couponIssueService.issueCoupon(member.getId(), "DISTANCE", 1000);
                 log.info("[RewardEventListener] 🏃‍♂️ 5km 달성! 거리 보상 쿠폰(1000원) 발급 완료!");
             }
+            */
 
             log.info("[RewardEventListener] 보상 지급 전체 프로세스 성공! 대상: {}", event.getEmail());
 
