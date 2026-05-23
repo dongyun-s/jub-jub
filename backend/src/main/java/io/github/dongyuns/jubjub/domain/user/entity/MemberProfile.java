@@ -33,12 +33,13 @@ public class MemberProfile extends BaseTimeEntity {
     // [리워드 지갑 영역] - 초기값 설정
     // ==========================================
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
     private RewardTier tier = RewardTier.BRONZE;  // 기본 등급은 브론즈
 
     private int pointBalance = 0;         // 포인트 잔액
     private int totalWalkingDistance = 0; // 누적 도보 거리
-    private int orderCount = 0;           // 누적 주문(픽업) 횟수 - 원본 유지
+    private int orderCount = 0;            // 누적 주문(픽업) 횟수 - 원본 유지
+    private int cumulativeXp = 0;         // 누적 경험치 (향후 출석체크 등 다른 보상 이벤트에서도 활용 가능하도록 추가)
     private boolean pushAgree = true;     // 푸시 알림 동의 여부
 
     @Builder

@@ -7,6 +7,7 @@ import io.github.dongyuns.jubjub.domain.reward.entity.CouponPolicy;
 import io.github.dongyuns.jubjub.domain.reward.entity.MemberCoupon;
 import io.github.dongyuns.jubjub.domain.reward.entity.RewardHistory;
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardSource;
+import io.github.dongyuns.jubjub.domain.reward.enums.RewardTier; // 티어 비교를 위한 임포트
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardType; // 기존 로직 존중
 import io.github.dongyuns.jubjub.domain.reward.repository.CouponPolicyRepository;
 import io.github.dongyuns.jubjub.domain.reward.repository.MemberCouponRepository;
@@ -14,19 +15,20 @@ import io.github.dongyuns.jubjub.domain.reward.repository.RewardHistoryRepositor
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // 승급 축하 로그를 찍기 위함
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RewardService {
 
     private final MemberProfileRepository memberProfileRepository;
     private final RewardHistoryRepository rewardHistoryRepository;
-    // 프론트엔드 쿠폰 조회를 위해 새로 추가된 레포지토리 의존성
     private final MemberCouponRepository memberCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;
     private final CouponIssueService couponIssueService;
@@ -48,11 +50,25 @@ public class RewardService {
     @Transactional
     public void earnReward(MemberProfile profile, RewardSource source, int xp, int distance, Long referenceId) {
 
-        // 1) 프로필 수치 업데이트 (픽업일 경우에만 횟수 증가 및 승급 심사)
+        // 1) 보상 추가 전의 (과거) 티어를 기억해 둡니다.
+        RewardTier previousTier = profile.getTier();
+
+        // 2) 프로필 수치 업데이트 (픽업일 경우에만 횟수 증가 및 승급 심사)
         boolean isPickup = (source == RewardSource.EARN_PICKUP);
         int earnedDistanceCoupons = profile.addReward(distance, isPickup);
 
-        // 2) 최신화된 RewardHistory 엔티티 구조에 맞춰 적립 내역 저장
+        // 3) 보상 추가 후의 (현재) 티어를 확인합니다.
+        RewardTier currentTier = profile.getTier();
+
+        // 4) 과거 티어보다 현재 티어가 더 높다면? (승급 성공!)
+        if (previousTier.ordinal() < currentTier.ordinal()) {
+            // DB 쿠폰 정책에 condition_type="TIER_UPGRADE", amount=1000 을 넣어두셔야 합니다!
+            couponIssueService.issueCoupon(profile.getId(), "TIER_UPGRADE", 1000);
+            log.info("🎉 [승급 축하] {} -> {} 승급! 1000원 쿠폰 발급 완료 (User ID: {})",
+                    previousTier.name(), currentTier.name(), profile.getId());
+        }
+
+        // 5) 최신화된 RewardHistory 엔티티 구조에 맞춰 적립 내역 저장
         RewardHistory history = RewardHistory.builder()
                 .memberProfile(profile)
                 .rewardType(RewardType.EARNED) // 적립 고정
@@ -65,7 +81,7 @@ public class RewardService {
 
         rewardHistoryRepository.save(history);
 
-        // 3) 🎯 10km 돌파 횟수만큼 거리 보상(DISTANCE) 1000원 쿠폰 발급!
+        // 6) 🎯 10km 돌파 횟수만큼 거리 보상(DISTANCE) 1000원 쿠폰 발급!
         if (earnedDistanceCoupons > 0) {
             for (int i = 0; i < earnedDistanceCoupons; i++) {
                 // DB의 condition_type="DISTANCE", amount=1000 인 정책을 찾아 발급합니다.
@@ -79,11 +95,9 @@ public class RewardService {
     // ==========================================
     @Transactional
     public void givePickupReward(String email, int xp, int distance, Long orderId) {
-        // 1) 회원 프로필 조회
         MemberProfile profile = memberProfileRepository.findByAccountEmail(email)
                 .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
-        // 2) 범용 메서드를 호출하여 로직 중복 제거 및 깔끔하게 처리!
         earnReward(profile, RewardSource.EARN_PICKUP, xp, distance, orderId);
     }
 
@@ -92,12 +106,9 @@ public class RewardService {
     // ==========================================
     @Transactional(readOnly = true)
     public List<MemberCouponResponse> getMyAvailableCoupons(Long memberProfileId) {
-        // 1. 유저의 '사용 안 한(isUsed=false)' 쿠폰 목록을 가져옵니다.
         List<MemberCoupon> myCoupons = memberCouponRepository.findAllByMemberProfileIdAndIsUsedFalse(memberProfileId);
 
-        // 2. 프론트엔드에 전달할 DTO 형태로 변환합니다.
         return myCoupons.stream().map(coupon -> {
-            // 연관된 쿠폰 정책(이름, 조건 등)을 찾아옵니다.
             CouponPolicy policy = couponPolicyRepository.findById(coupon.getCouponPolicyId())
                     .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰 정책입니다."));
 
@@ -106,7 +117,7 @@ public class RewardService {
                     .name(policy.getName())
                     .discountAmount(policy.getDiscountAmount())
                     .minOrderAmount(policy.getMinOrderAmount())
-                    .expiredAt(coupon.getExpiredAt().toLocalDate()) // 시간 빼고 날짜만!
+                    .expiredAt(coupon.getExpiredAt().toLocalDate())
                     .build();
         }).toList();
     }
