@@ -7,6 +7,7 @@ import io.github.dongyuns.jubjub.domain.reward.dto.DiscountCalculateResponse;
 import io.github.dongyuns.jubjub.domain.reward.dto.MemberCouponResponse;
 import io.github.dongyuns.jubjub.domain.reward.dto.RewardProfileResponse;
 import io.github.dongyuns.jubjub.domain.reward.service.AttendanceService;
+import io.github.dongyuns.jubjub.domain.reward.service.CouponIssueService;
 import io.github.dongyuns.jubjub.domain.reward.service.DiscountCalculatorService;
 import io.github.dongyuns.jubjub.domain.reward.service.RewardService;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
@@ -20,7 +21,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "리워드 API", description = "사용자의 등급, 경험치, 출석체크 등을 관리하는 API")
 @RestController
@@ -28,8 +31,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RewardController {
 
-    private final RewardService rewardService; // 출석체크 기능과 프로필 조회를 위해 주입
+    private final RewardService rewardService;
     private final AttendanceService attendanceService;
+    private final CouponIssueService couponIssueService;
     private final MemberProfileRepository memberProfileRepository;
     private final DiscountCalculatorService discountCalculatorService;
 
@@ -48,20 +52,48 @@ public class RewardController {
     // ==========================================
     // 2. 출석체크 기능
     // ==========================================
-    @Operation(summary = "출석체크 진행", description = "하루에 한 번 출석체크를 진행하고 경험치 보상을 획득합니다.")
+    @Operation(summary = "출석체크 진행", description = "하루에 한 번 출석체크를 진행하고, 일주일 연속 달성 시 랜덤박스 오픈 권한(isRandomBoxAvailable = true)을 반환합니다.")
     @PostMapping("/attendance")
-    public ResponseEntity<String> checkIn(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> checkIn(Authentication authentication) {
         String accountEmail = authentication.getName();
 
-        // 1. 이메일로 현재 로그인한 회원의 프로필을 조회합니다.
         MemberProfile profile = memberProfileRepository.findByAccountEmail(accountEmail)
                 .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
-        // 2. 출석체크 비즈니스 로직을 실행합니다. (보상 지급까지 완벽하게 처리됨)
-        attendanceService.checkIn(profile);
+        // 7일 연속 개근을 충족했다면 true, 아니면 false 반환
+        boolean isRandomBoxAvailable = attendanceService.checkIn(profile);
 
-        // 3. 성공 메시지를 반환합니다.
-        return ResponseEntity.ok("출석체크가 완료되었습니다. 보상이 지급되었습니다!");
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "출석체크가 완료되었습니다. 보상이 지급되었습니다!");
+        response.put("isRandomBoxAvailable", isRandomBoxAvailable);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // ==========================================
+    // 2-1. 랜덤박스 오픈 API (무한 가챠 방어 적용 🛡️)
+    // ==========================================
+    @Operation(summary = "랜덤박스 오픈", description = "일주일 연속 출석을 달성한 유저가 상자를 열어 확률(꽝 50%, 100원 45%, 1000원 5%)에 따라 보상을 뽑습니다.")
+    @PostMapping("/random-box")
+    public ResponseEntity<Map<String, String>> openRandomBox(Authentication authentication) {
+        String accountEmail = authentication.getName();
+
+        MemberProfile profile = memberProfileRepository.findByAccountEmail(accountEmail)
+                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        // 1. 철통 방어: 7일 연속이 맞는지 + 오늘 이미 깠는지 사전에 검증
+        attendanceService.validateRandomBoxEligibility(profile);
+
+        // 2. 가챠 돌리기 (결과 반환)
+        String result = couponIssueService.openAttendanceRandomBox(profile.getId());
+
+        // 3. 무한 가챠 방지: "이 유저 오늘 상자 깠음!" 상태 저장 (도장 쾅!)
+        attendanceService.markRandomBoxAsOpened(profile);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("result", result);
+
+        return ResponseEntity.ok(response);
     }
 
     // ==========================================
@@ -72,7 +104,6 @@ public class RewardController {
     public ResponseEntity<List<MemberCouponResponse>> getMyCoupons(Authentication authentication) {
         String accountEmail = authentication.getName();
 
-        // 기존 패턴과 동일하게 이메일로 회원 프로필을 조회하여 ID를 추출합니다.
         MemberProfile profile = memberProfileRepository.findByAccountEmail(accountEmail)
                 .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
@@ -107,7 +138,6 @@ public class RewardController {
 
         String accountEmail = authentication.getName();
 
-        // 파라미터가 없으면 자동으로 현재 시간 기준으로 세팅
         LocalDate now = LocalDate.now();
         int targetYear = (year != null) ? year : now.getYear();
         int targetMonth = (month != null) ? month : now.getMonthValue();
