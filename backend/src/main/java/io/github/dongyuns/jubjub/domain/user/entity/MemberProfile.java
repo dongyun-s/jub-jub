@@ -8,7 +8,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "member_profile")
+@Table(
+        name = "member_profile",
+        indexes = @Index(name = "idx_member_profile_ranking", columnList = "total_walking_distance DESC, order_count DESC, id ASC")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 // 🌟 추가: BaseTimeEntity를 상속받아 생성/수정 시간 자동화
@@ -38,7 +41,10 @@ public class MemberProfile extends BaseTimeEntity {
     private RewardTier tier = RewardTier.BRONZE;  // 기본 등급은 브론즈
 
     private int pointBalance = 0;         // 포인트 잔액
+    @Column(name = "total_walking_distance", nullable = false)
     private int totalWalkingDistance = 0; // 누적 도보 거리
+
+    @Column(name = "order_count", nullable = false)
     private int orderCount = 0;            // 누적 주문(픽업) 횟수 - 원본 유지
     private int cumulativeXp = 0;         // 누적 경험치 (향후 출석체크 등 다른 보상 이벤트에서도 활용 가능하도록 추가)
     private boolean pushAgree = true;     // 푸시 알림 동의 여부
