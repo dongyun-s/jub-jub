@@ -3,6 +3,7 @@ package io.github.dongyuns.jubjub.domain.user.service;
 import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.auth.repository.AccountRepository;
 import io.github.dongyuns.jubjub.domain.auth.repository.RefreshTokenRepository;
+import io.github.dongyuns.jubjub.domain.user.dto.ProfileUpdateRequest;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,19 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // (프로필 수정 로직은 나중에 추가하기 위해 잠시 빼두었습니다!)
+    // 프로필 수정 (닉네임, 전화번호)
+    @Transactional
+    public void updateProfile(String email, ProfileUpdateRequest request) {
+        // 가장 안전하고 확실한 2단계 조회 방식으로 변경!
+        Account account = accountRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        MemberProfile profile = memberProfileRepository.findByAccount(account)
+                .orElseThrow(() -> new IllegalArgumentException("프로필 정보를 찾을 수 없습니다."));
+
+        // 2. 엔티티에 만들어둔 수정 메서드 호출 (JPA Dirty Checking으로 DB 자동 반영!)
+        profile.updateProfile(request.nickname(), request.phone());
+    }
 
     // 2. 회원 탈퇴 (Soft Delete) 🌟
     @Transactional

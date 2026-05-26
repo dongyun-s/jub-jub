@@ -22,6 +22,6 @@ public interface MemberProfileRepository extends JpaRepository<MemberProfile, Lo
     @Query("select mp.phone from MemberProfile mp where mp.id = :id")
     Optional<String> findPhoneById(@Param("id") Long id);
 
-    // 탈퇴(isDeleted = true)한 유저 중, 특정 날짜(deletedAt) 이전에 탈퇴한 유저 목록 조회
-    List<MemberProfile> findByIsDeletedTrueAndDeletedAtBefore(LocalDateTime cutoffDate);
+    // 탈퇴(isDeleted = true)한 유저 중, 아직 익명화가 안 된(False) 대상자만 정확하게 타겟팅!
+    List<MemberProfile> findByIsDeletedTrueAndIsAnonymizedFalseAndDeletedAtBefore(LocalDateTime cutoffDate);
 }

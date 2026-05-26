@@ -31,8 +31,8 @@ public class UserCleanupScheduler {
         // 1. 기준일 계산: 지금으로부터 정확히 30일 전 시간 구하기
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
 
-        // 2. 대상자 찾기 (30일 이전에 탈퇴 요청한 사람들)
-        List<MemberProfile> targetProfiles = memberProfileRepository.findByIsDeletedTrueAndDeletedAtBefore(cutoffDate);
+        // 2. 대상자 찾기 (30일 이전에 탈퇴 요청을 했고, '아직 익명화가 안 된' 사람들)
+        List<MemberProfile> targetProfiles = memberProfileRepository.findByIsDeletedTrueAndIsAnonymizedFalseAndDeletedAtBefore(cutoffDate);
 
         if (targetProfiles.isEmpty()) {
             log.info("[스케줄러 종료] 오늘 비식별화 처리할 대상이 없습니다.");
@@ -41,10 +41,10 @@ public class UserCleanupScheduler {
 
         // 3. 대상자들을 순회하며 익명화 처리
         for (MemberProfile profile : targetProfiles) {
-            // 👤 프로필 익명화 ("탈퇴회원", "00000000000")
+            // 프로필 익명화 ("탈퇴회원", "00000000000")
             profile.anonymize();
 
-            // 📧 계정(Account) 익명화
+            // 계정(Account) 익명화
             // UUID 8자리를 붙여서 "deleted_a1b2c3d4@jubjub.com" 형태로 고유한 가짜 이메일을 만듭니다.
             // (이메일 컬럼의 Unique(중복불가) 에러를 방지하기 위함입니다!)
             String randomId = UUID.randomUUID().toString().substring(0, 8);
