@@ -9,10 +9,12 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import PickupRewardModal from '../../components/PickupRewardModal/PickupRewardModal'
-import { FEATURED_RESTAURANTS } from '../../constants'
 import type { ReviewWritePayload } from '../../api/reviews'
-import { completeOrderPickup, getMyOrders } from '../../api/orders'
+import type { PickupDestination } from '../../hooks/useActivePickup'
+import type { OrderContextRow } from '../../lib/orderResolve'
+import { completeOrderPickup } from '../../api/orders'
 import { ApiError } from '../../api/authClient'
+import { getActivePaidOrderFromLocal } from '../../lib/orderResolve'
 import { getAccessToken } from '../../lib/authStorage'
 import { fetchRewardMe, notifyRewardsUpdated } from '../../api/rewards'
 import {
@@ -34,6 +36,9 @@ interface OrderStatusPageProps {
   onNotificationsClick?: () => void
   onReviewWriteClick?: (payload: ReviewWritePayload) => void
   onPickupComplete?: () => void
+  activeOrder?: OrderContextRow | null
+  pickupDestination?: PickupDestination | null
+  pickupContextLoading?: boolean
   cartCount?: number
 }
 
@@ -44,71 +49,24 @@ const COOKING_TO_READY_MS = 15_000
 
 const LOCAL_ORDERS_KEY = '__jubjub_local_orders'
 
-type LocalOrderRow = {
-  orderId: number
-  storeId: number
-  storeName: string
-  menuSummary?: string
-  /** 명세: READY | PAID | COMPLETED */
-  orderStatus?: string
-  paymentStatus?: string
-  pickupCompleted?: boolean
-  createdAt?: string
-}
-
-/** 픽업 대기 중인 주문 — orderStatus PAID(명세) 또는 로컬 paymentStatus PAID */
-function isPickupPending(o: LocalOrderRow): boolean {
-  if (o.pickupCompleted || o.orderStatus === 'COMPLETED') return false
-  if (o.orderStatus === 'PAID') return true
-  return o.paymentStatus === 'PAID'
-}
-
-const fallbackOrder = {
+const emptyDisplay = {
   orderNumber: '—',
   pickupTime: '—',
   menuName: '주문 정보 없음',
-  storeId: FEATURED_RESTAURANTS[0].id,
-  storeName: FEATURED_RESTAURANTS[0].title,
-  storeAddress: '서울 강남구 테헤란로 123 (데모)',
-  distance: '지도·경로 탭',
-  estimatedTime: '에서 확인',
+  storeId: 0,
+  storeName: '—',
+  storeAddress: '—',
+  distance: '',
+  estimatedTime: '',
 }
 
-function readLocalOrders(): LocalOrderRow[] {
+function readLocalOrders(): OrderContextRow[] {
   try {
     const raw = window.localStorage.getItem(LOCAL_ORDERS_KEY)
     const arr = raw ? (JSON.parse(raw) as unknown) : []
-    return Array.isArray(arr) ? (arr as LocalOrderRow[]) : []
+    return Array.isArray(arr) ? (arr as OrderContextRow[]) : []
   } catch {
     return []
-  }
-}
-
-function getActivePaidOrderFromLocal(): LocalOrderRow | null {
-  const paid = readLocalOrders().filter((o) => o?.orderId && isPickupPending(o))
-  return paid[0] ?? null
-}
-
-async function resolveActivePaidOrder(): Promise<LocalOrderRow | null> {
-  const local = getActivePaidOrderFromLocal()
-  if (local) return local
-  if (!getAccessToken()) return null
-  try {
-    const list = await getMyOrders()
-    const paid = Array.isArray(list) ? list.find((o) => o.orderStatus === 'PAID') : undefined
-    if (!paid) return null
-    const localMatch = readLocalOrders().find((lo) => lo.orderId === paid.orderId)
-    return {
-      orderId: paid.orderId,
-      storeId: paid.storeId ?? localMatch?.storeId ?? FEATURED_RESTAURANTS[0].id,
-      storeName: paid.storeName,
-      menuSummary: localMatch?.menuSummary ?? paid.orderNo,
-      orderStatus: 'PAID',
-      paymentStatus: paid.paymentStatus ?? 'PAID',
-      createdAt: localMatch?.createdAt ?? paid.orderedAt,
-    }
-  } catch {
-    return null
   }
 }
 
@@ -155,10 +113,11 @@ function OrderStatusPage({
   onNotificationsClick: _onNotificationsClick,
   onReviewWriteClick,
   onPickupComplete,
+  activeOrder = null,
+  pickupDestination = null,
+  pickupContextLoading = false,
   cartCount = 0,
 }: OrderStatusPageProps) {
-  const [activeOrder, setActiveOrder] = useState<LocalOrderRow | null>(null)
-  const [orderResolving, setOrderResolving] = useState(true)
   const [orderStep, setOrderStep] = useState<OrderStep>('cooking')
   const [rewardModalOpen, setRewardModalOpen] = useState(false)
   const [rewardModalLoading, setRewardModalLoading] = useState(false)
@@ -170,32 +129,24 @@ function OrderStatusPage({
   )
 
   useEffect(() => {
-    let cancelled = false
-    setOrderResolving(true)
-    void resolveActivePaidOrder().then((order) => {
-      if (!cancelled) {
-        setActiveOrder(order)
-        setOrderResolving(false)
-      }
-    })
-    return () => {
-      cancelled = true
+    if (activeOrder?.pickupCompleted || activeOrder?.orderStatus === 'COMPLETED') {
+      setOrderStep('completed')
     }
-  }, [])
+  }, [activeOrder])
 
   const display = useMemo(() => {
-    if (!activeOrder) return fallbackOrder
+    if (!activeOrder) return emptyDisplay
     return {
       orderNumber: formatOrderNumber(activeOrder.orderId),
       pickupTime: formatPickupTime(activeOrder.createdAt),
       menuName: activeOrder.menuSummary?.trim() || '주문',
       storeId: activeOrder.storeId,
       storeName: activeOrder.storeName,
-      storeAddress: fallbackOrder.storeAddress,
-      distance: fallbackOrder.distance,
-      estimatedTime: fallbackOrder.estimatedTime,
+      storeAddress: pickupDestination?.address?.trim() || '주소 정보 없음',
+      distance: '',
+      estimatedTime: '',
     }
-  }, [activeOrder])
+  }, [activeOrder, pickupDestination])
 
   const reviewPayload = useMemo((): ReviewWritePayload => {
     if (activeOrder) {
@@ -230,10 +181,8 @@ function OrderStatusPage({
 
   const currentStepIndex = steps.findIndex((s) => s.key === orderStep)
 
-  const pickupStore =
-    FEATURED_RESTAURANTS.find((r) => r.id === display.storeId) ?? FEATURED_RESTAURANTS[0]
-  const storeMapLat = pickupStore.lat
-  const storeMapLng = pickupStore.lng
+  const storeMapLat = pickupDestination?.lat
+  const storeMapLng = pickupDestination?.lng
 
   const completePickup = () => {
     const order = activeOrder ?? getActivePaidOrderFromLocal()
@@ -253,7 +202,6 @@ function OrderStatusPage({
       .then((rewardBefore) => completeOrderPickup(order.orderId).then(() => rewardBefore))
       .then(async (rewardBefore) => {
         markLocalOrderPickupCompleted(order.orderId)
-        setActiveOrder(null)
         setOrderStep('completed')
         setPickupRewards(null)
         setRewardModalLoading(true)
@@ -374,7 +322,7 @@ function OrderStatusPage({
               </span>
             </div>
             <h2 className={styles.orderTitle}>{display.menuName}</h2>
-            {!orderResolving && !activeOrder && orderStep !== 'completed' && (
+            {!pickupContextLoading && !activeOrder && orderStep !== 'completed' && (
               <p className={styles.pickupDoneHint} style={{ color: 'rgb(107 114 128)', marginTop: '0.5rem' }}>
                 결제 완료(PAID) 주문이 없습니다. 장바구니에서 결제 후 다시 시도해 주세요.
               </p>
@@ -443,7 +391,7 @@ function OrderStatusPage({
                   type="button"
                   className={styles.pickupDoneButton}
                   onClick={completePickup}
-                  disabled={pickupSubmitting || orderResolving || !activeOrder}
+                  disabled={pickupSubmitting || pickupContextLoading || !activeOrder}
                 >
                   <span className="material-symbols-outlined">verified</span>
                   {pickupSubmitting ? '처리 중…' : '매장에서 픽업을 완료했어요'}

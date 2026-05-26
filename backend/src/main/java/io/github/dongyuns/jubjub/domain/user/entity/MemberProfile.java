@@ -34,7 +34,7 @@ public class MemberProfile extends BaseTimeEntity {
     // [리워드 지갑 영역] - 초기값 설정
     // ==========================================
     @Convert(converter = RewardTierConverter.class)
-    @Column(nullable = false, columnDefinition = "INT DEFAULT 1")
+    @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
     private RewardTier tier = RewardTier.BRONZE;  // 기본 등급은 브론즈
 
     private int pointBalance = 0;         // 포인트 잔액

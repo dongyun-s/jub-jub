@@ -3,6 +3,7 @@ package io.github.dongyuns.jubjub.domain.ordertracking.service;
 import io.github.dongyuns.jubjub.domain.ordertracking.entity.OrderTracking;
 import io.github.dongyuns.jubjub.domain.ordertracking.entity.OrderTrackingStatus;
 import io.github.dongyuns.jubjub.domain.ordertracking.repository.OrderTrackingRepository;
+import io.github.dongyuns.jubjub.domain.user.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.payment.domain.Order;
 import io.github.dongyuns.jubjub.payment.domain.OrderStatus;
 import jakarta.persistence.EntityManager;
@@ -22,6 +23,7 @@ public class OrderTrackingLifecycleService {
     private final OrderTrackingRepository orderTrackingRepository;
     private final OrderTrackingSmsService orderTrackingSmsService;
     private final OrderTrackingNotificationService orderTrackingNotificationService;
+    private final MemberProfileRepository memberProfileRepository;
 
     @Transactional
     public OrderTracking ensureTracking(Order order) {
@@ -59,8 +61,10 @@ public class OrderTrackingLifecycleService {
 
         orderTrackingNotificationService.createIfNeeded(order, tracking);
         if (tracking.getStatus() == OrderTrackingStatus.READY_FOR_PICKUP) {
+            String phone = memberProfileRepository.findPhoneById(order.getMemberProfileId())
+                    .orElseThrow(() -> new IllegalArgumentException("주문 회원의 전화번호를 찾을 수 없습니다."));
             orderTrackingSmsService.send(
-                    order.getMemberProfile().getPhone(),
+                    phone,
                     buildMessage(order, tracking)
             );
         }

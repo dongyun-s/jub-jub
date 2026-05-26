@@ -1,19 +1,26 @@
 /**
- * NotificationsPage.tsx
- * 주문·픽업 알림 — GET /order-tracking/notifications, POST .../read-all
+ * NotificationsPage.tsx — 통합 알림
+ * - 카드 본문 탭: 읽음 처리
+ * - 핑크 안내 문구 탭: 해당 화면으로 이동
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import {
-  fetchOrderNotifications,
-  postOrderNotificationsReadAll,
-  type OrderNotificationItem,
-} from '../../api/orderNotifications'
+  notificationTypeLabel,
+  useUnifiedNotifications,
+} from '../../hooks/useUnifiedNotifications'
+import type { UnifiedNotificationItem } from '../../api/notifications'
 import { getAccessToken } from '../../lib/authStorage'
+import {
+  notificationNavigateHint,
+  resolveNotificationTarget,
+  type NotificationNavigateTarget,
+} from '../../lib/notificationNavigation'
 import { notifyNotificationsUpdated } from '../../hooks/useUnreadNotificationCount'
+import { notifyReviewNotificationsUpdated } from '../../hooks/useUnreadReviewNotificationCount'
 
 function formatNotifyTime(isoOrRaw: string): string {
   if (!isoOrRaw.trim()) return ''
@@ -36,6 +43,7 @@ interface NotificationsPageProps {
   onOrdersClick?: () => void
   onMapClick?: () => void
   onMypageClick?: () => void
+  onNavigate?: (target: NotificationNavigateTarget) => void
   cartCount?: number
 }
 
@@ -46,67 +54,63 @@ function NotificationsPage({
   onOrdersClick,
   onMapClick,
   onMypageClick,
+  onNavigate,
   cartCount = 0,
 }: NotificationsPageProps) {
-  const [items, setItems] = useState<OrderNotificationItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    if (!getAccessToken()) {
-      setItems([])
-      setError(null)
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    try {
-      const data = await fetchOrderNotifications()
-      setItems(data.notifications)
-      setError(null)
-      notifyNotificationsUpdated()
-    } catch {
-      setError('알림을 불러오지 못했습니다.')
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const {
+    items,
+    unreadCount,
+    loading,
+    error,
+    isMock,
+    load,
+    markAsRead,
+    markAllRead,
+  } = useUnifiedNotifications()
 
   useEffect(() => {
+    if (!getAccessToken()) return
     void load()
   }, [load])
 
   useEffect(() => {
     const onFocus = () => {
-      void load()
+      if (getAccessToken()) void load()
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [load])
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.read).length, [items])
-
-  /** 명세상 단건 읽음 API 없음 — 화면에서만 읽음 표시(새로고침 시 서버 상태로 덮임). 모두 읽음은 서버 반영. */
-  const markAsRead = (id: string) => {
-    setItems((prev) =>
-      prev.map((n) => (n.id === id && !n.read ? { ...n, read: true } : n)),
-    )
+  const bumpBadge = () => {
     notifyNotificationsUpdated()
+    notifyReviewNotificationsUpdated()
   }
 
-  const markAllRead = async () => {
-    if (!getAccessToken() || unreadCount === 0) return
-    setBusy(true)
+  const handleMarkReadOnly = (item: UnifiedNotificationItem) => {
+    if (item.read) return
+    void markAsRead(item).then(bumpBadge).catch(() => {
+      /* hook sets error */
+    })
+  }
+
+  const handleNavigateOnly = (item: UnifiedNotificationItem) => {
+    if (!onNavigate) return
+    void (async () => {
+      try {
+        const target = await resolveNotificationTarget(item)
+        onNavigate(target)
+      } catch {
+        /* ignore */
+      }
+    })()
+  }
+
+  const handleMarkAllRead = async () => {
     try {
-      await postOrderNotificationsReadAll()
-      await load()
-      notifyNotificationsUpdated()
+      await markAllRead()
+      bumpBadge()
     } catch {
-      setError('모두 읽음 처리에 실패했습니다.')
-    } finally {
-      setBusy(false)
+      /* hook sets error */
     }
   }
 
@@ -124,8 +128,8 @@ function NotificationsPage({
           </p>
           <button
             type="button"
-            onClick={() => void markAllRead()}
-            disabled={loggedOut || loading || busy || unreadCount === 0}
+            onClick={() => void handleMarkAllRead()}
+            disabled={loggedOut || loading || unreadCount === 0}
             className="text-xs font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 disabled:pointer-events-none"
           >
             모두 읽음
@@ -134,7 +138,7 @@ function NotificationsPage({
 
         {loggedOut && (
           <div className="py-12 text-center text-sm text-slate-600">
-            로그인 후 주문·픽업 알림을 확인할 수 있습니다.
+            로그인 후 주문·리뷰·쿠폰 알림을 확인할 수 있습니다.
           </div>
         )}
 
@@ -157,30 +161,73 @@ function NotificationsPage({
 
         {!loggedOut && !loading && items.length > 0 && (
           <div className="space-y-3">
-            {items.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => markAsRead(n.id)}
-                className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
-                  n.read ? 'bg-white border-slate-200' : 'bg-amber-50 border-amber-200'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+            {items.map((n) => {
+              const hint = notificationNavigateHint(n)
+              const canGo = Boolean(onNavigate && hint)
+
+              return (
+                <article
+                  key={n.id}
+                  className={`rounded-2xl border overflow-hidden ${
+                    n.read ? 'bg-white border-slate-200' : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleMarkReadOnly(n)}
+                    disabled={n.read}
+                    className={`w-full text-left px-4 py-3 transition ${
+                      n.read ? 'cursor-default' : 'hover:bg-black/[0.02] active:bg-black/[0.04]'
+                    }`}
+                    aria-label={n.read ? `${n.title}, 읽음` : `${n.title}, 탭하여 읽음 처리`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        {notificationTypeLabel(n.type)}
+                      </span>
+                      {!n.read && (
+                        <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                      )}
+                    </div>
                     <p className="text-sm font-bold text-slate-900">{n.title}</p>
                     {n.body ? (
                       <p className="mt-1 text-xs text-slate-600 leading-5">{n.body}</p>
                     ) : null}
-                  </div>
-                  {!n.read && (
-                    <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    {n.couponAmount != null && n.couponAmount > 0 && (
+                      <p className="mt-1 text-xs font-semibold text-amber-800">
+                        {n.couponAmount.toLocaleString('ko-KR')}원
+                      </p>
+                    )}
+                    <p className="mt-2 text-[11px] text-slate-500">{formatNotifyTime(n.createdAt)}</p>
+                  </button>
+
+                  {canGo && (
+                    <div className="px-4 pb-3 pt-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleNavigateOnly(n)
+                        }}
+                        className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary"
+                      >
+                        {hint}
+                        <span className="material-symbols-outlined text-base" aria-hidden>
+                          chevron_right
+                        </span>
+                      </button>
+                    </div>
                   )}
-                </div>
-                <p className="mt-2 text-[11px] text-slate-500">{formatNotifyTime(n.createdAt)}</p>
-              </button>
-            ))}
+                </article>
+              )
+            })}
           </div>
+        )}
+
+        {!loggedOut && isMock && !loading && (
+          <p className="mt-6 text-center text-[11px] text-slate-400">
+            API 연동 시 .env 에 VITE_LIVE_API_NOTIFICATIONS=true
+          </p>
         )}
       </div>
 

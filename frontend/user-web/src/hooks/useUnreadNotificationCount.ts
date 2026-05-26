@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchOrderNotifications } from '../api/orderNotifications'
+import { fetchUnifiedNotifications } from '../api/notifications'
 import { getAccessToken } from '../lib/authStorage'
+import { LIVE_API } from '../lib/liveApi'
+import { getMockUnifiedNotifications } from '../lib/mocks/notifications'
 
-/** 주문·픽업 알림 미읽음 개수 (헤더 배지용) */
+/** 통합 알림 미읽음 개수 (헤더 배지용) */
 export function useUnreadNotificationCount() {
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -12,8 +14,12 @@ export function useUnreadNotificationCount() {
       return
     }
     try {
-      const data = await fetchOrderNotifications()
-      setUnreadCount(Math.max(0, data.unreadCount))
+      if (LIVE_API.notifications) {
+        const data = await fetchUnifiedNotifications()
+        setUnreadCount(Math.max(0, data.unreadCount))
+      } else {
+        setUnreadCount(getMockUnifiedNotifications().unreadCount)
+      }
     } catch {
       setUnreadCount(0)
     }
