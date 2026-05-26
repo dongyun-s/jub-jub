@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "장바구니")
+@Table(name = "carts")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -19,26 +19,26 @@ public class Cart {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "장바구니번호")
+    @Column(name = "cart_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "고객프로필번호", nullable = false)
+    @JoinColumn(name = "member_profile_id", nullable = false)
     private MemberProfile memberProfile;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "매장번호", nullable = false)
+    @JoinColumn(name = "store_id", nullable = false)
     private Store store;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "메뉴번호", nullable = false)
+    @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;
 
-    @Column(name = "수량", nullable = false)
+    @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
     // 🌟 우리가 추가한 메뉴별 요청사항!
-    @Column(name = "요청사항", length = 500)
+    @Column(name = "request_memo", length = 500)
     private String requestMemo;
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
