@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardTier; // 등급 Enum 임포트
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardTierConverter;
 import io.github.dongyuns.jubjub.global.common.BaseTimeEntity; //  공통 시간 엔티티 임포트
+import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -111,5 +112,31 @@ public class MemberProfile extends BaseTimeEntity {
         if (this.tier != calculatedTier) {
             this.tier = calculatedTier;
         }
+    }
+
+    // 탈퇴 여부 및 탈퇴 요청 일시
+    @Column(nullable = false)
+    private boolean isDeleted = false;
+
+    private LocalDateTime deletedAt;
+
+    // Soft Delete 메서드
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now(); // 탈퇴를 요청한 현재 시간 기록
+    }
+
+    // 30일 후 개인정보 파기 (익명화) 메서드
+    public void anonymize() {
+        this.name = "탈퇴회원";
+        this.phone = "00000000000"; // 전화번호 무효화
+        this.nickname = "알수없음";
+        this.pushAgree = false;
+    }
+
+    // 프로필 복구 (탈퇴 취소)
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null; // 탈퇴 요청 시간도 싹 지워줍니다!
     }
 }

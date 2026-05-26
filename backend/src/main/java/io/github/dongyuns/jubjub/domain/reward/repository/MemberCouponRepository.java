@@ -23,4 +23,7 @@ public interface MemberCouponRepository extends JpaRepository<MemberCoupon, Long
     @Query("UPDATE MemberCoupon mc SET mc.isExpired = true " +
             "WHERE mc.expiredAt < :now AND mc.isUsed = false AND mc.isExpired = false")
     int expireExpiredCoupons(@Param("now") LocalDateTime now);
+
+    // 탈퇴 시 회원의 쿠폰 내역 싹 지우기
+    void deleteAllByMemberProfileId(Long memberProfileId);
 }
