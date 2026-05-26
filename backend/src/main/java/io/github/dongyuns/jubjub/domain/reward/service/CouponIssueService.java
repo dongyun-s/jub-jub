@@ -2,6 +2,7 @@ package io.github.dongyuns.jubjub.domain.reward.service;
 
 import io.github.dongyuns.jubjub.domain.reward.entity.CouponPolicy;
 import io.github.dongyuns.jubjub.domain.reward.entity.MemberCoupon;
+import io.github.dongyuns.jubjub.domain.couponnotification.service.CouponNotificationService;
 import io.github.dongyuns.jubjub.domain.reward.repository.CouponPolicyRepository;
 import io.github.dongyuns.jubjub.domain.reward.repository.MemberCouponRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class CouponIssueService {
 
     private final CouponPolicyRepository couponPolicyRepository;
     private final MemberCouponRepository memberCouponRepository;
+    private final CouponNotificationService couponNotificationService;
 
     /**
      * 기본 쿠폰 발급 로직 (용기 지참, 거리 보상 등에서 호출)
@@ -39,7 +41,8 @@ public class CouponIssueService {
                 .expiredAt(expiredAt)
                 .build();
 
-        memberCouponRepository.save(memberCoupon);
+        MemberCoupon savedMemberCoupon = memberCouponRepository.save(memberCoupon);
+        couponNotificationService.createIssuedNotification(savedMemberCoupon, policy);
         log.info("✅ 쿠폰 발급 완료: 유저 ID = {}, 쿠폰명 = {}", memberProfileId, policy.getName());
     }
 

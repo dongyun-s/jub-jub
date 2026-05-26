@@ -1,6 +1,9 @@
 package io.github.dongyuns.jubjub.domain.notification.service;
 
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
+import io.github.dongyuns.jubjub.domain.couponnotification.dto.CouponNotificationItemResponse;
+import io.github.dongyuns.jubjub.domain.couponnotification.dto.CouponNotificationListResponse;
+import io.github.dongyuns.jubjub.domain.couponnotification.service.CouponNotificationService;
 import io.github.dongyuns.jubjub.domain.notification.dto.NotificationItemResponse;
 import io.github.dongyuns.jubjub.domain.notification.dto.NotificationListResponse;
 import io.github.dongyuns.jubjub.domain.notification.dto.NotificationType;
@@ -23,6 +26,7 @@ public class NotificationService {
 
     private final OrderTrackingNotificationService orderTrackingNotificationService;
     private final ReviewNotificationService reviewNotificationService;
+    private final CouponNotificationService couponNotificationService;
 
     @Transactional(readOnly = true)
     public NotificationListResponse getMyNotifications(String accountEmail) {
@@ -30,6 +34,8 @@ public class NotificationService {
                 orderTrackingNotificationService.getMyNotifications(accountEmail);
         ReviewNotificationListResponse reviewNotifications =
                 reviewNotificationService.getMyNotifications(accountEmail);
+        CouponNotificationListResponse couponNotifications =
+                couponNotificationService.getMyNotifications(accountEmail);
 
         List<NotificationItemResponse> merged = orderTrackingNotifications.notifications().stream()
                 .map(this::fromOrderTracking)
@@ -40,11 +46,18 @@ public class NotificationService {
                         .map(this::fromReviewRequest)
                         .toList()
         );
+        merged.addAll(
+                couponNotifications.notifications().stream()
+                        .map(this::fromCouponIssued)
+                        .toList()
+        );
 
         merged.sort(Comparator.comparing(NotificationItemResponse::createdAt).reversed());
 
         return new NotificationListResponse(
-                orderTrackingNotifications.unreadCount() + reviewNotifications.unreadCount(),
+                orderTrackingNotifications.unreadCount()
+                        + reviewNotifications.unreadCount()
+                        + couponNotifications.unreadCount(),
                 merged
         );
     }
@@ -53,6 +66,7 @@ public class NotificationService {
     public void markAllAsRead(String accountEmail) {
         orderTrackingNotificationService.markAllAsRead(accountEmail);
         reviewNotificationService.markAllAsRead(accountEmail);
+        couponNotificationService.markAllAsRead(accountEmail);
     }
 
     @Transactional
@@ -60,7 +74,19 @@ public class NotificationService {
         switch (type) {
             case ORDER_TRACKING -> orderTrackingNotificationService.markAsRead(accountEmail, notificationId);
             case REVIEW_REQUEST -> reviewNotificationService.markAsRead(accountEmail, notificationId);
+            case COUPON_ISSUED -> couponNotificationService.markAsRead(accountEmail, notificationId);
             default -> throw new BusinessException("UNSUPPORTED_NOTIFICATION_TYPE", "지원하지 않는 알림 타입입니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Transactional
+    public void markAsRead(String accountEmail, Long notificationId) {
+        boolean updated = orderTrackingNotificationService.markAsReadIfExists(accountEmail, notificationId);
+        updated = reviewNotificationService.markAsReadIfExists(accountEmail, notificationId) || updated;
+        updated = couponNotificationService.markAsReadIfExists(accountEmail, notificationId) || updated;
+
+        if (!updated) {
+            throw new BusinessException("NOTIFICATION_NOT_FOUND", "알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
         }
     }
 
@@ -83,6 +109,19 @@ public class NotificationService {
                 notification.notificationId(),
                 notification.orderId(),
                 notification.storeId(),
+                notification.title(),
+                notification.message(),
+                notification.read(),
+                notification.createdAt()
+        );
+    }
+
+    private NotificationItemResponse fromCouponIssued(CouponNotificationItemResponse notification) {
+        return new NotificationItemResponse(
+                NotificationType.COUPON_ISSUED,
+                notification.notificationId(),
+                null,
+                null,
                 notification.title(),
                 notification.message(),
                 notification.read(),

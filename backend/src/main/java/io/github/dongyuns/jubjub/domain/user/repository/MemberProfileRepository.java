@@ -2,8 +2,10 @@ package io.github.dongyuns.jubjub.domain.user.repository;
 
 import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.user.entity.MemberProfile;
-import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface MemberProfileRepository extends JpaRepository<MemberProfile, Long> {
     // Account 엔티티를 이용해 프로필을 찾는 쿼리 메서드
@@ -11,4 +13,10 @@ public interface MemberProfileRepository extends JpaRepository<MemberProfile, Lo
     Optional<MemberProfile> findByAccountEmail(String email);
     // 🌟 이름과 휴대폰 번호로 프로필 찾기
     Optional<MemberProfile> findByNameAndPhone(String name, String phone);
+
+    @Query("select mp.id from MemberProfile mp where mp.account.email = :email")
+    Optional<Long> findIdByAccountEmail(@Param("email") String email);
+
+    @Query("select mp.phone from MemberProfile mp where mp.id = :id")
+    Optional<String> findPhoneById(@Param("id") Long id);
 }

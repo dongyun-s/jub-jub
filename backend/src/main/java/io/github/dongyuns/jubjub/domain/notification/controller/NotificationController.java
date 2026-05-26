@@ -36,4 +36,12 @@ public class NotificationController {
     ) {
         notificationService.markAsRead(authentication != null ? authentication.getName() : null, type, notificationId);
     }
+
+    @PostMapping("/{notificationId}/read")
+    public void markAsRead(
+            Authentication authentication,
+            @PathVariable Long notificationId
+    ) {
+        notificationService.markAsRead(authentication != null ? authentication.getName() : null, notificationId);
+    }
 }
