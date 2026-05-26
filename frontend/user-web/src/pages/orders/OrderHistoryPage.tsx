@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
-import { FEATURED_RESTAURANTS } from '../../constants'
 import {
   formatOrderMenuSummary,
   formatPickupDistance,
@@ -21,6 +20,9 @@ import { fetchStores } from '../../api/store'
 import { ApiError } from '../../api/authClient'
 import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
 import { useProfile } from '../../hooks/useProfile'
+import type { PickupDestination } from '../../hooks/useActivePickup'
+import type { OrderContextRow } from '../../lib/orderResolve'
+import { storeCardImage } from '../../lib/storeGeo'
 import styles from './OrderHistoryPage.module.css'
 
 interface OrderHistoryPageProps {
@@ -35,6 +37,8 @@ interface OrderHistoryPageProps {
   /** 리뷰 쓰기 클릭 시 주문·매장 정보 전달 후 리뷰 작성 페이지로 이동 */
   onReviewWriteClick?: (payload: ReviewWritePayload) => void
   hasActiveOrder?: boolean
+  activeOrder?: OrderContextRow | null
+  pickupDestination?: PickupDestination | null
   cartCount?: number
 }
 
@@ -64,14 +68,17 @@ function dedupeOrdersById(items: OrderItem[]): OrderItem[] {
   return out
 }
 
-/** 매장명만 알 때 서버 storeId 추정 (데모·구버전 주문 API 호환) */
-function resolveStoreIdFromFeatured(storeName: string): number {
-  const hit = FEATURED_RESTAURANTS.find(
-    (r) =>
-      storeName.includes(r.title) ||
-      r.title.includes(storeName.trim().slice(0, Math.min(6, storeName.trim().length)))
-  )
-  return hit?.id ?? FEATURED_RESTAURANTS[0].id
+type LocalOrder = {
+  orderId: number
+  storeId: number
+  storeName: string
+  menuSummary: string
+  finalAmount?: number
+  totalAmount?: number
+  image?: string | null
+  createdAt: string
+  paymentStatus?: string
+  paidAt?: string | null
 }
 
 /**
@@ -79,7 +86,6 @@ function resolveStoreIdFromFeatured(storeName: string): number {
  * 1) 응답에 storeId가 있으면 사용
  * 2) 결제 시 저장한 `__jubjub_local_orders` 행과 orderId로 매칭
  * 3) GET /api/v1/stores 목록에서 매장명 정확 일치
- * 4) 마지막으로 데모용 FEATURED 추정
  */
 function resolveStoreIdForServerOrder(
   o: MyOrderItem,
@@ -97,89 +103,8 @@ function resolveStoreIdForServerOrder(
   if (key && storeNameToId[key] != null) {
     return storeNameToId[key]
   }
-  return resolveStoreIdFromFeatured(o.storeName)
+  return 0
 }
-
-type LocalOrder = {
-  orderId: number
-  storeId: number
-  storeName: string
-  menuSummary: string
-  finalAmount?: number
-  totalAmount?: number
-  image?: string | null
-  createdAt: string
-  paymentStatus?: string
-  paidAt?: string | null
-}
-
-/** 최근 주문 목록 (데모) */
-const recentOrders: OrderItem[] = [
-  {
-    id: 1,
-    storeId: resolveStoreIdFromFeatured('스타벅스 강남점'),
-    storeName: '스타벅스 강남점',
-    date: '2023.10.25',
-    menu: '아이스 아메리카노 외 1건',
-    price: 12500,
-    xp: 50,
-    distance: '1.2km',
-    image: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop',
-    status: 'completed',
-  },
-  {
-    id: 2,
-    storeId: resolveStoreIdFromFeatured('도미노피자 역삼점'),
-    storeName: '도미노피자 역삼점',
-    date: '2023.10.22',
-    menu: '페퍼로니 피자 L',
-    price: 24900,
-    xp: 120,
-    distance: '2.5km',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-    status: 'reviewed',
-  },
-  {
-    id: 3,
-    storeId: resolveStoreIdFromFeatured('쉑쉑버거 신논현'),
-    storeName: '쉑쉑버거 신논현',
-    date: '2023.10.18',
-    menu: '쉑버거 싱글 세트',
-    price: 14900,
-    xp: 65,
-    distance: '0.8km',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop',
-    status: 'completed',
-  },
-]
-
-/** 과거 주문 목록 (데모) */
-const pastOrders: OrderItem[] = [
-  {
-    id: 4,
-    storeId: resolveStoreIdFromFeatured('맥도날드 강남역점'),
-    storeName: '맥도날드 강남역점',
-    date: '2023.09.15',
-    menu: '빅맥 세트',
-    price: 8900,
-    xp: 40,
-    distance: '0.5km',
-    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=200&h=200&fit=crop',
-    status: 'reviewed',
-  },
-  {
-    id: 5,
-    storeId: resolveStoreIdFromFeatured('서브웨이 역삼점'),
-    storeName: '서브웨이 역삼점',
-    date: '2023.09.10',
-    menu: 'BLT 세트',
-    price: 9500,
-    xp: 45,
-    distance: '1.0km',
-    image: 'https://images.unsplash.com/photo-1509722747041-616f39b57569?w=200&h=200&fit=crop',
-    status: 'reviewed',
-  },
-]
 
 function applyReviewedStatus(orders: OrderItem[], reviewedOrderIds: Set<number>): OrderItem[] {
   return orders.map((o) =>
@@ -199,7 +124,21 @@ function sortOrdersByDateDesc(items: OrderItem[]): OrderItem[] {
   return [...items].sort((a, b) => parseOrderDisplayDate(b.date) - parseOrderDisplayDate(a.date))
 }
 
-function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatusClick, onMapClick, onMypageClick, onFavoritesClick, onNotificationsClick, onReviewWriteClick, hasActiveOrder, cartCount = 0 }: OrderHistoryPageProps) {
+function OrderHistoryPage({
+  onBack: _onBack,
+  onGoHome,
+  onCartClick,
+  onOrderStatusClick,
+  onMapClick,
+  onMypageClick,
+  onFavoritesClick,
+  onNotificationsClick,
+  onReviewWriteClick,
+  hasActiveOrder,
+  activeOrder,
+  pickupDestination,
+  cartCount = 0,
+}: OrderHistoryPageProps) {
   const { profile } = useProfile()
   const [activeTab, setActiveTab] = useState<'recent' | 'past'>('recent')
   const [myOrdersApi, setMyOrdersApi] = useState<MyOrderItem[]>([])
@@ -210,6 +149,11 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<number>>(() => new Set())
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
+
+  const activeOrderTitle =
+    activeOrder?.storeName?.trim() || pickupDestination?.name?.trim() || '진행 중인 주문'
+  const activeOrderSubtitle =
+    activeOrder?.menuSummary?.trim() || '주문 현황에서 단계를 확인하세요.'
 
   useEffect(() => {
     setMyOrdersLoading(true)
@@ -274,7 +218,7 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
         }
         setStoreNameToId(m)
       } catch {
-        /* 매장 목록 실패 시에도 주문 목록은 표시 — storeId는 로컬/추정만 사용 */
+        /* 매장 목록 실패 시에도 주문 목록은 표시 */
       }
     })()
   }, [])
@@ -290,21 +234,22 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
     }
 
     return dedupeOrdersById(
-      myOrdersApi.map((o) => ({
-      id: o.orderId,
-      storeId: resolveStoreIdForServerOrder(o, localOrders, storeNameToId),
-      storeName: o.storeName,
-      date: formatDate(o.orderedAt),
-      menu: formatOrderMenuSummary(o),
-      price: o.finalAmount,
-      xp: 0,
-      distance: formatPickupDistance(o.pickupDistanceMeters),
-      image:
-        FEATURED_RESTAURANTS.find((r) => r.title === o.storeName)?.image ||
-        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
-      status: 'completed',
-      orderStatus: o.orderStatus,
-    })),
+      myOrdersApi.map((o) => {
+        const storeId = resolveStoreIdForServerOrder(o, localOrders, storeNameToId)
+        return {
+          id: o.orderId,
+          storeId,
+          storeName: o.storeName,
+          date: formatDate(o.orderedAt),
+          menu: formatOrderMenuSummary(o),
+          price: o.finalAmount,
+          xp: 0,
+          distance: formatPickupDistance(o.pickupDistanceMeters),
+          image: storeId > 0 ? storeCardImage(storeId) : storeCardImage(1),
+          status: 'completed' as const,
+          orderStatus: o.orderStatus,
+        }
+      }),
     )
   }, [myOrdersApi, localOrders, storeNameToId])
 
@@ -320,30 +265,26 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
 
     return dedupeOrdersById(
       localOrders.map((o) => {
-      const img =
-        o.image ||
-        FEATURED_RESTAURANTS.find((r) => r.id === o.storeId)?.image ||
-        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
-      const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
-      const paid = o.paymentStatus === 'PAID'
-      return {
-        id: o.orderId,
-        storeId: o.storeId,
-        storeName: o.storeName,
-        date: formatDate(o.createdAt),
-        menu: o.menuSummary,
-        price,
-        xp: 0,
-        distance: '',
-        image: img,
-        status: paid ? 'completed' : 'completed',
-      }
-    }),
+        const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
+        const paid = o.paymentStatus === 'PAID'
+        return {
+          id: o.orderId,
+          storeId: o.storeId,
+          storeName: o.storeName,
+          date: formatDate(o.createdAt),
+          menu: o.menuSummary,
+          price,
+          xp: 0,
+          distance: '',
+          image: o.image?.trim() || storeCardImage(o.storeId),
+          status: paid ? ('completed' as const) : ('completed' as const),
+        }
+      }),
     )
   }, [localOrders])
 
   const allOrders = useMemo(() => {
-    const base = apiOrders.length ? apiOrders : myOrders.length ? myOrders : recentOrders
+    const base = dedupeOrdersById([...apiOrders, ...myOrders])
     return applyReviewedStatus(base, reviewedOrderIds)
   }, [apiOrders, myOrders, reviewedOrderIds])
 
@@ -367,11 +308,7 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
         o.orderStatus != null &&
         (o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED'),
     )
-    const liveIds = new Set([...reviewedFromLive, ...completedFromLive].map((o) => o.id))
-    const demoPastOnly = pastOrders.filter((p) => !liveIds.has(p.id))
-    return sortOrdersByDateDesc(
-      dedupeOrdersById([...reviewedFromLive, ...completedFromLive, ...demoPastOnly]),
-    )
+    return sortOrdersByDateDesc(dedupeOrdersById([...reviewedFromLive, ...completedFromLive]))
   }, [allOrders])
 
   const orders = activeTab === 'recent' ? recentTabOrders : pastTabOrders
@@ -435,8 +372,8 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
                   <div className={styles.activeOrderStatusRow}>
                     <span className={styles.activeOrderStatusBadge}>진행 중</span>
                   </div>
-                  <p className={styles.activeOrderStoreName}>{FEATURED_RESTAURANTS[0].title}</p>
-                  <p className={styles.activeOrderSubtitle}>주문 현황에서 단계를 확인하세요.</p>
+                  <p className={styles.activeOrderStoreName}>{activeOrderTitle}</p>
+                  <p className={styles.activeOrderSubtitle}>{activeOrderSubtitle}</p>
                 </div>
                 <span className="material-symbols-outlined text-primary">chevron_right</span>
               </button>
@@ -444,6 +381,11 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
           )}
 
           <div className={styles.listWrapper}>
+            {orders.length === 0 && !myOrdersLoading && (
+              <p style={{ padding: '24px 16px', fontSize: 14, color: 'rgb(107 114 128)', textAlign: 'center' }}>
+                {activeTab === 'recent' ? '최근 주문이 없습니다.' : '지난 주문이 없습니다.'}
+              </p>
+            )}
             {orders.map((order) => (
               <div
                 key={order.id}
@@ -492,13 +434,13 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
                   </div>
                 </div>
 
-                {/* 버튼 */}
                 <div className={styles.orderActions}>
-                  <button className={styles.reorderButton}>
+                  <button type="button" className={styles.reorderButton}>
                     다시 주문하기
                   </button>
-                  {order.status === 'completed' && (
-                    <button 
+                  {order.status === 'completed' && order.storeId > 0 && (
+                    <button
+                      type="button"
                       onClick={() =>
                         onReviewWriteClick?.({
                           storeName: order.storeName,
@@ -514,21 +456,9 @@ function OrderHistoryPage({ onBack: _onBack, onGoHome, onCartClick, onOrderStatu
                 </div>
               </div>
             ))}
-
-            {orders.length === 0 && (
-              <div className={styles.emptyState}>
-                <span className={`material-symbols-outlined ${styles.emptyStateIcon}`}>receipt_long</span>
-                <p className={styles.emptyStateText}>
-                  {activeTab === 'recent'
-                    ? '리뷰를 남길 수 있는 최근 주문이 없습니다.'
-                    : '지난 주문 내역이 없습니다.'}
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* 하단 네비게이션 */}
         <BottomNav
           active="orders"
           cartCount={cartCount}

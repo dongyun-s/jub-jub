@@ -20,7 +20,10 @@ import { fetchTmapRoute } from '../../lib/tmap/tmapRouteApi'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
-import { FEATURED_RESTAURANTS } from '../../constants'
+import { STORE_LIST_CARD_IMAGES } from '../../constants'
+import { fetchSortedStores } from '../../api/store'
+import type { PickupDestination } from '../../hooks/useActivePickup'
+import { formatStoreDistanceMeters } from '../../lib/storeUi'
 import styles from './MapPage.module.css'
 
 interface MapPageProps {
@@ -37,6 +40,8 @@ interface MapPageProps {
   onNotificationsClick?: () => void
   /** true면 픽업 경로 뷰, false면 주변 매장 리스트 */
   hasActiveOrder?: boolean
+  pickupDestination?: PickupDestination | null
+  onSelectStore?: (storeId: number) => void
   cartCount?: number
 }
 
@@ -45,58 +50,20 @@ interface Location {
   lng: number
 }
 
-/** 주변 매장 목록 (데모) */
-const nearbyStores = [
-  {
-    id: FEATURED_RESTAURANTS[0].id,
-    name: FEATURED_RESTAURANTS[0].title,
-    category: '피자',
-    distance: '—',
-    rating: FEATURED_RESTAURANTS[0].rating,
-    pickupTime: '15-20분',
-    image: FEATURED_RESTAURANTS[0].image,
-    lat: FEATURED_RESTAURANTS[0].lat ?? 37.4979,
-    lng: FEATURED_RESTAURANTS[0].lng ?? 127.0276,
-  },
-  {
-    id: 2,
-    name: '맘스터치 역삼점',
-    category: '버거',
-    distance: '250m',
-    rating: 4.5,
-    pickupTime: '10-15분',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop',
-    lat: 37.4985,
-    lng: 127.0285,
-  },
-  {
-    id: 3,
-    name: '스타벅스 테헤란로점',
-    category: '카페',
-    distance: '320m',
-    rating: 4.7,
-    pickupTime: '5-10분',
-    image: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop',
-    lat: 37.4990,
-    lng: 127.0290,
-  },
-]
-
-/**
- * 진행 중 주문 픽업 목적지 (hasActiveOrder) — 좌표·이름은 주문 매장과 동일(FEATURED_RESTAURANTS[0])
- */
-const ORDER_PICKUP_RESTAURANT = FEATURED_RESTAURANTS[0]
-
-const destinationData = {
-  storeName: ORDER_PICKUP_RESTAURANT.title,
-  storeImage: ORDER_PICKUP_RESTAURANT.image,
-  storeAddress: '서울 강남구 테헤란로 123 (데모)',
-  lat: ORDER_PICKUP_RESTAURANT.lat ?? 37.4979,
-  lng: ORDER_PICKUP_RESTAURANT.lng ?? 127.0276,
+type NearbyStoreUi = {
+  id: number
+  name: string
+  category: string
+  distance: string
+  rating: number
+  pickupTime: string
+  image: string
+  lat: number
+  lng: number
 }
 
 /** 주변 매장 탭 지도 기본 중심 (위치 권한 전) */
-const MAP_DEFAULT_CENTER = { lat: destinationData.lat, lng: destinationData.lng }
+const MAP_DEFAULT_CENTER = { lat: 37.4979, lng: 127.0276 }
 
 const NEARBY_MAP_ZOOM = 16
 
@@ -609,8 +576,30 @@ function MapPage({
   onFavoritesClick,
   onNotificationsClick,
   hasActiveOrder,
+  pickupDestination = null,
+  onSelectStore,
   cartCount = 0,
 }: MapPageProps) {
+  const destinationData = useMemo(() => {
+    if (pickupDestination) {
+      return {
+        storeName: pickupDestination.name,
+        storeImage: pickupDestination.imageUrl,
+        storeAddress: pickupDestination.address || '주소 정보 없음',
+        lat: pickupDestination.lat,
+        lng: pickupDestination.lng,
+      }
+    }
+    return {
+      storeName: '픽업 매장',
+      storeImage: STORE_LIST_CARD_IMAGES[0],
+      storeAddress: '',
+      lat: MAP_DEFAULT_CENTER.lat,
+      lng: MAP_DEFAULT_CENTER.lng,
+    }
+  }, [pickupDestination])
+
+  const [nearbyStores, setNearbyStores] = useState<NearbyStoreUi[]>([])
   const [transportMode, setTransportMode] = useState<'walk' | 'bike' | 'car'>('walk')
   /** 픽업 탭: Tmap 경로 API 폴리라인·요약 */
   const [pickupRoutePath, setPickupRoutePath] = useState<{ lat: number; lng: number }[] | null>(null)
@@ -839,6 +828,44 @@ function MapPage({
   useEffect(() => {
     getCurrentLocation()
   }, [])
+
+  useEffect(() => {
+    if (hasActiveOrder) {
+      setNearbyStores([])
+      return
+    }
+    const lat = currentLocation?.lat
+    const lng = currentLocation?.lng
+    if (lat == null || lng == null) return
+
+    let cancelled = false
+    void fetchSortedStores({ sortBy: 'DISTANCE', latitude: lat, longitude: lng })
+      .then((list) => {
+        if (cancelled) return
+        setNearbyStores(
+          list
+            .filter((s) => s.latitude != null && s.longitude != null)
+            .slice(0, 20)
+            .map((s) => ({
+              id: s.storeId,
+              name: s.name,
+              category: s.categoryName?.trim() || '매장',
+              distance: formatStoreDistanceMeters(s.distanceMeters) || '—',
+              rating: Math.round(s.averageRating * 10) / 10 || 0,
+              pickupTime: `${s.cookingTimeMinutes}분`,
+              image: STORE_LIST_CARD_IMAGES[Math.abs(s.storeId) % STORE_LIST_CARD_IMAGES.length],
+              lat: s.latitude!,
+              lng: s.longitude!,
+            })),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setNearbyStores([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [hasActiveOrder, currentLocation?.lat, currentLocation?.lng])
 
   /**
    * 단말이 바라보는 방향(진북 기준). — GPS 이동 방향(coords.heading) · 나침반(DeviceOrientation).
@@ -1294,7 +1321,10 @@ function MapPage({
                         <button
                           key={store.id}
                           type="button"
-                          onClick={onStoreClick}
+                          onClick={() => {
+                            if (onSelectStore) onSelectStore(store.id)
+                            else onStoreClick?.()
+                          }}
                           className={styles.storeRow}
                         >
                           <img src={store.image} alt={store.name} className={styles.storeRowImage} />

@@ -73,10 +73,15 @@ function PickupRewardModal({
       </p>
 
       {rewards?.tierUpgraded && rewards.previousTierName && !loading && (
-        <p className={styles.tierUpgradeBanner}>
-          <TierIcon tierName={rewards.tierName} size="sm" glow alt="" />
-          {rewards.previousTierName} → {rewards.tierName} 등급 달성!
-        </p>
+        <div className={styles.tierUpgradeBanner}>
+          <p className={styles.tierUpgradeTitle}>
+            <TierIcon tierName={rewards.tierName} size="sm" glow alt="" />
+            {rewards.previousTierName} → {rewards.tierName} 등급 달성!
+          </p>
+          <p className={styles.tierUpgradeCoupon}>
+            승급 기념 <strong>1,000원 쿠폰</strong>이 쿠폰함에 지급되었어요.
+          </p>
+        </div>
       )}
 
       {loading ? (

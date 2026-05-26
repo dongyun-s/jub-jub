@@ -42,11 +42,7 @@ import {
 import TierIcon from '../../components/TierIcon/TierIcon'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
-import { postReviewNotificationsReadAll } from '../../api/reviewNotifications'
-import {
-  notifyReviewNotificationsUpdated,
-  useUnreadReviewNotificationCount,
-} from '../../hooks/useUnreadReviewNotificationCount'
+import { useUnreadReviewNotificationCount } from '../../hooks/useUnreadReviewNotificationCount'
 import styles from './MyPage.module.css'
 
 interface MyPageProps {
@@ -380,17 +376,7 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
   }, [])
 
   const handleReviewsMenuClick = () => {
-    void (async () => {
-      if (unreadReviewNotificationCount > 0 && getAccessToken()) {
-        try {
-          await postReviewNotificationsReadAll()
-          notifyReviewNotificationsUpdated()
-        } catch {
-          /* 배지는 리뷰 관리 화면 진입 시 한 번 더 시도 */
-        }
-      }
-      onReviewsClick?.()
-    })()
+    onReviewsClick?.()
   }
 
   return (

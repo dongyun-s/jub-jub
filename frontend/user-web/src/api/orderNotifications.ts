@@ -103,3 +103,10 @@ export async function postOrderNotificationsReadAll(): Promise<void> {
     method: 'POST',
   })
 }
+
+/** POST /order-tracking/notifications/{notificationId}/read */
+export async function postOrderNotificationRead(notificationId: number): Promise<void> {
+  await apiFetch<unknown>(`/order-tracking/notifications/${notificationId}/read`, {
+    method: 'POST',
+  })
+}

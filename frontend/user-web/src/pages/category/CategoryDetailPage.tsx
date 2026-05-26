@@ -1,8 +1,6 @@
 /**
  * CategoryDetailPage.tsx
- * 카테고리 상세 페이지 (홈에서 카테고리 클릭 시)
- * - 상단 탭(한식/중식/…), 필터(거리순/평점순/포장할인), 가로 드래그 스크롤, 맛집 카드 리스트
- * - 상단 검색창에서 매장명 검색
+ * 카테고리 상세 — 정렬(기본/거리/평점)은 useStoreList 훅 경유 (API 연동 전 목 데이터)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -12,15 +10,11 @@ import BottomNav from '../../components/BottomNav'
 import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
 import SearchBar from '../../components/SearchBar'
 import { useDragScroll } from '../../hooks'
-import { fetchStores } from '../../api/store'
+import { useStoreList } from '../../hooks/useStoreList'
+import { useUserLocation } from '../../hooks/useUserLocation'
 import type { FeaturedRestaurant } from '../../constants'
-import {
-  CATEGORY_TABS,
-  categoryTabToApiParam,
-  FEATURED_RESTAURANTS,
-  FILTER_OPTIONS,
-} from '../../constants'
-import { mapStoreListItemToFeatured, restaurantMatchesCategoryTab } from '../../lib/storeUi'
+import { CATEGORY_TABS, FILTER_OPTIONS } from '../../constants'
+import { restaurantMatchesCategoryTab } from '../../lib/storeUi'
 import styles from './CategoryDetailPage.module.css'
 
 interface CategoryDetailPageProps {
@@ -48,47 +42,21 @@ function CategoryDetailPage({
   onNotificationsClick,
   cartCount = 0,
 }: CategoryDetailPageProps) {
-  const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
-  const [storesLoading, setStoresLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('전체')
   const [sortOrder, setSortOrder] = useState<'default' | 'distance' | 'rating'>('default')
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const { coords, loading: geoLoading, usedFallback } = useUserLocation()
+  const { restaurants, loading: storesLoading, hint: storeListHint, error: storeListError } = useStoreList({
+    activeTab,
+    sortOrder,
+    coords,
+    geoLoading,
+    usedFallback,
+  })
   const { scrollRef, isDragging, shouldIgnoreClick, handlers } = useDragScroll()
-
-  useEffect(() => {
-    let cancelled = false
-    setStoresLoading(true)
-    void fetchStores(categoryTabToApiParam(activeTab))
-      .then((list) => {
-        if (cancelled) return
-        if (list.length > 0) {
-          setRestaurants(list.map(mapStoreListItemToFeatured))
-        } else if (activeTab === '전체') {
-          setRestaurants(FEATURED_RESTAURANTS)
-        } else {
-          setRestaurants(
-            FEATURED_RESTAURANTS.filter((r) => restaurantMatchesCategoryTab(activeTab, r)),
-          )
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRestaurants(
-            FEATURED_RESTAURANTS.filter((r) => restaurantMatchesCategoryTab(activeTab, r)),
-          )
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setStoresLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [activeTab])
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
-  // 선택된 탭을 중앙으로 스크롤
   const scrollToCenter = useCallback((tab: string) => {
     const container = scrollRef.current
     const button = tabRefs.current.get(tab)
@@ -97,22 +65,23 @@ function CategoryDetailPage({
     const containerWidth = container.offsetWidth
     const buttonLeft = button.offsetLeft
     const buttonWidth = button.offsetWidth
-    const scrollPosition = buttonLeft - (containerWidth / 2) + (buttonWidth / 2)
-    
+    const scrollPosition = buttonLeft - containerWidth / 2 + buttonWidth / 2
+
     container.scrollTo({
       left: scrollPosition,
-      behavior: 'smooth'
+      behavior: 'smooth',
     })
   }, [scrollRef])
 
-  // 탭 선택 핸들러
-  const handleTabClick = useCallback((tab: string) => {
-    if (shouldIgnoreClick()) return
-    setActiveTab(tab)
-    scrollToCenter(tab)
-  }, [shouldIgnoreClick, scrollToCenter])
+  const handleTabClick = useCallback(
+    (tab: string) => {
+      if (shouldIgnoreClick()) return
+      setActiveTab(tab)
+      scrollToCenter(tab)
+    },
+    [shouldIgnoreClick, scrollToCenter],
+  )
 
-  // 홈 검색·카테고리에서 넘어온 값 적용
   useEffect(() => {
     if (typeof window === 'undefined') return
     const q = window.sessionStorage.getItem('categorySearchQuery')
@@ -132,17 +101,12 @@ function CategoryDetailPage({
     const bySearch = !q
       ? restaurants
       : restaurants.filter(
-          (item) =>
+          (item: FeaturedRestaurant) =>
             item.title.toLowerCase().includes(q) ||
             item.hashtags.some((h) => h.toLowerCase().includes(q.replace('#', ''))),
         )
-    const byTab = bySearch.filter((item) => restaurantMatchesCategoryTab(activeTab, item))
-    const sorted = [...byTab]
-    if (sortOrder === 'rating') {
-      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    }
-    return sorted
-  }, [searchQuery, sortOrder, activeTab, restaurants])
+    return bySearch.filter((item) => restaurantMatchesCategoryTab(activeTab, item))
+  }, [searchQuery, activeTab, restaurants])
 
   return (
     <Layout showBackground={false}>
@@ -153,14 +117,12 @@ function CategoryDetailPage({
         onNotificationsClick={onNotificationsClick}
       />
 
-      {/* 검색 영역 - 홈과 동일한 SearchBar 사용 */}
       <SearchBar
         value={searchQuery}
         onChange={setSearchQuery}
         placeholder="공략할 맛집 던전을 검색하세요!"
       />
 
-      {/* 카테고리 탭 - 마우스 드래그 스크롤 */}
       <div className={styles.tabWrapper}>
         <div
           ref={scrollRef}
@@ -171,7 +133,9 @@ function CategoryDetailPage({
           {CATEGORY_TABS.map((tab) => (
             <button
               key={tab}
-              ref={(el) => { if (el) tabRefs.current.set(tab, el) }}
+              ref={(el) => {
+                if (el) tabRefs.current.set(tab, el)
+              }}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => handleTabClick(tab)}
               className={`${styles.tabButton} ${activeTab === tab ? styles.tabButtonActive : styles.tabButtonInactive}`}
@@ -182,7 +146,6 @@ function CategoryDetailPage({
         </div>
       </div>
 
-      {/* 필터 버튼 */}
       <div className={styles.filterRow}>
         <div className={styles.sortDropdown}>
           {FILTER_OPTIONS.map((filter) => (
@@ -240,8 +203,13 @@ function CategoryDetailPage({
         </div>
       </div>
 
-      {/* 맛집 리스트 - 홈과 동일한 FeaturedRestaurantList 사용 */}
       <main className={styles.main}>
+        {storeListError && !storesLoading && (
+          <p className="px-4 pb-2 text-center text-xs text-red-600">{storeListError}</p>
+        )}
+        {storeListHint && !storesLoading && !storeListError && (
+          <p className="px-4 pb-2 text-center text-xs text-slate-500">{storeListHint}</p>
+        )}
         {storesLoading && (
           <p className="px-4 py-6 text-center text-sm text-slate-500">매장을 불러오는 중…</p>
         )}
@@ -256,13 +224,17 @@ function CategoryDetailPage({
         />
       </main>
 
-      <BottomNav active="home" cartCount={cartCount} onNavigate={(page) => {
-        if (page === 'home') onGoHome()
-        if (page === 'cart') onCartClick?.()
-        if (page === 'orders') onOrdersClick?.()
-        if (page === 'map') onMapClick?.()
-        if (page === 'mypage') onMypageClick?.()
-      }} />
+      <BottomNav
+        active="home"
+        cartCount={cartCount}
+        onNavigate={(page) => {
+          if (page === 'home') onGoHome()
+          if (page === 'cart') onCartClick?.()
+          if (page === 'orders') onOrdersClick?.()
+          if (page === 'map') onMapClick?.()
+          if (page === 'mypage') onMypageClick?.()
+        }}
+      />
     </Layout>
   )
 }

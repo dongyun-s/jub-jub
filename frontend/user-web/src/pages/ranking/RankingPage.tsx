@@ -1,17 +1,19 @@
 /**
- * RankingPage.tsx
- * 주간 회원 랭킹 (데모 데이터 — API 연동 전)
+ * RankingPage.tsx — 주간/전체 랭킹 + 내 순위 (API 연동 전: 목 데이터)
  */
 
+import { useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import TierBadge, { getTierThemeForLabel } from '../../components/TierBadge/TierBadge'
 import RankingMemberStats from '../../components/RankingMemberStats/RankingMemberStats'
-import { getWeeklyRankingsByWalkingDistance, type RankingEntry } from '../../constants/ranking'
+import MyRankingCard from '../../components/MyRankingCard/MyRankingCard'
+import type { RankingEntryDto, RankingPeriod } from '../../api/ranking'
+import { useMyRanking } from '../../hooks/useMyRanking'
+import { useRankings } from '../../hooks/useRankings'
 import { TIER_THEMES } from '../../lib/rewardTierTheme'
 import styles from './RankingPage.module.css'
 
-/** 히어로 배너 — 앱 기본(핑크) 그라데이션 고정 */
 const HERO_THEME = TIER_THEMES.default
 
 interface RankingPageProps {
@@ -30,7 +32,7 @@ const rankMedalIcon: Record<number, string> = {
   3: 'military_tech',
 }
 
-function PodiumCard({ entry, elevated }: { entry: RankingEntry; elevated?: boolean }) {
+function PodiumCard({ entry, elevated }: { entry: RankingEntryDto; elevated?: boolean }) {
   const theme = getTierThemeForLabel(entry.tierLabel)
   return (
     <article
@@ -74,7 +76,7 @@ function PodiumCard({ entry, elevated }: { entry: RankingEntry; elevated?: boole
   )
 }
 
-function RankingRow({ entry }: { entry: RankingEntry }) {
+function RankingRow({ entry }: { entry: RankingEntryDto }) {
   const theme = getTierThemeForLabel(entry.tierLabel)
   return (
     <article
@@ -131,12 +133,21 @@ function RankingPage({
   onMypageClick,
   cartCount = 0,
 }: RankingPageProps) {
-  const rankings = getWeeklyRankingsByWalkingDistance()
-  const top3 = rankings.filter((e) => e.rank <= 3)
-  const rest = rankings.filter((e) => e.rank > 3)
+  const [period, setPeriod] = useState<RankingPeriod>('WEEKLY')
+  const { entries, loading, error, isMock } = useRankings(period)
+  const { myRanking, loading: myLoading, isMock: myMock } = useMyRanking(period)
+
+  const top3 = entries.filter((e) => e.rank <= 3)
+  const rest = entries.filter((e) => e.rank > 3)
   const podiumSecond = top3.find((e) => e.rank === 2)
   const podiumFirst = top3.find((e) => e.rank === 1)
   const podiumThird = top3.find((e) => e.rank === 3)
+
+  const heroTitle = period === 'WEEKLY' ? '이번 주 TOP 줍줍러' : '전체 누적 TOP 줍줍러'
+  const heroDesc =
+    period === 'WEEKLY'
+      ? '누적 도보 이동 거리 기준 주간 회원 순위'
+      : '누적 도보 이동 거리 기준 전체 회원 순위'
 
   return (
     <Layout showBackground={false}>
@@ -147,6 +158,29 @@ function RankingPage({
           </button>
           <h1 className={styles.headerTitle}>회원 랭킹</h1>
         </header>
+
+        <div className={styles.periodTabs} role="tablist" aria-label="랭킹 기간">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={period === 'WEEKLY'}
+            className={period === 'WEEKLY' ? styles.periodTabActive : styles.periodTab}
+            onClick={() => setPeriod('WEEKLY')}
+          >
+            주간 랭킹
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={period === 'ALL'}
+            className={period === 'ALL' ? styles.periodTabActive : styles.periodTab}
+            onClick={() => setPeriod('ALL')}
+          >
+            전체 랭킹
+          </button>
+        </div>
+
+        <MyRankingCard data={myRanking} loading={myLoading} isMock={myMock} />
 
         <div className={styles.scrollArea}>
           <section
@@ -162,40 +196,53 @@ function RankingPage({
                 <span className="material-symbols-outlined">leaderboard</span>
               </span>
               <div>
-                <h2 className={styles.heroTitle}>이번 주 TOP 줍줍러</h2>
-                <p className={styles.heroDesc}>누적 도보 이동 거리 기준 주간 회원 순위</p>
+                <h2 className={styles.heroTitle}>{heroTitle}</h2>
+                <p className={styles.heroDesc}>{heroDesc}</p>
               </div>
-              <span className={styles.heroBadge}>WEEKLY</span>
+              <span className={styles.heroBadge}>{period === 'WEEKLY' ? 'WEEKLY' : 'ALL'}</span>
             </div>
           </section>
 
-          <section className={styles.podiumSection} aria-label="상위 3명">
-            <h3 className={styles.sectionLabel}>
-              <span className="material-symbols-outlined">stars</span>
-              명예의 전당
-            </h3>
-            <div className={styles.podium}>
-              {podiumSecond ? <PodiumCard entry={podiumSecond} /> : <div className={styles.podiumSpacer} />}
-              {podiumFirst ? <PodiumCard entry={podiumFirst} elevated /> : null}
-              {podiumThird ? <PodiumCard entry={podiumThird} /> : <div className={styles.podiumSpacer} />}
-            </div>
-          </section>
+          {loading && (
+            <p className={styles.loadingMessage}>랭킹을 불러오는 중…</p>
+          )}
 
-          {rest.length > 0 ? (
-            <section className={styles.listSection} aria-label="4위 이하">
-              <h3 className={styles.sectionLabel}>
-                <span className="material-symbols-outlined">format_list_numbered</span>
-                전체 순위
-              </h3>
-              <div className={styles.list}>
-                {rest.map((entry) => (
-                  <RankingRow key={entry.rank} entry={entry} />
-                ))}
-              </div>
-            </section>
-          ) : null}
+          {!loading && entries.length > 0 && (
+            <>
+              <section className={styles.podiumSection} aria-label="상위 3명">
+                <h3 className={styles.sectionLabel}>
+                  <span className="material-symbols-outlined">stars</span>
+                  명예의 전당
+                </h3>
+                <div className={styles.podium}>
+                  {podiumSecond ? <PodiumCard entry={podiumSecond} /> : <div className={styles.podiumSpacer} />}
+                  {podiumFirst ? <PodiumCard entry={podiumFirst} elevated /> : null}
+                  {podiumThird ? <PodiumCard entry={podiumThird} /> : <div className={styles.podiumSpacer} />}
+                </div>
+              </section>
 
-          <p className={styles.footerNote}>데모 데이터 · 누적 도보 거리순 · API 연동 후 실시간 반영</p>
+              {rest.length > 0 ? (
+                <section className={styles.listSection} aria-label="4위 이하">
+                  <h3 className={styles.sectionLabel}>
+                    <span className="material-symbols-outlined">format_list_numbered</span>
+                    전체 순위
+                  </h3>
+                  <div className={styles.list}>
+                    {rest.map((entry) => (
+                      <RankingRow key={`${period}-${entry.rank}`} entry={entry} />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          )}
+
+          <p className={styles.footerNote}>
+            {isMock
+              ? '데모 데이터 · API 연동 시 VITE_LIVE_API_RANKING=true'
+              : '실시간 랭킹'}
+            {error ? ` · ${error}` : ''}
+          </p>
         </div>
 
         <BottomNav
