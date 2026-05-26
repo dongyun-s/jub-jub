@@ -103,6 +103,17 @@ public class ReviewNotificationService {
     }
 
     @Transactional
+    public boolean markAsReadIfExists(String accountEmail, Long notificationId) {
+        MemberProfile memberProfile = findMemberProfile(accountEmail);
+        return reviewNotificationRepository.findByIdAndMemberProfileId(notificationId, memberProfile.getId())
+                .map(notification -> {
+                    notification.markAsRead();
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Transactional
     public void markAsReadByOrderId(Long orderId) {
         reviewNotificationRepository.findTopByOrderIdOrderByCreatedAtDesc(orderId)
                 .ifPresent(ReviewNotification::markAsRead);

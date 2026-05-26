@@ -2,6 +2,7 @@ package io.github.dongyuns.jubjub.domain.user.entity;
 
 import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardTier; // 등급 Enum 임포트
+import io.github.dongyuns.jubjub.domain.reward.enums.RewardTierConverter;
 import io.github.dongyuns.jubjub.global.common.BaseTimeEntity; //  공통 시간 엔티티 임포트
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,7 +33,7 @@ public class MemberProfile extends BaseTimeEntity {
     // ==========================================
     // [리워드 지갑 영역] - 초기값 설정
     // ==========================================
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = RewardTierConverter.class)
     @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
     private RewardTier tier = RewardTier.BRONZE;  // 기본 등급은 브론즈
 

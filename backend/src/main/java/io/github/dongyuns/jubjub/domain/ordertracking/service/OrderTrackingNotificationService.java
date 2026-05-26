@@ -78,6 +78,17 @@ public class OrderTrackingNotificationService {
         notification.markAsRead();
     }
 
+    @Transactional
+    public boolean markAsReadIfExists(String accountEmail, Long notificationId) {
+        MemberProfile memberProfile = findMemberProfile(accountEmail);
+        return orderTrackingNotificationRepository.findByIdAndMemberProfileId(notificationId, memberProfile.getId())
+                .map(notification -> {
+                    notification.markAsRead();
+                    return true;
+                })
+                .orElse(false);
+    }
+
     private MemberProfile findMemberProfile(String accountEmail) {
         if (accountEmail == null || accountEmail.isBlank()) {
             throw new BusinessException("UNAUTHORIZED", "로그인한 사용자만 알림을 조회할 수 있습니다.", HttpStatus.UNAUTHORIZED);
