@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "장바구니_옵션")
+@Table(name = "cart_options")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -14,16 +14,16 @@ public class CartOption {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "장바구니옵션번호")
+    @Column(name = "cart_option_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "장바구니번호", nullable = false)
+    @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
     // 🌟 이 부분이 OptionDetail에서 MenuOption으로 변경되었습니다!
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "옵션상세번호", nullable = false)
+    @JoinColumn(name = "menu_option_id", nullable = false)
     private MenuOption menuOption;
 
     // 연관관계 편의 메서드
