@@ -125,3 +125,100 @@ export async function fetchStores(params?: FetchStoresParams): Promise<StoreList
 export function fetchStoreDetail(storeId: number) {
   return apiV1Fetch<StoreDetailDto>(`/stores/${storeId}`)
 }
+
+export type StoreSortBy = 'DISTANCE' | 'RATING'
+
+export interface SortedStoreListItem {
+  storeId: number
+  name: string
+  categoryId: number
+  categoryName?: string
+  cookingTimeMinutes: number
+  minOrderAmount: number
+  latitude: number | null
+  longitude: number | null
+  distanceMeters: number
+  averageRating: number
+  reviewCount: number
+}
+
+export type FetchSortedStoresParams = {
+  sortBy: StoreSortBy
+  latitude: number
+  longitude: number
+  categoryId?: number
+  category?: string
+}
+
+function normalizeSortedStoreItem(raw: unknown): SortedStoreListItem | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const p = raw as Record<string, unknown>
+  const storeId = num(p.storeId ?? p.store_id ?? p.id)
+  const name = String(p.name ?? '').trim()
+  if (!storeId || !name) return null
+  return {
+    storeId,
+    name,
+    categoryId: num(p.categoryId ?? p.category_id),
+    categoryName: String(p.categoryName ?? p.category_name ?? '').trim() || undefined,
+    cookingTimeMinutes: num(p.cookingTimeMinutes ?? p.cooking_time_minutes, 15),
+    minOrderAmount: num(p.minOrderAmount ?? p.min_order_amount),
+    latitude:
+      p.latitude != null && p.latitude !== ''
+        ? num(p.latitude)
+        : p.lat != null
+          ? num(p.lat)
+          : null,
+    longitude:
+      p.longitude != null && p.longitude !== ''
+        ? num(p.longitude)
+        : p.lng != null
+          ? num(p.lng)
+          : null,
+    distanceMeters: num(p.distanceMeters ?? p.distance_meters),
+    averageRating: num(p.averageRating ?? p.average_rating, 0),
+    reviewCount: num(p.reviewCount ?? p.review_count),
+  }
+}
+
+function parseSortedStoreList(body: unknown): SortedStoreListItem[] {
+  if (Array.isArray(body)) {
+    return body.map(normalizeSortedStoreItem).filter(Boolean) as SortedStoreListItem[]
+  }
+  if (typeof body === 'object' && body !== null) {
+    const o = body as Record<string, unknown>
+    if (o.success === true && Array.isArray(o.data)) {
+      return parseSortedStoreList(o.data)
+    }
+    const arr = o.data ?? o.stores ?? o.items
+    if (Array.isArray(arr)) return parseSortedStoreList(arr)
+  }
+  return []
+}
+
+/** GET /api/v1/stores/sorted — 반경 3km, 거리순·평점순 */
+export async function fetchSortedStores(
+  params: FetchSortedStoresParams,
+): Promise<SortedStoreListItem[]> {
+  const q = new URLSearchParams()
+  q.set('sortBy', params.sortBy)
+  q.set('latitude', String(params.latitude))
+  q.set('longitude', String(params.longitude))
+  if (params.categoryId != null) q.set('categoryId', String(params.categoryId))
+  if (params.category?.trim()) q.set('category', params.category.trim())
+
+  try {
+    const wrapped = await apiV1Fetch<unknown>(`/stores/sorted?${q.toString()}`)
+    const list = parseSortedStoreList(wrapped)
+    if (list.length > 0) return list
+  } catch {
+    /* plain 폴백 */
+  }
+
+  try {
+    const plain = await apiV1FetchPlain<unknown>(`/stores/sorted?${q.toString()}`)
+    return parseSortedStoreList(plain)
+  } catch {
+    return []
+  }
+}

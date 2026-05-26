@@ -5,22 +5,19 @@
  * - 하단 네비로 장바구니/주문내역/지도/내정보 이동
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
 import SearchBar from '../../components/SearchBar'
-import { fetchStores } from '../../api/store'
+import { useNearbyRestaurants } from '../../hooks/useStoreList'
+import { useRankings } from '../../hooks/useRankings'
+import { useUserLocation } from '../../hooks/useUserLocation'
 import type { FeaturedRestaurant } from '../../constants'
-import {
-  FEATURED_RESTAURANTS,
-  HOME_CATEGORIES,
-  getWeeklyRankingsByWalkingDistance,
-  type RankingEntry,
-} from '../../constants'
+import { FEATURED_RESTAURANTS, HOME_CATEGORIES } from '../../constants'
+import type { RankingEntryDto } from '../../api/ranking'
 import { formatRankingStripDistanceKm, formatRankingStripMeta } from '../../lib/rankingDisplay'
-import { mapStoreListItemToFeatured } from '../../lib/storeUi'
 import { getAttendanceStreak, isAttendanceMarkedDone } from '../../lib/rewardAttendance'
 import { useProfile } from '../../hooks/useProfile'
 import { fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
@@ -30,7 +27,7 @@ import TierIcon from '../../components/TierIcon/TierIcon'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './HomePage.module.css'
 
-function RankingStripLine({ entry }: { entry: RankingEntry }) {
+function RankingStripLine({ entry }: { entry: RankingEntryDto }) {
   return (
     <span className={styles.rankingStripItem}>
       <span className={styles.rankingStripRank}>{entry.rank}위</span>
@@ -56,6 +53,7 @@ interface HomePageProps {
   onRankingClick?: () => void
   /** 진행 중 주문이 있으면 상단 배너 표시 */
   hasActiveOrder?: boolean
+  activeOrderLabel?: string
   cartCount?: number
 }
 
@@ -71,18 +69,21 @@ function HomePage({
   onStoreSelect,
   onRankingClick,
   hasActiveOrder,
+  activeOrderLabel,
   cartCount = 0,
 }: HomePageProps) {
   const { profile } = useProfile()
   const [searchQuery, setSearchQuery] = useState('')
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
+  const { coords, loading: geoLoading } = useUserLocation()
+  const { restaurants: nearbyRestaurants, hint: nearbyHint } = useNearbyRestaurants(coords, geoLoading)
+  const { entries: weeklyRankings } = useRankings('WEEKLY')
   const [rewardMe, setRewardMe] = useState<RewardMeResponse | null>(null)
   const [rewardLoading, setRewardLoading] = useState(false)
   const [rewardFetchFailed, setRewardFetchFailed] = useState(false)
   const [attendanceDoneToday, setAttendanceDoneToday] = useState(false)
   const [attendanceStreak, setAttendanceStreak] = useState(0)
   const [rankingCarouselIndex, setRankingCarouselIndex] = useState(0)
-  const weeklyRankings = useMemo(() => getWeeklyRankingsByWalkingDistance(), [])
 
   const greetingName =
     rewardMe?.nickname?.trim() ||
@@ -150,18 +151,10 @@ function HomePage({
   }, [profile?.email])
 
   useEffect(() => {
-    let cancelled = false
-    fetchStores()
-      .then((list) => {
-        if (!cancelled && list.length > 0) {
-          setRestaurants(list.map(mapStoreListItemToFeatured))
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
+    if (nearbyRestaurants.length > 0) {
+      setRestaurants(nearbyRestaurants)
     }
-  }, [])
+  }, [nearbyRestaurants])
 
   useEffect(() => {
     if (weeklyRankings.length <= 1) return
@@ -252,7 +245,7 @@ function HomePage({
               <div className={styles.activeOrderText}>
                 <p className={styles.activeOrderLabel}>주문 진행 중</p>
                 <p className={styles.activeOrderTitle}>주문 내역 보기</p>
-                <p className={styles.activeOrderTime}>{FEATURED_RESTAURANTS[0].title}</p>
+                <p className={styles.activeOrderTime}>{activeOrderLabel?.trim() || '진행 중인 주문'}</p>
               </div>
               <div className={styles.activeOrderLink}>
                 <span className="text-sm font-bold">주문 현황</span>
@@ -483,6 +476,10 @@ function HomePage({
               전체보기
             </button>
           </div>
+
+          {nearbyHint && (
+            <p className="px-4 pb-2 text-xs text-slate-500">{nearbyHint}</p>
+          )}
 
           <FeaturedRestaurantList
             restaurants={restaurants}

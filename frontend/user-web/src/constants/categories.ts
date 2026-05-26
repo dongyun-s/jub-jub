@@ -72,6 +72,8 @@ export interface FeaturedRestaurant {
   /** 픽업/매장 지도 마커용 WGS84 (없으면 별도 폴백) */
   lat?: number
   lng?: number
+  /** /stores/sorted 응답 — 3km 이내 거리(m) */
+  distanceMeters?: number
 }
 
 /** 홈/카테고리 공통 맛집 던전 카드 데이터(API 실패 시 폴백) */

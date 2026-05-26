@@ -13,8 +13,6 @@ import { deleteReview, fetchMyReviews, type ReviewDto } from '../../api/reviews'
 import { fetchStoreDetail } from '../../api/store'
 import { useProfile } from '../../hooks/useProfile'
 import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
-import { postReviewNotificationsReadAll } from '../../api/reviewNotifications'
-import { notifyReviewNotificationsUpdated } from '../../hooks/useUnreadReviewNotificationCount'
 import { FEATURED_RESTAURANTS } from '../../constants'
 import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imageUrl'
 import styles from './MyReviewsPage.module.css'
@@ -143,19 +141,6 @@ function MyReviewsPage({
   useEffect(() => {
     void loadReviews()
   }, [loadReviews])
-
-  /** 리뷰 관리 화면 진입 = 알림 확인 → 마이페이지 NEW 배지 제거 */
-  useEffect(() => {
-    if (!getAccessToken()) return
-    void (async () => {
-      try {
-        await postReviewNotificationsReadAll()
-        notifyReviewNotificationsUpdated()
-      } catch {
-        /* ignore */
-      }
-    })()
-  }, [])
 
   const handleDeleteClick = (id: number) => {
     setSelectedReviewId(id)

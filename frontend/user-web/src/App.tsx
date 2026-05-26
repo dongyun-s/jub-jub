@@ -34,10 +34,11 @@ import {
   NotificationsPage,
   RankingPage,
 } from './pages'
-import { FEATURED_RESTAURANTS } from './constants'
 import { clearTokens, getAccessToken } from './lib/authStorage'
+import { useActivePickup } from './hooks/useActivePickup'
 import { fetchMyCart, mapCartListToUiLines, type ServerCartLineUi } from './api/cart'
 import type { ReviewWritePayload } from './api/reviews'
+import type { NotificationNavigateTarget } from './lib/notificationNavigation'
 
 /** 앱에서 사용하는 모든 페이지 식별자 */
 type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites' | 'notifications' | 'ranking'
@@ -80,16 +81,49 @@ function App() {
   const [lastPage, setLastPage] = useState<Page | null>(null)
   /** 장바구니에서 사용 중인 쿠폰 (미사용 시 null) */
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
-  /** 진행 중인 주문이 있는지 (지도/주문현황 연동) */
-  const [hasActiveOrder, setHasActiveOrder] = useState(() => launch.activeOrder)
   /** 리뷰 작성 페이지로 넘길 주문·매장 정보 */
   const [reviewWriteTarget, setReviewWriteTarget] = useState<ReviewWritePayload | null>(null)
   /** 장바구니 상품 목록 (로그인 시 GET /api/v1/carts) */
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [cartStoreId, setCartStoreId] = useState<number | null>(null)
   const [cartStoreName, setCartStoreName] = useState<string | null>(null)
-  const [selectedStoreId, setSelectedStoreId] = useState(FEATURED_RESTAURANTS[0].id)
+  const [selectedStoreId, setSelectedStoreId] = useState(1)
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null)
+  /** 알림 → 주문 현황 등 특정 주문으로 열 때 */
+  const [focusOrderId, setFocusOrderId] = useState<number | null>(null)
+
+  const {
+    activeOrder,
+    destination: pickupDestination,
+    hasActivePickup,
+    loading: pickupContextLoading,
+    refresh: refreshActivePickup,
+  } = useActivePickup(focusOrderId)
+
+  const hasActiveOrder = launch.activeOrder && pickupContextLoading ? true : hasActivePickup
+
+  const navigateFromNotification = useCallback((target: NotificationNavigateTarget) => {
+    setLastPage('notifications')
+    switch (target.type) {
+      case 'orders':
+        setFocusOrderId(null)
+        setCurrentPage('orders')
+        break
+      case 'orderStatus':
+        setFocusOrderId(target.orderId)
+        setCurrentPage('orderStatus')
+        break
+      case 'reviewWrite':
+        setReviewWriteTarget(target.payload)
+        setCurrentPage('reviewWrite')
+        break
+      case 'mypage':
+        setCurrentPage('mypage')
+        break
+      default:
+        break
+    }
+  }, [])
 
   const refreshCart = useCallback(async () => {
     if (!getAccessToken()) {
@@ -172,6 +206,7 @@ function App() {
             onStoreSelect={openStoreById}
             onRankingClick={goTo('ranking')}
             hasActiveOrder={hasActiveOrder}
+            activeOrderLabel={activeOrder?.storeName ?? pickupDestination?.name}
             cartCount={cartCount}
           />
         )
@@ -240,7 +275,7 @@ function App() {
           <CartPage
             onBack={goTo('store')}
             onCheckout={() => {
-              setHasActiveOrder(true)
+              void refreshActivePickup()
               setCartItems([])
               setCartStoreId(null)
               setCartStoreName(null)
@@ -298,13 +333,18 @@ function App() {
               setCurrentPage('reviewWrite')
             }}
             hasActiveOrder={hasActiveOrder}
+            activeOrder={activeOrder}
+            pickupDestination={pickupDestination}
             cartCount={cartCount}
           />
         )
       case 'orderStatus':
         return (
           <OrderStatusPage 
-            onBack={goTo('orders')} 
+            onBack={() => {
+              setFocusOrderId(null)
+              goTo('orders')()
+            }}
             onGoHome={goTo('home')} 
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
@@ -316,7 +356,10 @@ function App() {
               setReviewWriteTarget(payload)
               setCurrentPage('reviewWrite')
             }}
-            onPickupComplete={() => setHasActiveOrder(false)}
+            onPickupComplete={() => void refreshActivePickup()}
+            activeOrder={activeOrder}
+            pickupDestination={pickupDestination}
+            pickupContextLoading={pickupContextLoading}
             cartCount={cartCount}
           />
         )
@@ -328,12 +371,16 @@ function App() {
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
             onOrderStatusClick={goTo('orderStatus')}
-            onPickupStoreDetail={() => openStoreById(FEATURED_RESTAURANTS[0].id)}
-            onStoreClick={() => openStoreById(FEATURED_RESTAURANTS[0].id)}
+            onPickupStoreDetail={() => {
+              const id = pickupDestination?.storeId ?? activeOrder?.storeId
+              if (id) openStoreById(id)
+            }}
+            onSelectStore={openStoreById}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
             hasActiveOrder={hasActiveOrder}
+            pickupDestination={pickupDestination}
             cartCount={cartCount}
           />
         )
@@ -428,6 +475,7 @@ function App() {
             onOrdersClick={goTo('orders')}
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
+            onNavigate={navigateFromNotification}
             cartCount={cartCount}
           />
         )

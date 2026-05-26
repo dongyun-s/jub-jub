@@ -30,6 +30,38 @@
   color: rgb(17 24 39);
 }
 
+.periodTabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem 0;
+}
+
+.periodTab,
+.periodTabActive {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border: 1px solid rgb(229 231 235);
+  background: white;
+  color: rgb(107 114 128);
+}
+
+.periodTabActive {
+  border-color: rgb(236 72 153);
+  background: linear-gradient(90deg, rgb(236 72 153), rgb(244 114 182));
+  color: white;
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.25);
+}
+
+.loadingMessage {
+  text-align: center;
+  font-size: 0.875rem;
+  color: rgb(100 116 139);
+  padding: 2rem 1rem;
+}
+
 .scrollArea {
   flex: 1;
   overflow-y: auto;

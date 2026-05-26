@@ -1,4 +1,6 @@
-import type { RankingEntry } from '../constants/ranking'
+import type { RankingEntryDto } from '../api/ranking'
+
+type RankingEntry = RankingEntryDto
 
 export function formatWalkingDistance(meters: number): string {
   if (meters >= 1000) {
