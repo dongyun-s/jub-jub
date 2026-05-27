@@ -41,7 +41,7 @@ public class RankingService {
         return new RankingListResponse(
                 normalizedPage,
                 normalizedSize,
-                rankingRepository.count(),
+                rankingRepository.countByIsDeletedFalse(),
                 rankings
         );
     }
@@ -64,8 +64,8 @@ public class RankingService {
         RankingProjection rankingProfile = rankingRepository.findRankingProfile(profile.getId());
         if (rankingProfile == null) {
             throw new BusinessException(
-                    "RANKING_PROFILE_NOT_FOUND",
-                    "랭킹 프로필 정보를 찾을 수 없습니다.",
+                    "DELETED_MEMBER_NOT_RANKED",
+                    "탈퇴한 회원은 랭킹 조회 대상이 아닙니다.",
                     HttpStatus.NOT_FOUND
             );
         }
@@ -73,7 +73,7 @@ public class RankingService {
         RewardTier tier = RewardTier.fromCode(rankingProfile.getTierCode());
         return new MyRankingResponse(
                 ranking,
-                rankingRepository.count(),
+                rankingRepository.countByIsDeletedFalse(),
                 rankingProfile.getUserId(),
                 rankingProfile.getNickname(),
                 rankingProfile.getProfileImageUrl(),
