@@ -27,6 +27,7 @@ public interface RankingRepository extends JpaRepository<MemberProfile, Long> {
                     WHERE m.owner_type = 'PROFILE'
                       AND m.owner_id = mp.id
                 )
+            WHERE mp.is_deleted = false
             ORDER BY mp.total_walking_distance DESC, mp.order_count DESC, mp.id ASC
             LIMIT :size OFFSET :offset
             """, nativeQuery = true)
@@ -49,6 +50,7 @@ public interface RankingRepository extends JpaRepository<MemberProfile, Long> {
                       AND m.owner_id = mp.id
                 )
             WHERE mp.id = :userId
+              AND mp.is_deleted = false
             LIMIT 1
             """, nativeQuery = true)
     RankingProjection findRankingProfile(@Param("userId") Long userId);
@@ -56,20 +58,25 @@ public interface RankingRepository extends JpaRepository<MemberProfile, Long> {
     @Query(value = """
             SELECT COUNT(*)
             FROM member_profile mp
-            WHERE mp.total_walking_distance > :totalDistanceMeters
-               OR (
-                    mp.total_walking_distance = :totalDistanceMeters
-                    AND mp.order_count > :pickupCount
-               )
-               OR (
-                    mp.total_walking_distance = :totalDistanceMeters
-                    AND mp.order_count = :pickupCount
-                    AND mp.id < :userId
-               )
+            WHERE mp.is_deleted = false
+              AND (
+                   mp.total_walking_distance > :totalDistanceMeters
+                OR (
+                     mp.total_walking_distance = :totalDistanceMeters
+                     AND mp.order_count > :pickupCount
+                )
+                OR (
+                     mp.total_walking_distance = :totalDistanceMeters
+                     AND mp.order_count = :pickupCount
+                     AND mp.id < :userId
+                )
+              )
             """, nativeQuery = true)
     long countUsersAhead(
             @Param("userId") Long userId,
             @Param("totalDistanceMeters") int totalDistanceMeters,
             @Param("pickupCount") int pickupCount
     );
+
+    long countByIsDeletedFalse();
 }
