@@ -26,4 +26,24 @@ public class Account {
     public void updatePassword(String newPassword) {
         this.password = newPassword;
     }
+
+    // 탈퇴 여부 플래그
+    @Column(nullable = false)
+    private boolean isDeleted = false;
+
+    // Soft Delete 메서드
+    public void softDelete() {
+        this.isDeleted = true;
+    }
+
+    // 30일 후 익명화(비식별화) 처리 메서드
+    public void anonymize(String uuid) {
+        this.email = "deleted_" + uuid + "@jubjub.com"; // 가짜 이메일로 덮어쓰기
+        this.password = "deleted"; // 비밀번호 무효화
+    }
+
+    // 계정 복구 (탈퇴 취소)
+    public void restore() {
+        this.isDeleted = false;
+    }
 }

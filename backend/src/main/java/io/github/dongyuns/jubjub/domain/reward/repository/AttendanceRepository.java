@@ -27,4 +27,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             LocalDate startDate,
             LocalDate endDate
     );
+
+    // 탈퇴 시 회원의 출석 내역 싹 지우기
+    void deleteAllByMemberProfile(MemberProfile memberProfile);
 }

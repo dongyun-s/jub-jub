@@ -146,6 +146,13 @@ public class AuthService {
         MemberProfile profile = memberProfileRepository.findByAccount(account)
                 .orElseThrow(() -> new IllegalArgumentException("프로필 정보를 찾을 수 없습니다."));
 
+        // 탈퇴 유예 기간(30일) 내에 다시 로그인한 경우, 계정 자동 복구!
+        if (account.isDeleted()) {
+            account.restore(); // 계정 살리기 (isDeleted = false)
+            profile.restore(); // 프로필 살리기 (isDeleted = false, deletedAt = null)
+            // 💡 Dirty Checking 덕분에 따로 save를 안 해도 트랜잭션이 끝날 때 DB에 반영됩니다!
+        }
+
         // 🌟 4-4. 토큰 세트 생성 (Access Token & Refresh Token)
         // JwtTokenProvider의 createToken 메서드를 통해 두 토큰을 한 번에 가져옵니다.
         TokenResponse tokenResponse = jwtTokenProvider.createToken(account.getEmail(), "ROLE_USER");
@@ -168,6 +175,7 @@ public class AuthService {
                 account.getEmail(),
                 profile.getNickname()
         );
+
     }
 
     /**

@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.domain.auth.entity.Account;
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardTier; // 등급 Enum 임포트
 import io.github.dongyuns.jubjub.domain.reward.enums.RewardTierConverter;
 import io.github.dongyuns.jubjub.global.common.BaseTimeEntity; //  공통 시간 엔티티 임포트
+import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -110,6 +111,64 @@ public class MemberProfile extends BaseTimeEntity {
         // 만약 계산된 등급이 현재 등급과 다르다면 (승급했다면) 갱신합니다.
         if (this.tier != calculatedTier) {
             this.tier = calculatedTier;
+        }
+    }
+
+    // ==========================================
+    // [탈퇴 및 계정 상태 관리 로직]
+    // ==========================================
+    @Column(nullable = false)
+    private boolean isDeleted = false;
+
+    private LocalDateTime deletedAt;
+
+    // 익명화(개인정보 파기) 완료 여부 플래그
+    @Column(nullable = false)
+    private boolean isAnonymized = false;
+
+    // 1. Soft Delete 메서드 (탈퇴 요청 시)
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    // 2. 30일 후 개인정보 파기 (익명화) 메서드
+    public void anonymize() {
+        this.name = "탈퇴회원";
+        this.phone = "00000000000";
+        this.nickname = "알수없음";
+        this.pushAgree = false;
+
+        // 중요: 탈퇴 날짜(deletedAt)는 절대 지우지 않고 보존합니다!
+        // 대신 익명화 처리가 완료되었다고 표시합니다.
+        this.isAnonymized = true;
+    }
+
+    // 3. 프로필 복구 (탈퇴 취소 시)
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+        this.isAnonymized = false; // 안전장치!
+    }
+
+    // ==========================================
+    // [비즈니스 로직] - 프로필 수정
+    // ==========================================
+    public void updateProfile(String nickname, String phone) {
+        // 1. 닉네임 방어: null, 빈칸 방지 + 스웨거 기본값("string") 무시!
+        if (nickname != null && !nickname.isBlank() && !nickname.equals("string")) {
+            this.nickname = nickname;
+        }
+
+        // 2. 전화번호 방어: null, 빈칸 방지 + 스웨거 기본값("string") 무시!
+        if (phone != null && !phone.isBlank() && !phone.equals("string")) {
+            // 일단 숫자 이외의 문자(하이픈 등)를 다 떼어냅니다.
+            String cleanPhone = phone.replaceAll("[^0-9]", "");
+
+            // 숫자를 떼어낸 결과가 빈칸이 아닐 때만 진짜로 업데이트! (여기서 아까 문제가 방어됩니다)
+            if (!cleanPhone.isBlank()) {
+                this.phone = cleanPhone;
+            }
         }
     }
 }
