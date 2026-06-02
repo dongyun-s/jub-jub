@@ -5,7 +5,6 @@ export interface MenuItem {
   name: string
   description?: string
   price: number
-  xp?: number
   image?: string
   tags: ('best' | 'loot')[]
   rank?: number
@@ -37,7 +36,6 @@ function dtoToMenuItem(m: MenuDto, idx: number): MenuItem {
     name: m.name,
     description: m.description || undefined,
     price: m.price,
-    xp: m.rewardXp,
     image: MENU_IMAGES[idx % MENU_IMAGES.length],
     tags,
     isSoldOut: m.isSoldOut,
@@ -90,50 +88,3 @@ export function buildMenuCategoriesFromApi(menus: MenuDto[]): MenuCategory[] {
     },
   ]
 }
-
-export const demoMenuCategories: MenuCategory[] = [
-  {
-    id: 'popular',
-    name: '인기 메뉴',
-    description: '한 달간 주문수가 많고 만족도가 높은 메뉴에요.',
-    items: [
-      {
-        id: 1,
-        name: '프리미엄 줍줍 보울',
-        description: '신선한 아보카도와 수비드 연어가 어우러진 줍줍의 시그니처 메뉴',
-        price: 14900,
-        xp: 50,
-        image:
-          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
-        tags: ['best', 'loot'],
-        rank: 1,
-      },
-      {
-        id: 2,
-        name: '아보카도 가든 샐러드',
-        description: '숲의 버터 아보카도와 유기농 채소의 환상적인 만남',
-        price: 12500,
-        xp: 30,
-        image:
-          'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&h=200&fit=crop',
-        tags: ['best'],
-        rank: 2,
-      },
-    ],
-  },
-  {
-    id: 'main',
-    name: '메인 메뉴',
-    items: [
-      {
-        id: 3,
-        name: '그릴드 치킨 스테이크',
-        description: '부드러운 닭가슴살을 그릴에 구워 특제 소스와 함께',
-        price: 15900,
-        xp: 40,
-        image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&h=200&fit=crop',
-        tags: [],
-      },
-    ],
-  },
-]

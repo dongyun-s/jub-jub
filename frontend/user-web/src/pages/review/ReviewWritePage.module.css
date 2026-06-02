@@ -13,6 +13,7 @@
 }
 
 .header {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -45,12 +46,20 @@
 }
 
 .headerTitle {
-  flex: 1;
-  text-align: center;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  max-width: min(60vw, 14rem);
   font-size: 1.125rem;
   font-weight: 700;
   color: rgb(17 24 39);
-  margin-left: -2.5rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .scrollArea {
@@ -414,54 +423,7 @@
   transform: scale(0.98);
 }
 
-/* AI 모달 — AppModal flush + 카드 스타일 */
-.modalShell {
-  background-color: #ffffff;
-  border-radius: 1.25rem;
-  overflow: hidden;
-  box-shadow:
-    0 0 0 1px rgba(246, 49, 154, 0.1),
-    0 20px 40px -12px rgba(0, 0, 0, 0.18);
-}
-
-.modalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.25rem 1rem;
-}
-
-.modalTitle {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: rgb(17 24 39);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.modalTitleIcon {
-  color: var(--color-primary);
-}
-
-.modalClose {
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgb(156 163 175);
-  transition: color 150ms ease;
-}
-
-.modalClose:hover {
-  color: rgb(75 85 99);
-}
-
-.modalBody {
-  padding: 0 1.25rem;
-}
-
+/* AI 모달 본문 (AppModal + modalContent 공통 셸) */
 .modalItem {
   margin-bottom: 1.5rem;
 }
@@ -511,46 +473,15 @@
   color: rgb(229 231 235);
 }
 
-.modalFooter {
-  padding: 1.25rem 1.25rem 1.5rem;
-}
-
-.modalSubmit {
-  width: 100%;
-  padding: 1rem;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 1rem;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #ec4899 0%, var(--color-primary) 50%, #db2777 100%);
-  box-shadow: 0 4px 14px rgba(246, 49, 154, 0.35);
-  transition: filter 150ms ease, transform 150ms ease;
-}
-
-.modalSubmit:hover {
-  filter: brightness(1.05);
-}
-
-.modalSubmit:active {
-  transform: scale(0.98);
-}
-
-.modalHint {
-  text-align: center;
-  font-size: 0.75rem;
-  color: rgb(156 163 175);
-  margin-top: 0.75rem;
-}
-
 /* 전체 화면 사진 미리보기 */
 .photoLightbox {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 120;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem;
+  padding: 1.25rem;
 }
 
 .photoLightboxBackdrop {
@@ -560,7 +491,9 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(17, 12, 20, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .photoLightboxPanel {

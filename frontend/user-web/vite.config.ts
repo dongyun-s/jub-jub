@@ -67,8 +67,12 @@ export default defineConfig(({ mode }) => {
       },
     ],
     server: {
+      host: true,
+      allowedHosts: true,
       proxy: {
         '/api': backendProxy(proxyTarget),
+        '/notifications': backendProxy(proxyTarget),
+        '/coupon-notifications': backendProxy(proxyTarget),
         '/order-tracking': backendProxy(proxyTarget),
         '/orders': backendProxy(proxyTarget),
         '/payments': backendProxy(proxyTarget),

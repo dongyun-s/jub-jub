@@ -1,0 +1,87 @@
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  padding: 1rem 1.125rem 1.125rem;
+  color: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cardHighlight {
+  box-shadow: 0 8px 28px rgba(236, 72, 153, 0.22);
+}
+
+.cardTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.cardTopLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.badge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.medal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.medal .material-symbols-outlined {
+  font-size: 1.125rem;
+  font-variation-settings: 'FILL' 1;
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.profileInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.nickname {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  word-break: break-word;
+}
+
+.footerNote {
+  margin: 0.5rem 0 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+}

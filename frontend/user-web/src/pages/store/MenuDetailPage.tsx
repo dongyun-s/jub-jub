@@ -215,12 +215,6 @@ function MenuDetailPage({
             ) : null}
             <div className={styles.infoRow}>
               <span className={styles.menuPrice}>{formatPrice(menu.price)}</span>
-              {menu.rewardXp > 0 ? (
-                <div className={styles.xpBadge}>
-                  <span className={`material-symbols-outlined ${styles.xpIcon}`}>bolt</span>
-                  <span className={styles.xpText}>+{menu.rewardXp} XP</span>
-                </div>
-              ) : null}
             </div>
             {menu.isSoldOut ? (
               <p className="mt-2 text-sm font-medium text-amber-700">현재 품절입니다.</p>

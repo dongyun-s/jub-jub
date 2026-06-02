@@ -1,11 +1,4 @@
 /**
- * 랭킹 타입·데모 re-export — UI는 hooks(useRankings) 사용 권장
+ * 랭킹 타입 re-export — 데이터는 hooks(useRankings, useMyRanking) + API
  */
-import { getMockRankings } from '../lib/mocks/ranking'
-
-export type { RankingEntryDto as RankingEntry, RankingPeriod } from '../api/ranking'
-
-/** @deprecated useRankings('WEEKLY') 사용 */
-export function getWeeklyRankingsByWalkingDistance() {
-  return getMockRankings('WEEKLY')
-}
+export type { RankingEntryDto as RankingEntry } from '../api/ranking'

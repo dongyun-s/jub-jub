@@ -62,7 +62,7 @@ export default function AppModal({
   const panelClass = [
     styles.panel,
     sizeClassMap[size],
-    flush ? null : `${styles.panelCard} ${styles.panelPadded}`,
+    flush ? styles.panelFlushCard : `${styles.panelCard} ${styles.panelPadded}`,
     panelClassName,
   ]
     .filter(Boolean)

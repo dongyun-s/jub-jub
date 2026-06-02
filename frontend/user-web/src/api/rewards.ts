@@ -43,7 +43,6 @@ function normalizeRewardMePayload(payload: unknown): RewardMeResponse {
   }
   const p = payload as Record<string, unknown>
   return {
-    cumulativeXp: num(p.cumulativeXp ?? p.cumulative_xp),
     nextTierRequiredCount: num(p.nextTierRequiredCount ?? p.next_tier_required_count),
     nickname: str(p.nickname),
     orderCount: num(p.orderCount ?? p.order_count),
@@ -64,6 +63,9 @@ function normalizeCouponPayload(raw: unknown): MemberCouponDto {
     discountAmount: num(p.discountAmount ?? p.discount_amount),
     minOrderAmount: num(p.minOrderAmount ?? p.min_order_amount),
     expiredAt: str(p.expiredAt ?? p.expired_at),
+    isUsed: Boolean(p.isUsed ?? p.is_used),
+    isExpired: Boolean(p.isExpired ?? p.is_expired),
+    usedAt: p.usedAt != null || p.used_at != null ? str(p.usedAt ?? p.used_at) : null,
   }
 }
 
@@ -82,7 +84,6 @@ function normalizeCalculatePayload(payload: unknown): RewardCalculateResponse {
 
 /** GET /api/v1/rewards/me */
 export interface RewardMeResponse {
-  cumulativeXp: number
   nextTierRequiredCount: number
   nickname: string
   orderCount: number
@@ -98,6 +99,9 @@ export interface MemberCouponDto {
   discountAmount: number
   minOrderAmount: number
   expiredAt: string
+  isUsed: boolean
+  isExpired: boolean
+  usedAt: string | null
 }
 
 /** POST /api/v1/rewards/calculate 요청 */
@@ -179,14 +183,56 @@ export async function fetchAttendanceHistory(params?: {
   return normalizeAttendanceHistoryPayload(inner)
 }
 
-export async function postAttendanceCheck(): Promise<string> {
+/** POST /api/v1/rewards/attendance */
+export type AttendanceCheckResponse = {
+  message: string
+  isRandomBoxAvailable: boolean
+}
+
+function normalizeAttendanceCheckPayload(inner: unknown): AttendanceCheckResponse {
+  if (typeof inner === 'string') {
+    return { message: inner, isRandomBoxAvailable: false }
+  }
+  if (typeof inner !== 'object' || inner === null) {
+    return { message: '출석체크가 완료되었습니다.', isRandomBoxAvailable: false }
+  }
+  const p = inner as Record<string, unknown>
+  const message = str(p.message, '출석체크가 완료되었습니다.')
+  const flag = p.isRandomBoxAvailable ?? p.is_random_box_available
+  const isRandomBoxAvailable =
+    flag === true || flag === 1 || String(flag).toLowerCase() === 'true'
+  return { message, isRandomBoxAvailable }
+}
+
+export async function postAttendanceCheck(): Promise<AttendanceCheckResponse> {
   const raw = await apiV1FetchPlain<unknown>('/rewards/attendance', { method: 'POST' })
   const inner = unwrapApiEnvelope(raw)
-  if (typeof inner === 'string') return inner
-  if (typeof inner === 'object' && inner !== null && typeof (inner as Record<string, unknown>).message === 'string') {
-    return String((inner as Record<string, unknown>).message)
+  return normalizeAttendanceCheckPayload(inner)
+}
+
+export type RandomBoxApiResult = 'WIN_1000' | 'WIN_100' | 'LOSE'
+
+/** POST /api/v1/rewards/random-box */
+export type RandomBoxOpenResponse = {
+  result: RandomBoxApiResult
+}
+
+function normalizeRandomBoxPayload(inner: unknown): RandomBoxOpenResponse {
+  if (typeof inner !== 'object' || inner === null) {
+    throw new ApiError('랜덤박스 응답 형식이 올바르지 않습니다.', { status: 200 })
   }
-  return '출석체크가 완료되었습니다.'
+  const p = inner as Record<string, unknown>
+  const raw = String(p.result ?? '').trim().toUpperCase()
+  if (raw === 'WIN_1000' || raw === 'WIN_100' || raw === 'LOSE') {
+    return { result: raw as RandomBoxApiResult }
+  }
+  throw new ApiError('랜덤박스 결과를 확인할 수 없습니다.', { status: 200 })
+}
+
+export async function postRandomBoxOpen(): Promise<RandomBoxOpenResponse> {
+  const raw = await apiV1FetchPlain<unknown>('/rewards/random-box', { method: 'POST' })
+  const inner = unwrapApiEnvelope(raw)
+  return normalizeRandomBoxPayload(inner)
 }
 
 export async function calculateRewardDiscount(

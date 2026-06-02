@@ -22,7 +22,9 @@ import {
   pollRewardAfterPickup,
   type PickupRewardBreakdown,
 } from '../../lib/pickupReward'
+import { useDistanceToCoords } from '../../hooks/useDistanceToCoords'
 import { MapTmapCanvas } from '../map/MapPage'
+import type { MapTmapMarker } from '../../lib/mapCategoryMarkers'
 import styles from './OrderStatusPage.module.css'
 
 interface OrderStatusPageProps {
@@ -184,6 +186,28 @@ function OrderStatusPage({
   const storeMapLat = pickupDestination?.lat
   const storeMapLng = pickupDestination?.lng
 
+  const storeMapMarkers = useMemo((): MapTmapMarker[] => {
+    if (storeMapLat == null || storeMapLng == null) return []
+    return [
+      {
+        kind: 'destination',
+        lat: storeMapLat,
+        lng: storeMapLng,
+        title: display.storeName,
+        category: pickupDestination?.categoryName ?? '매장',
+      },
+    ]
+  }, [storeMapLat, storeMapLng, display.storeName, pickupDestination?.categoryName])
+
+  const storeCoords =
+    storeMapLat != null && storeMapLng != null ? { lat: storeMapLat, lng: storeMapLng } : null
+  const {
+    distanceLabel: storeDistanceLabel,
+    walkTimeLabel: storeWalkTimeLabel,
+    loading: storeDistanceLoading,
+    error: storeDistanceError,
+  } = useDistanceToCoords(storeCoords)
+
   const completePickup = () => {
     const order = activeOrder ?? getActivePaidOrderFromLocal()
     if (!order?.orderId) {
@@ -213,7 +237,6 @@ function OrderStatusPage({
         } else {
           const after = await fetchRewardMe()
           setPickupRewards({
-            earnedXp: 0,
             walkedMeters: 0,
             orderCountGain: 0,
             totalOrderCount: after.orderCount,
@@ -245,14 +268,19 @@ function OrderStatusPage({
       .finally(() => setPickupSubmitting(false))
   }
 
-  const handleRewardClose = () => {
+  const dismissRewardModal = (navigateAway: boolean) => {
     setRewardModalOpen(false)
     setRewardModalLoading(false)
     setPickupRewards(null)
+    if (navigateAway && orderStep === 'completed') {
+      onOrdersClick?.() ?? onBack()
+    }
   }
 
+  const handleRewardClose = () => dismissRewardModal(true)
+
   const handleReviewFromModal = () => {
-    setRewardModalOpen(false)
+    dismissRewardModal(false)
     onReviewWriteClick?.(reviewPayload)
   }
 
@@ -280,7 +308,7 @@ function OrderStatusPage({
                 className={styles.mapIframe}
                 center={{ lat: storeMapLat, lng: storeMapLng }}
                 zoom={17}
-                markers={[{ lat: storeMapLat, lng: storeMapLng, title: display.storeName }]}
+                markers={storeMapMarkers}
                 fitMarkers={false}
               />
             ) : (
@@ -304,11 +332,20 @@ function OrderStatusPage({
                   <span className={`material-symbols-outlined ${styles.distanceIcon}`}>directions_walk</span>
                 </div>
                 <div>
-                  <p className={styles.distanceLabel}>남은 거리</p>
+                  <p className={styles.distanceLabel}>가게까지 거리</p>
                   <p className={styles.distanceValue}>
-                    {display.distance}{' '}
-                    <span className={styles.distanceTime}>({display.estimatedTime})</span>
+                    {storeDistanceLoading
+                      ? '위치 확인 중…'
+                      : storeDistanceLabel || '—'}{' '}
+                    {storeWalkTimeLabel && !storeDistanceLoading && (
+                      <span className={styles.distanceTime}>({storeWalkTimeLabel})</span>
+                    )}
                   </p>
+                  {storeDistanceError && !storeDistanceLoading && (
+                    <p style={{ fontSize: '0.65rem', color: 'rgb(220 38 38)', marginTop: '0.25rem' }}>
+                      {storeDistanceError}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

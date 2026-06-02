@@ -387,6 +387,31 @@
   color: rgb(100 116 139);
 }
 
+.menuEmpty {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.menuEmptyIcon {
+  font-size: 2.5rem;
+  color: rgb(203 213 225);
+  margin-bottom: 0.75rem;
+}
+
+.menuEmptyTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: rgb(51 65 85);
+}
+
+.menuEmptyDesc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgb(100 116 139);
+  line-height: 1.5;
+}
+
 .menuDivide {
   border-top: 2rem solid rgb(248 250 252);
 }
@@ -560,24 +585,6 @@
   color: transparent;
   font-weight: 700;
   font-size: 1.125rem;
-}
-
-.menuCardXp {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.menuCardXpIcon {
-  font-size: 0.75rem;
-  color: rgb(245 158 11);
-  font-variation-settings: 'FILL' 1;
-}
-
-.menuCardXpText {
-  font-size: 0.625rem;
-  font-weight: 700;
-  color: rgb(245 158 11);
 }
 
 .menuCardAddBtn {

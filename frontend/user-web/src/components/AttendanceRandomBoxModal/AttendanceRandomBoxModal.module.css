@@ -6,13 +6,6 @@
   padding: 0.25rem 0 0.5rem;
 }
 
-.title {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: rgb(15 23 42);
-  margin: 0 0 0.35rem;
-}
-
 .subtitle {
   font-size: 0.8125rem;
   line-height: 1.45;
@@ -176,38 +169,6 @@
   color: rgb(100 116 139);
   margin: 0 0 1.25rem;
   line-height: 1.5;
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.primaryBtn {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border-radius: 9999px;
-  border: none;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  color: #fff;
-  background: linear-gradient(to right, var(--color-primary), #ec4899);
-  box-shadow: 0 8px 16px rgba(236, 72, 153, 0.35);
-  cursor: pointer;
-}
-
-.secondaryBtn {
-  width: 100%;
-  padding: 0.65rem 1rem;
-  border-radius: 9999px;
-  border: 1px solid rgb(226 232 240);
-  background: #fff;
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: rgb(71 85 105);
-  cursor: pointer;
 }
 
 .opening {

@@ -4,16 +4,18 @@
  * - 매장명, 별점, 사진, 한줄평, AI 리뷰 도움 모달
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import AppModal from '../../components/AppModal/AppModal'
+import mc from '../../components/AppModal/modalContent.module.css'
 import { ApiError } from '../../api/authClient'
 import { assertImageFileConstraints, MAX_REVIEW_IMAGES, uploadImageFileViaPresigned } from '../../api/uploads'
-import { createReview, generateAiReview } from '../../api/reviews'
+import { createReview, fetchReview, generateAiReview, updateReview } from '../../api/reviews'
 import { useProfile } from '../../hooks/useProfile'
-import { resolveMemberProfileIdForReview } from '../../lib/authStorage'
+import { getCachedMemberProfileId, resolveMemberProfileIdForReview } from '../../lib/authStorage'
+import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { notifyReviewNotificationsUpdated } from '../../hooks/useUnreadReviewNotificationCount'
 import styles from './ReviewWritePage.module.css'
 
@@ -21,6 +23,7 @@ interface ReviewWritePageProps {
   storeName?: string
   orderId: number
   storeId: number
+  reviewId?: number
   onBack?: () => void
   /** 서버 등록 성공 후 */
   onSubmitted?: () => void
@@ -70,6 +73,7 @@ function ReviewWritePage({
   storeName = '카페 네온 하이브',
   orderId,
   storeId,
+  reviewId,
   onBack,
   onSubmitted,
   onGoHome,
@@ -79,10 +83,13 @@ function ReviewWritePage({
   onMypageClick,
   cartCount = 0
 }: ReviewWritePageProps) {
+  const isEditMode = reviewId != null && reviewId > 0
   const { profile } = useProfile()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const photoIdRef = useRef(0)
   const pendingPhotosRef = useRef<PendingPhotoRow[]>([])
+  const [editLoading, setEditLoading] = useState(isEditMode)
+  const [existingImagePaths, setExistingImagePaths] = useState<string[]>([])
   const [rating, setRating] = useState(0)
   const [content, setContent] = useState('')
   /** 로컬 미리보기(data URL) + 업로드용 File */
@@ -101,9 +108,55 @@ function ReviewWritePage({
     pickup: 0,
   })
 
+  const handleBack = useCallback(() => {
+    if (onBack) {
+      onBack()
+      return
+    }
+    onGoHome?.()
+  }, [onBack, onGoHome])
+
   const handleStarClick = (star: number) => {
     setRating(star)
   }
+
+  const totalPhotoCount = existingImagePaths.length + pendingPhotos.length
+
+  useEffect(() => {
+    if (!isEditMode || !reviewId) {
+      setEditLoading(false)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      setEditLoading(true)
+      try {
+        const dto = await fetchReview(reviewId)
+        if (cancelled) return
+        setRating(dto.overallRating)
+        setContent(dto.content)
+        setUsedAiAssist(Boolean(dto.aiGeneratedHelped))
+        const taste = dto.tasteRating ?? 0
+        const packaging = dto.packagingRating ?? 0
+        const pickup = dto.timeRating ?? 0
+        if (taste > 0 && packaging > 0 && pickup > 0) {
+          setAiRatings({ taste, packaging, pickup })
+        }
+        const paths = normalizeReviewImageList(dto as unknown as Record<string, unknown>)
+        setExistingImagePaths(paths)
+      } catch (e) {
+        if (!cancelled) {
+          alert(e instanceof ApiError ? e.message : '리뷰 정보를 불러오지 못했습니다.')
+          handleBack()
+        }
+      } finally {
+        if (!cancelled) setEditLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isEditMode, reviewId, handleBack])
 
   useLayoutEffect(() => {
     pendingPhotosRef.current = pendingPhotos
@@ -119,7 +172,7 @@ function ReviewWritePage({
 
   useEffect(() => {
     if (photoPreviewIndex === null) return
-    const len = pendingPhotos.length
+    const len = totalPhotoCount
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setPhotoPreviewIndex(null)
@@ -142,14 +195,34 @@ function ReviewWritePage({
       document.body.style.overflow = prevOverflow
       window.removeEventListener('keydown', onKey)
     }
-  }, [photoPreviewIndex, pendingPhotos.length])
+  }, [photoPreviewIndex, totalPhotoCount])
 
   useEffect(() => {
-    if (pendingPhotos.length === 0) setPhotoPreviewIndex(null)
-    else if (photoPreviewIndex !== null && photoPreviewIndex >= pendingPhotos.length) {
-      setPhotoPreviewIndex(pendingPhotos.length - 1)
+    if (totalPhotoCount === 0) setPhotoPreviewIndex(null)
+    else if (photoPreviewIndex !== null && photoPreviewIndex >= totalPhotoCount) {
+      setPhotoPreviewIndex(totalPhotoCount - 1)
     }
-  }, [pendingPhotos.length, photoPreviewIndex])
+  }, [totalPhotoCount, photoPreviewIndex])
+
+  const previewUrlAt = (index: number): string => {
+    if (index < existingImagePaths.length) {
+      const path = existingImagePaths[index]!
+      const u = resolveDisplayImageUrl(path)
+      return (u && u.length > 0 ? u : path) as string
+    }
+    const row = pendingPhotos[index - existingImagePaths.length]
+    return row?.previewUrl ?? ''
+  }
+
+  const handleRemoveExistingPhoto = (index: number) => {
+    setExistingImagePaths((prev) => prev.filter((_, i) => i !== index))
+    setPhotoPreviewIndex((cur) => {
+      if (cur === null) return null
+      if (cur === index) return null
+      if (cur > index) return cur - 1
+      return cur
+    })
+  }
 
   /** File/Blob — 일부 환경에서 `instanceof File` 만으로 걸러질 수 있음 */
   const isUploadableImage = (f: unknown): f is Blob =>
@@ -180,7 +253,7 @@ function ReviewWritePage({
         setPendingPhotos((prev) => {
           const next = [...prev]
           for (const row of batch) {
-            if (next.length >= MAX_REVIEW_IMAGES) {
+            if (existingImagePaths.length + next.length >= MAX_REVIEW_IMAGES) {
               alert(`사진은 최대 ${MAX_REVIEW_IMAGES}장까지 추가할 수 있습니다.`)
               break
             }
@@ -266,15 +339,23 @@ function ReviewWritePage({
   }
 
   const handleSubmit = () => {
-    const memberProfileId = resolveMemberProfileIdForReview(orderId, profile?.memberProfileId)
+    const memberProfileId = isEditMode
+      ? profile?.memberProfileId ?? getCachedMemberProfileId()
+      : resolveMemberProfileIdForReview(orderId, profile?.memberProfileId)
     if (memberProfileId == null || Number.isNaN(Number(memberProfileId))) {
       alert(
-        '회원 프로필 ID를 확인할 수 없습니다. 결제 시 주문이 서버에 생성된 뒤 다시 시도해 주세요. (데모 주문만 있는 경우에는 실제 주문을 한 번 진행해 주세요.)',
+        isEditMode
+          ? '회원 프로필 정보를 확인할 수 없습니다. 다시 로그인한 뒤 시도해 주세요.'
+          : '회원 프로필 ID를 확인할 수 없습니다. 결제 완료 후 생성된 주문에서 다시 시도해 주세요.',
       )
       return
     }
-    if (!orderId || !storeId) {
+    if (!isEditMode && (!orderId || !storeId)) {
       alert('주문 정보(orderId / storeId)가 없습니다. 주문 내역에서 리뷰 작성을 다시 시도해 주세요.')
+      return
+    }
+    if (isEditMode && !reviewId) {
+      alert('수정할 리뷰 정보가 없습니다.')
       return
     }
     if (rating === 0) {
@@ -312,27 +393,41 @@ function ReviewWritePage({
           imagePaths.push(url)
         }
 
-        await createReview({
-          orderId,
+        const allImagePaths = [...existingImagePaths, ...imagePaths]
+        const body = {
           memberProfileId: Number(memberProfileId),
-          storeId,
           overallRating: rating,
           packagingRating,
           tasteRating,
           timeRating,
           content: content.trim(),
           aiGeneratedHelped: usedAiAssist,
-          imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
-        })
-        notifyReviewNotificationsUpdated()
-        alert(
-          imagePaths.length > 0
-            ? `리뷰가 등록되었습니다. 사진 ${imagePaths.length}장이 함께 저장되었습니다.`
-            : '리뷰가 등록되었습니다.',
-        )
+          imagePaths: allImagePaths.length > 0 ? allImagePaths : undefined,
+        }
+
+        if (isEditMode && reviewId) {
+          await updateReview(reviewId, body)
+          alert(
+            allImagePaths.length > 0
+              ? `리뷰가 수정되었습니다. 사진 ${allImagePaths.length}장이 반영되었습니다.`
+              : '리뷰가 수정되었습니다.',
+          )
+        } else {
+          await createReview({
+            orderId,
+            storeId,
+            ...body,
+          })
+          notifyReviewNotificationsUpdated()
+          alert(
+            allImagePaths.length > 0
+              ? `리뷰가 등록되었습니다. 사진 ${allImagePaths.length}장이 함께 저장되었습니다.`
+              : '리뷰가 등록되었습니다.',
+          )
+        }
         onSubmitted?.()
       } catch (e) {
-        alert(e instanceof ApiError ? e.message : '리뷰 등록에 실패했습니다.')
+        alert(e instanceof ApiError ? e.message : isEditMode ? '리뷰 수정에 실패했습니다.' : '리뷰 등록에 실패했습니다.')
       } finally {
         setSubmitLoading(false)
       }
@@ -343,13 +438,19 @@ function ReviewWritePage({
     <Layout showBackground={false}>
       <div className={styles.root}>
         <header className={styles.header}>
-          <button type="button" onClick={() => onBack?.()} className={styles.backButton}>
+          <button type="button" onClick={handleBack} className={styles.backButton} aria-label="뒤로 가기">
             <span className={`material-symbols-outlined ${styles.backIcon}`}>arrow_back</span>
           </button>
-          <h1 className={styles.headerTitle}>리뷰 쓰기</h1>
+          <h1 className={styles.headerTitle}>{isEditMode ? '리뷰 수정' : '리뷰 쓰기'}</h1>
         </header>
 
-        <div className={styles.scrollArea}>
+        {editLoading ? (
+          <div className={styles.scrollArea}>
+            <p className={styles.storeSub}>리뷰 정보를 불러오는 중…</p>
+          </div>
+        ) : null}
+
+        <div className={styles.scrollArea} style={editLoading ? { display: 'none' } : undefined}>
           <section className={styles.storeSection}>
             <span className={styles.verifiedBadge}>인증된 방문</span>
             <h2 className={styles.storeName}>{storeName}</h2>
@@ -367,9 +468,9 @@ function ReviewWritePage({
             <div className={styles.photosHeader}>
               <div className={styles.photosHeaderLeft}>
                 <h3 className={styles.photosTitle}>맛있는 순간, 사진으로 남겨요</h3>
-                {pendingPhotos.length > 0 ? (
+                {totalPhotoCount > 0 ? (
                   <span className={styles.photoCountBadge} aria-live="polite">
-                    {pendingPhotos.length}장 골랐어요
+                    {totalPhotoCount}장 골랐어요
                   </span>
                 ) : null}
               </div>
@@ -398,26 +499,60 @@ function ReviewWritePage({
               <button
                 type="button"
                 className={styles.addPhotoButton}
-                disabled={pendingPhotos.length >= MAX_REVIEW_IMAGES || photoPickLoading}
+                disabled={totalPhotoCount >= MAX_REVIEW_IMAGES || photoPickLoading}
                 onClick={() => photoInputRef.current?.click()}
               >
                 <span className={`material-symbols-outlined ${styles.addPhotoIcon}`}>photo_camera</span>
                 <span className={styles.addPhotoLabel}>사진 고르기</span>
               </button>
-              {pendingPhotos.map((photo, index) => (
+              {existingImagePaths.map((path, index) => {
+                const previewUrl = resolveDisplayImageUrl(path) || path
+                return (
+                  <div key={`existing-${path}-${index}`} className={styles.photoWrap}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={styles.photoThumbHit}
+                      onClick={() => setPhotoPreviewIndex(index)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setPhotoPreviewIndex(index)
+                        }
+                      }}
+                      aria-label={`기존 사진 ${index + 1} 크게 보기`}
+                    >
+                      <img src={previewUrl} alt="" className={styles.photoImg} draggable={false} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveExistingPhoto(index)
+                      }}
+                      className={styles.removePhotoButton}
+                    >
+                      <span className={`material-symbols-outlined ${styles.removePhotoIcon}`}>close</span>
+                    </button>
+                  </div>
+                )
+              })}
+              {pendingPhotos.map((photo, index) => {
+                const displayIndex = existingImagePaths.length + index
+                return (
                 <div key={photo.id} className={styles.photoWrap}>
                   <div
                     role="button"
                     tabIndex={0}
                     className={styles.photoThumbHit}
-                    onClick={() => setPhotoPreviewIndex(index)}
+                    onClick={() => setPhotoPreviewIndex(displayIndex)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        setPhotoPreviewIndex(index)
+                        setPhotoPreviewIndex(displayIndex)
                       }
                     }}
-                    aria-label={`사진 ${index + 1} 크게 보기`}
+                    aria-label={`사진 ${displayIndex + 1} 크게 보기`}
                   >
                     <img src={photo.previewUrl} alt="" className={styles.photoImg} draggable={false} />
                   </div>
@@ -428,8 +563,8 @@ function ReviewWritePage({
                       handleRemovePhoto(index)
                       setPhotoPreviewIndex((cur) => {
                         if (cur === null) return null
-                        if (cur === index) return null
-                        if (cur > index) return cur - 1
+                        if (cur === displayIndex) return null
+                        if (cur > displayIndex) return cur - 1
                         return cur
                       })
                     }}
@@ -438,13 +573,13 @@ function ReviewWritePage({
                     <span className={`material-symbols-outlined ${styles.removePhotoIcon}`}>close</span>
                   </button>
                 </div>
-              ))}
+              )})}
             </div>
           </section>
 
           <section className={styles.contentSection}>
             <div className={styles.contentHeader}>
-              <h3 className={styles.contentTitle}>리뷰 작성</h3>
+              <h3 className={styles.contentTitle}>{isEditMode ? '리뷰 수정' : '리뷰 작성'}</h3>
               <button
                 type="button"
                 onClick={handleAIButtonClick}
@@ -472,10 +607,16 @@ function ReviewWritePage({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitLoading}
+            disabled={submitLoading || editLoading}
             className={styles.submitButton}
           >
-            {submitLoading ? '등록 중…' : '리뷰 등록하기'}
+            {submitLoading
+              ? isEditMode
+                ? '수정 중…'
+                : '등록 중…'
+              : isEditMode
+                ? '리뷰 수정하기'
+                : '리뷰 등록하기'}
           </button>
         </div>
 
@@ -494,7 +635,7 @@ function ReviewWritePage({
 
         {typeof document !== 'undefined' &&
           photoPreviewIndex !== null &&
-          pendingPhotos[photoPreviewIndex] &&
+          previewUrlAt(photoPreviewIndex) &&
           createPortal(
             <div className={styles.photoLightbox} role="dialog" aria-modal="true" aria-label="사진 미리보기">
               <button
@@ -512,14 +653,14 @@ function ReviewWritePage({
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
-                {pendingPhotos.length > 1 ? (
+                {totalPhotoCount > 1 ? (
                   <button
                     type="button"
                     className={styles.photoLightboxPrev}
                     aria-label="이전 사진"
                     onClick={() =>
                       setPhotoPreviewIndex((i) =>
-                        i === null ? null : (i - 1 + pendingPhotos.length) % pendingPhotos.length,
+                        i === null ? null : (i - 1 + totalPhotoCount) % totalPhotoCount,
                       )
                     }
                   >
@@ -527,25 +668,25 @@ function ReviewWritePage({
                   </button>
                 ) : null}
                 <img
-                  src={pendingPhotos[photoPreviewIndex].previewUrl}
+                  src={previewUrlAt(photoPreviewIndex)}
                   alt={`리뷰 사진 ${photoPreviewIndex + 1}`}
                   className={styles.photoLightboxImg}
                   draggable={false}
                 />
-                {pendingPhotos.length > 1 ? (
+                {totalPhotoCount > 1 ? (
                   <button
                     type="button"
                     className={styles.photoLightboxNext}
                     aria-label="다음 사진"
                     onClick={() =>
-                      setPhotoPreviewIndex((i) => (i === null ? null : (i + 1) % pendingPhotos.length))
+                      setPhotoPreviewIndex((i) => (i === null ? null : (i + 1) % totalPhotoCount))
                     }
                   >
                     <span className="material-symbols-outlined">chevron_right</span>
                   </button>
                 ) : null}
                 <p className={styles.photoLightboxCounter}>
-                  {photoPreviewIndex + 1} / {pendingPhotos.length}
+                  {photoPreviewIndex + 1} / {totalPhotoCount}
                 </p>
               </div>
             </div>,
@@ -557,18 +698,17 @@ function ReviewWritePage({
           onClose={() => setShowAIModal(false)}
           size="lg"
           flush
-          panelClassName={styles.modalShell}
         >
-              <div className={styles.modalHeader}>
-                <h3 className={styles.modalTitle}>
-                  <span className={`material-symbols-outlined ${styles.modalTitleIcon}`}>auto_awesome</span>
+              <div className={mc.header}>
+                <h3 className={mc.headerTitle}>
+                  <span className={`material-symbols-outlined ${mc.headerTitleIcon}`}>auto_awesome</span>
                   AI 상세평가
                 </h3>
-                <button type="button" onClick={() => setShowAIModal(false)} className={styles.modalClose}>
+                <button type="button" onClick={() => setShowAIModal(false)} className={mc.closeBtn} aria-label="닫기">
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
-              <div className={styles.modalBody}>
+              <div className={mc.body}>
                 <div className={styles.modalItem}>
                   <div className={styles.modalItemHeader}>
                     <span className={styles.modalItemLabel}>음식의 맛</span>
@@ -609,16 +749,16 @@ function ReviewWritePage({
                   </div>
                 </div>
               </div>
-              <div className={styles.modalFooter}>
+              <div className={mc.footer}>
                 <button
                   type="button"
                   onClick={handleAIGenerateFromModal}
                   disabled={aiGenerating}
-                  className={styles.modalSubmit}
+                  className={mc.btnPrimary}
                 >
                   {aiGenerating ? '생성 중…' : '생성하기'}
                 </button>
-                <p className={styles.modalHint}>
+                <p className={mc.footerHint}>
                   본문이 비어 있을 때만 이 화면이 열립니다. 글을 먼저 쓰고 AI리뷰 생성을 누르면 별점 선택 없이 초안을 다듬습니다.
                 </p>
               </div>

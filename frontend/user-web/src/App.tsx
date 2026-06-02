@@ -5,11 +5,6 @@
  * - 전역 상태: 장바구니, 적용 쿠폰, 진행 중 주문 여부, 리뷰 작성 대상 매장명
  * - 로그인 여부에 따라 홈 또는 로그인에서 시작
  *
- * 미리보기(쿼리는 로드 후 주소에서 제거됨):
- * - 지도: ?map=1
- * - 진행 중 주문 UI(홈 배너·지도 픽업 경로·주문내역 카드): ?activeOrder=1
- * - 예: 픽업 지도만 바로: ?map=1&activeOrder=1
- * - 주문 현황 페이지까지: ?orderStatus=1&activeOrder=1
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -35,6 +30,7 @@ import {
   RankingPage,
 } from './pages'
 import { clearTokens, getAccessToken } from './lib/authStorage'
+import { pruneUnpaidLocalOrders } from './lib/orderResolve'
 import { useActivePickup } from './hooks/useActivePickup'
 import { fetchMyCart, mapCartListToUiLines, type ServerCartLineUi } from './api/cart'
 import type { ReviewWritePayload } from './api/reviews'
@@ -53,41 +49,21 @@ interface AppliedCoupon {
 /** 장바구니 줄 — 서버 GET /carts 매핑 결과와 동일 구조 */
 type CartItem = ServerCartLineUi
 
-/**
- * 개발·데모용 URL 쿼리: 초기 페이지·진행 중 주문 여부만 설정하고 쿼리스트링은 제거.
- */
-function readLaunchQuery(): { page: Page | null; activeOrder: boolean } {
-  if (typeof window === 'undefined') return { page: null, activeOrder: false }
-  const q = new URLSearchParams(window.location.search)
-  let page: Page | null = null
-  if (q.get('orderStatus') === '1') page = 'orderStatus'
-  else if (q.get('map') === '1') page = 'map'
-  const activeOrder = q.get('activeOrder') === '1' || q.get('orderStatus') === '1'
-  if (page !== null || activeOrder) {
-    const clean = `${window.location.pathname}${window.location.hash}`
-    window.history.replaceState({}, '', clean)
-  }
-  return { page, activeOrder }
-}
-
 function App() {
-  const launch = readLaunchQuery()
-
   /** 현재 화면에 표시할 페이지 */
-  const [currentPage, setCurrentPage] = useState<Page>(
-    () => launch.page ?? (getAccessToken() ? 'home' : 'login')
-  )
+  const [currentPage, setCurrentPage] = useState<Page>(() => (getAccessToken() ? 'home' : 'login'))
   /** 직전에 보고 있던 페이지 (뒤로가기용) */
   const [lastPage, setLastPage] = useState<Page | null>(null)
   /** 장바구니에서 사용 중인 쿠폰 (미사용 시 null) */
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   /** 리뷰 작성 페이지로 넘길 주문·매장 정보 */
   const [reviewWriteTarget, setReviewWriteTarget] = useState<ReviewWritePayload | null>(null)
+  const [couponHighlightExpiring, setCouponHighlightExpiring] = useState(false)
   /** 장바구니 상품 목록 (로그인 시 GET /api/v1/carts) */
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [cartStoreId, setCartStoreId] = useState<number | null>(null)
   const [cartStoreName, setCartStoreName] = useState<string | null>(null)
-  const [selectedStoreId, setSelectedStoreId] = useState(1)
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null)
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null)
   /** 알림 → 주문 현황 등 특정 주문으로 열 때 */
   const [focusOrderId, setFocusOrderId] = useState<number | null>(null)
@@ -100,7 +76,36 @@ function App() {
     refresh: refreshActivePickup,
   } = useActivePickup(focusOrderId)
 
-  const hasActiveOrder = launch.activeOrder && pickupContextLoading ? true : hasActivePickup
+  /** 실제 결제 완료·픽업 전 주문만 (개발 URL ?activeOrder=1 로 배너 강제 표시하지 않음) */
+  const hasActiveOrder = hasActivePickup
+
+  /** 리뷰 작성/수정 진입 — 뒤로가기 시 직전 화면으로 복귀 */
+  const openReviewWrite = useCallback(
+    (payload: ReviewWritePayload, returnPage?: Page) => {
+      setLastPage(returnPage ?? currentPage)
+      setReviewWriteTarget(payload)
+      setCurrentPage('reviewWrite')
+    },
+    [currentPage],
+  )
+
+  const closeReviewWrite = useCallback(() => {
+    const fallback: Page = reviewWriteTarget?.reviewId ? 'myReviews' : 'orders'
+    let returnTo = lastPage ?? fallback
+    if (returnTo === 'reviewWrite') returnTo = fallback
+    setReviewWriteTarget(null)
+    setCurrentPage(returnTo)
+  }, [lastPage, reviewWriteTarget?.reviewId])
+
+  /** 직전 화면으로 복귀 (현재 페이지·리뷰작성 화면은 제외) */
+  const goBackFrom = useCallback(
+    (from: Page, fallback: Page) => () => {
+      const dest =
+        lastPage && lastPage !== from && lastPage !== 'reviewWrite' ? lastPage : fallback
+      setCurrentPage(dest)
+    },
+    [lastPage],
+  )
 
   const navigateFromNotification = useCallback((target: NotificationNavigateTarget) => {
     setLastPage('notifications')
@@ -114,16 +119,16 @@ function App() {
         setCurrentPage('orderStatus')
         break
       case 'reviewWrite':
-        setReviewWriteTarget(target.payload)
-        setCurrentPage('reviewWrite')
+        openReviewWrite(target.payload, 'notifications')
         break
-      case 'mypage':
-        setCurrentPage('mypage')
+      case 'coupon':
+        setCouponHighlightExpiring(Boolean(target.highlightExpiringSoon))
+        setCurrentPage('coupon')
         break
       default:
         break
     }
-  }, [])
+  }, [openReviewWrite])
 
   const refreshCart = useCallback(async () => {
     if (!getAccessToken()) {
@@ -149,10 +154,20 @@ function App() {
   }, [refreshCart])
 
   useEffect(() => {
+    pruneUnpaidLocalOrders()
+  }, [])
+
+  useEffect(() => {
     if (currentPage === 'menu' && selectedMenuId === null) {
       setCurrentPage('store')
     }
   }, [currentPage, selectedMenuId])
+
+  useEffect(() => {
+    if (currentPage === 'store' && selectedStoreId == null) {
+      setCurrentPage('category')
+    }
+  }, [currentPage, selectedStoreId])
 
   /** 장바구니 총 수량 (하단 네비 뱃지 등에 사용) */
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -238,6 +253,7 @@ function App() {
           />
         )
       case 'store':
+        if (selectedStoreId == null) return null
         return (
           <StoreDetailPage
             storeId={selectedStoreId}
@@ -258,7 +274,7 @@ function App() {
           />
         )
       case 'menu':
-        return selectedMenuId != null ? (
+        return selectedMenuId != null && selectedStoreId != null ? (
           <MenuDetailPage
             storeId={selectedStoreId}
             menuId={selectedMenuId}
@@ -281,7 +297,10 @@ function App() {
               setCartStoreName(null)
               setCurrentPage('orderStatus')
             }}
-            onCouponClick={goTo('coupon')}
+            onCouponClick={() => {
+              setCouponHighlightExpiring(false)
+              goTo('coupon')()
+            }}
             appliedCoupon={appliedCoupon}
             onRemoveCoupon={() => setAppliedCoupon(null)}
             onGoHome={goTo('home')}
@@ -297,12 +316,25 @@ function App() {
             cartStoreId={cartStoreId}
             onRefreshCart={refreshCart}
             pickupStoreName={cartStoreName}
+            onPickupStoreClick={() => {
+              if (cartStoreId != null) {
+                openStoreById(cartStoreId)
+                return
+              }
+              window.sessionStorage.setItem('categoryActiveTab', '전체')
+              goTo('category')()
+            }}
           />
         )
       case 'coupon':
         return (
           <CouponSelectPage 
-            onClose={goTo('cart')} 
+            highlightExpiringSoon={couponHighlightExpiring}
+            onClose={() => {
+              const back = lastPage && lastPage !== 'coupon' ? lastPage : 'cart'
+              setCouponHighlightExpiring(false)
+              setCurrentPage(back)
+            }}
             onSelect={(coupon) => {
               if (coupon) {
                 setAppliedCoupon(coupon)
@@ -328,10 +360,7 @@ function App() {
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
-            onReviewWriteClick={(payload) => {
-              setReviewWriteTarget(payload)
-              setCurrentPage('reviewWrite')
-            }}
+            onReviewWriteClick={openReviewWrite}
             hasActiveOrder={hasActiveOrder}
             activeOrder={activeOrder}
             pickupDestination={pickupDestination}
@@ -352,10 +381,7 @@ function App() {
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
-            onReviewWriteClick={(payload) => {
-              setReviewWriteTarget(payload)
-              setCurrentPage('reviewWrite')
-            }}
+            onReviewWriteClick={openReviewWrite}
             onPickupComplete={() => void refreshActivePickup()}
             activeOrder={activeOrder}
             pickupDestination={pickupDestination}
@@ -390,7 +416,10 @@ function App() {
             onGoHome={goTo('home')} 
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
-            onCouponClick={goTo('coupon')}
+            onCouponClick={() => {
+              setCouponHighlightExpiring(false)
+              goTo('coupon')()
+            }}
             onMapClick={goTo('map')}
             onReviewsClick={goTo('myReviews')}
             onFavoritesClick={goTo('favorites')}
@@ -409,8 +438,13 @@ function App() {
       case 'myReviews':
         return (
           <MyReviewsPage 
-            onBack={goTo('mypage')}
-            onWriteReview={goTo('orders')}
+            onBack={goBackFrom('myReviews', 'mypage')}
+            onWriteReview={() => {
+              setLastPage('myReviews')
+              setCurrentPage('orders')
+            }}
+            onEditReview={(payload) => openReviewWrite(payload, 'myReviews')}
+            onBackToMypage={goTo('mypage')}
             onGoHome={goTo('home')}
             onCartClick={goTo('cart')}
             onOrdersClick={goTo('orders')}
@@ -425,14 +459,9 @@ function App() {
             storeName={reviewWriteTarget?.storeName ?? ''}
             orderId={reviewWriteTarget?.orderId ?? 0}
             storeId={reviewWriteTarget?.storeId ?? 0}
-            onBack={() => {
-              setReviewWriteTarget(null)
-              goTo('orders')()
-            }}
-            onSubmitted={() => {
-              setReviewWriteTarget(null)
-              setCurrentPage('orders')
-            }}
+            reviewId={reviewWriteTarget?.reviewId}
+            onBack={closeReviewWrite}
+            onSubmitted={closeReviewWrite}
             onGoHome={goTo('home')}
             onCartClick={goTo('cart')}
             onOrdersClick={goTo('orders')}
@@ -463,13 +492,7 @@ function App() {
       case 'notifications':
         return (
           <NotificationsPage
-            onBack={() => {
-              if (lastPage) {
-                setCurrentPage(lastPage)
-              } else {
-                setCurrentPage('home')
-              }
-            }}
+            onBack={goBackFrom('notifications', 'home')}
             onGoHome={goTo('home')}
             onCartClick={goTo('cart')}
             onOrdersClick={goTo('orders')}

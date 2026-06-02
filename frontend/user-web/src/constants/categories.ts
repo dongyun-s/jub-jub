@@ -66,46 +66,17 @@ export interface FeaturedRestaurant {
   minOrder: string
   rating: number
   reviews: number
-  points: string
   hashtags: string[]
   categoryId?: number
-  /** 픽업/매장 지도 마커용 WGS84 (없으면 별도 폴백) */
+  /** 픽업/매장 지도 마커용 WGS84 */
   lat?: number
   lng?: number
   /** /stores/sorted 응답 — 3km 이내 거리(m) */
   distanceMeters?: number
 }
 
-/** 홈/카테고리 공통 맛집 던전 카드 데이터(API 실패 시 폴백) */
-export const FEATURED_RESTAURANTS: FeaturedRestaurant[] = [
-  {
-    id: 1,
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
-    tags: ['핫 미션', '포장 -10%'],
-    title: '네온 피자 슬라이스',
-    delivery: '배달 25-35분',
-    minOrder: '최소 주문 15,000원',
-    rating: 4.8,
-    reviews: 2500,
-    points: '+120',
-    hashtags: ['#음폭맛집', '#치즈폭탄'],
-    categoryId: 2,
-    lat: 37.4979,
-    lng: 127.0276,
-  },
-  {
-    id: 2,
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
-    tags: ['신규 퀘스트'],
-    title: '집밥의 정석 : 퀘스트 완료',
-    delivery: '배달 30-45분',
-    minOrder: '최소 주문 12,000원',
-    rating: 4.9,
-    reviews: 1200,
-    points: '+150',
-    hashtags: ['#한식', '#포근한맛집'],
-    categoryId: 1,
-    lat: 37.5012,
-    lng: 127.0396,
-  },
-]
+/** 매장 ID 기준 카드 썸네일 (API 이미지 없을 때) */
+export function storeCardImageById(storeId?: number | null): string {
+  const idx = storeId != null ? Math.abs(storeId) % STORE_LIST_CARD_IMAGES.length : 0
+  return STORE_LIST_CARD_IMAGES[idx]!
+}

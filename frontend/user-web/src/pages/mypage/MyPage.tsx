@@ -1,7 +1,7 @@
 /**
  * MyPage.tsx
  * 마이페이지 (탭: 내정보)
- * - 프로필·등급·이동거리·주간 출석 퀘스트, 주문내역/쿠폰/리뷰/찜 등 메뉴
+ * - 프로필·등급·이동거리·연속 출석(7일 rolling) 퀘스트, 주문내역/쿠폰/리뷰/찜 등 메뉴
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -10,32 +10,27 @@ import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import { useProfile } from '../../hooks/useProfile'
 import AppModal from '../../components/AppModal/AppModal'
+import mc from '../../components/AppModal/modalContent.module.css'
 import AttendanceRandomBoxModal from '../../components/AttendanceRandomBoxModal/AttendanceRandomBoxModal'
-/** [삭제용] 랜덤박스 미리보기 — 배포 시 아래 import + JSX 블록 제거 */
-import AttendanceRandomBoxPreviewButton from '../../components/AttendanceRandomBoxModal/AttendanceRandomBoxPreviewButton'
-import type { AttendanceBoxPrize } from '../../lib/attendanceRandomBox'
 import { ApiError } from '../../api/authClient'
 import { createMyProfileImage, deleteMyProfileImage, updateMyProfileImage } from '../../api/profileImage'
 import { uploadImageFileViaPresigned } from '../../api/uploads'
 import {
   fetchAttendanceWeek,
   fetchAttendanceHistory,
-  fetchMyCoupons,
   fetchRewardMe,
   postAttendanceCheck,
   type RewardMeResponse,
 } from '../../api/rewards'
+import { daysUntilRandomBoxStreak, sevenDayRewardCycleProgress } from '../../lib/attendanceRandomBox'
+import { clearTokens, getAccessToken } from '../../lib/authStorage'
 import {
-  attendanceUntilNextRandomBox,
-  countServerLifetimeAttendance,
-  invalidateLifetimeAttendanceCache,
-  isAttendanceRandomBoxMilestone,
-} from '../../lib/attendanceRandomBox'
-import { getAccessToken } from '../../lib/authStorage'
-import {
+  clearLocalAttendanceMark,
+  syncAttendanceStreakFromServer,
   getAttendanceStreak,
   getWeekAttendanceCheckedLocally,
   isAttendanceMarkedDone,
+  isoDateLocal,
   markAttendanceDone,
   weekIsoDatesMondayFirst,
 } from '../../lib/rewardAttendance'
@@ -43,6 +38,7 @@ import TierIcon from '../../components/TierIcon/TierIcon'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { useUnreadReviewNotificationCount } from '../../hooks/useUnreadReviewNotificationCount'
+import { deleteMyAccount, updateMyProfile } from '../../api/users'
 import styles from './MyPage.module.css'
 
 interface MyPageProps {
@@ -59,9 +55,7 @@ interface MyPageProps {
   cartCount?: number
 }
 
-const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-
-/** 월요일=0 … 일요일=6 */
+/** 월요일=0 … 일요일=6 (서버 주간 병합·오늘 칸 동기화용) */
 function todayWeekIndex(): number {
   return (new Date().getDay() + 6) % 7
 }
@@ -87,11 +81,16 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
   const [showAttendanceModal, setShowAttendanceModal] = useState(false)
   const [attendanceModalMessage, setAttendanceModalMessage] = useState('오늘의 출석체크가 완료되었습니다.')
   const [randomBoxOpen, setRandomBoxOpen] = useState(false)
-  const [randomBoxCouponIdsBefore, setRandomBoxCouponIdsBefore] = useState<Set<number>>(() => new Set())
-  const [randomBoxMockPrize, setRandomBoxMockPrize] = useState<AttendanceBoxPrize | null>(null)
-  const [lifetimeAttendanceCount, setLifetimeAttendanceCount] = useState<number | null>(null)
 
   const questSectionRef = useRef<HTMLDivElement | null>(null)
+
+  /** 개인정보 설정 (PUT /users/me, DELETE /users/me) */
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [editNickname, setEditNickname] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [withdrawPassword, setWithdrawPassword] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
 
   const loadRewards = useCallback(async () => {
     if (!getAccessToken()) {
@@ -148,6 +147,8 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
     const sync = async () => {
       const localWeek = getWeekAttendanceCheckedLocally(profile?.email)
       let merged = [...localWeek]
+      const todayIso = isoDateLocal(new Date())
+      let serverTodayAttended: boolean | null = null
 
       if (getAccessToken()) {
         const apiWeek = await fetchAttendanceWeek()
@@ -159,20 +160,34 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             year: now.getFullYear(),
             month: now.getMonth() + 1,
           })
-          if (!cancelled && history.attendedDates.length > 0) {
+          if (!cancelled) {
             const set = new Set(history.attendedDates)
-            const weekDates = weekIsoDatesMondayFirst()
-            const fromHistory = weekDates.map((d) => set.has(d))
-            merged = mergeWeek(merged, fromHistory)
+            serverTodayAttended = set.has(todayIso)
+            syncAttendanceStreakFromServer(profile?.email, history.attendedDates)
+            if (history.attendedDates.length > 0) {
+              const weekDates = weekIsoDatesMondayFirst()
+              const fromHistory = weekDates.map((d) => set.has(d))
+              merged = mergeWeek(merged, fromHistory)
+            }
+            if (serverTodayAttended) {
+              markAttendanceDone(profile?.email)
+            } else {
+              clearLocalAttendanceMark(profile?.email, todayIso)
+              merged[todayIndex] = false
+            }
           }
         } catch {
           /* 이번 달 history 실패 시 로컬만 */
         }
       }
 
-      const todayDone = isAttendanceMarkedDone(profile?.email)
+      const todayDone =
+        serverTodayAttended !== null && getAccessToken()
+          ? serverTodayAttended
+          : isAttendanceMarkedDone(profile?.email)
       if (!cancelled) {
         merged[todayIndex] = merged[todayIndex] || todayDone
+        if (serverTodayAttended === false) merged[todayIndex] = false
         setCheckedDays(merged)
         setAttendanceStreak(getAttendanceStreak(profile?.email))
       }
@@ -189,28 +204,6 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
       window.removeEventListener('jubjub-attendance-local', onLocal)
     }
   }, [profile?.email, todayIndex, profileLoading])
-
-  /** 누적 출석(랜덤박스 안내) — 로그인·프로필 준비 후 지연 로드, 과도한 동시 API 방지 */
-  useEffect(() => {
-    if (profileLoading || !getAccessToken()) {
-      setLifetimeAttendanceCount(null)
-      return
-    }
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      void countServerLifetimeAttendance()
-        .then((total) => {
-          if (!cancelled) setLifetimeAttendanceCount(total)
-        })
-        .catch(() => {
-          if (!cancelled) setLifetimeAttendanceCount(null)
-        })
-    }, 1200)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [profile?.email, profileLoading])
 
   const displayNickname =
     rewardMe?.nickname?.trim() ||
@@ -235,12 +228,12 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
   const distanceKm =
     rewardMe != null ? Math.round((rewardMe.totalWalkingDistance / 1000) * 10) / 10 : null
 
-  const cumulativeXpDisplay = rewardMe?.cumulativeXp ?? null
-
   const tierTheme = getTierTheme(rewardMe?.tier, rewardMe?.tierName)
   const tierLabelEn = getTierLabelEn(rewardMe?.tier, rewardMe?.tierName)
 
   const isTodayChecked = checkedDays[todayIndex]
+  const { filledInCycle: streakFilledInCycle } = sevenDayRewardCycleProgress(attendanceStreak)
+  const daysUntilRandomBox = daysUntilRandomBoxStreak(attendanceStreak)
 
   const profileImageUrl = (() => {
     const raw = profile?.profileImagePath?.trim()
@@ -305,39 +298,21 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
     if (isTodayChecked) return
 
     void (async () => {
-      const couponIdsBefore = new Set<number>()
       try {
-        const coupons = await fetchMyCoupons()
-        coupons.forEach((c) => couponIdsBefore.add(c.memberCouponId))
-      } catch {
-        /* 쿠폰 조회 실패 시에도 출석은 진행 */
-      }
-
-      try {
-        const msg = await postAttendanceCheck()
+        const { message, isRandomBoxAvailable } = await postAttendanceCheck()
         markAttendanceDone(profile?.email)
         setCheckedDays((prev) => {
           const next = [...prev]
           next[todayIndex] = true
           return next
         })
+        setAttendanceStreak(getAttendanceStreak(profile?.email))
         await loadRewards()
 
-        invalidateLifetimeAttendanceCache()
-        let total = lifetimeAttendanceCount ?? 0
-        try {
-          total = await countServerLifetimeAttendance(true)
-          setLifetimeAttendanceCount(total)
-        } catch {
-          total += 1
-          setLifetimeAttendanceCount(total)
-        }
-
-        if (isAttendanceRandomBoxMilestone(total)) {
-          setRandomBoxCouponIdsBefore(couponIdsBefore)
+        if (isRandomBoxAvailable) {
           setRandomBoxOpen(true)
         } else {
-          setAttendanceModalMessage(msg || '출석체크가 완료되었습니다.')
+          setAttendanceModalMessage(message || '출석체크가 완료되었습니다.')
           setShowAttendanceModal(true)
         }
       } catch (e) {
@@ -362,7 +337,7 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
     })()
   }
 
-  // 홈 출석 카드에서 진입한 경우에만 주간 퀘스트(출석체크) 섹션을 화면 가운데로 스크롤
+  // 홈 출석 카드에서 진입한 경우에만 연속 출석 섹션을 화면 가운데로 스크롤
   useEffect(() => {
     if (typeof window === 'undefined') return
     const fromHome = window.sessionStorage.getItem('fromHomeAttendance')
@@ -377,6 +352,70 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
 
   const handleReviewsMenuClick = () => {
     onReviewsClick?.()
+  }
+
+  const openSettings = () => {
+    if (!getAccessToken()) {
+      alert('로그인 후 개인정보 설정을 이용할 수 있습니다.')
+      return
+    }
+    setEditNickname(profile?.nickname?.trim() ?? '')
+    setEditPhone(profile?.phone?.trim() ?? '')
+    setWithdrawPassword('')
+    setSettingsOpen(true)
+  }
+
+  const handleSaveSettings = () => {
+    if (!getAccessToken()) return
+    const nextNickname = editNickname.trim()
+    const nextPhone = editPhone.trim()
+    // 부분 수정: 변경이 없으면 요청 생략
+    const nicknameChanged = nextNickname !== (profile?.nickname?.trim() ?? '')
+    const phoneChanged = nextPhone !== (profile?.phone?.trim() ?? '')
+    if (!nicknameChanged && !phoneChanged) {
+      setSettingsOpen(false)
+      return
+    }
+    void (async () => {
+      setSettingsSaving(true)
+      try {
+        await updateMyProfile({
+          ...(nicknameChanged ? { nickname: nextNickname || null } : {}),
+          ...(phoneChanged ? { phone: nextPhone || null } : {}),
+        })
+        await refetchProfile()
+        alert('프로필이 수정되었습니다.')
+        setSettingsOpen(false)
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : '프로필을 수정하지 못했습니다.')
+      } finally {
+        setSettingsSaving(false)
+      }
+    })()
+  }
+
+  const handleWithdraw = () => {
+    if (!getAccessToken()) return
+    const pw = withdrawPassword.trim()
+    if (!pw) {
+      alert('비밀번호를 입력해 주세요.')
+      return
+    }
+    if (!window.confirm('정말 탈퇴하시겠어요?\n탈퇴 후에는 로그아웃됩니다.')) return
+    void (async () => {
+      setWithdrawing(true)
+      try {
+        await deleteMyAccount(pw)
+        clearTokens()
+        alert('탈퇴 처리되었습니다. 이용해 주셔서 감사합니다.')
+        setSettingsOpen(false)
+        onLogout?.()
+      } catch (e) {
+        alert(e instanceof ApiError ? e.message : '탈퇴를 처리하지 못했습니다.')
+      } finally {
+        setWithdrawing(false)
+      }
+    })()
   }
 
   return (
@@ -535,7 +574,11 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                   리워드 요약
                 </h3>
                 <span className={styles.distanceGoalBadge} style={{ color: tierTheme.myGoalBadgeColor }}>
-                  XP {cumulativeXpDisplay != null ? cumulativeXpDisplay.toLocaleString('ko-KR') : '—'}
+                  {rewardMe != null
+                    ? `${rewardMe.orderCount.toLocaleString('ko-KR')}회 픽업`
+                    : rewardLoading
+                      ? '…'
+                      : '—'}
                 </span>
               </div>
               <div className={styles.distanceGoalBarWrap}>
@@ -559,57 +602,63 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
             <div className={styles.questHeader}>
               <h3 className={styles.questTitle}>
                 <span className={`material-symbols-outlined ${styles.questIcon}`}>calendar_month</span>
-                주간 퀘스트(출석체크)
+                연속 출석 퀘스트
               </h3>
               <span className={styles.questBadge}>
                 {attendanceStreak > 0 ? `${attendanceStreak}일째 연속 출석 중!` : '연속 출석을 시작해 보세요!'}
               </span>
             </div>
-            {lifetimeAttendanceCount != null && !isAttendanceRandomBoxMilestone(lifetimeAttendanceCount) && (
+            <p className={styles.questSubtext}>
+              요일과 관계없이 매일 이어지면 카운트돼요. 연속 7일마다 랜덤박스를 열 수 있어요.
+            </p>
+            {daysUntilRandomBox > 0 && (
               <p className={styles.randomBoxHint}>
-                누적 7회마다 랜덤박스 · 다음까지{' '}
-                {attendanceUntilNextRandomBox(lifetimeAttendanceCount)}회
+                7일 연속 달성까지 · {daysUntilRandomBox}일 남음
               </p>
             )}
-            {/* [삭제용] 랜덤박스 UI 확인 — AttendanceRandomBoxPreviewButton.tsx 와 함께 제거 */}
-            <AttendanceRandomBoxPreviewButton
-              onPreview={({ couponIdsBefore, mockPrize }) => {
-                setRandomBoxCouponIdsBefore(couponIdsBefore)
-                setRandomBoxMockPrize(mockPrize ?? null)
-                setRandomBoxOpen(true)
-              }}
-            />
-            <div className={styles.weekGrid}>
-              {weekDays.map((day, idx) => (
-                <div
-                  key={day}
-                  className={`${styles.dayCell} ${idx === todayIndex ? styles.dayCellToday : ''} ${!checkedDays[idx] && idx !== todayIndex ? styles.dayCellPast : ''}`}
-                >
-                  <span className={`${styles.dayLabel} ${idx === todayIndex ? styles.dayLabelToday : ''}`}>{day}</span>
-                  {idx === todayIndex ? (
-                    <button
-                      onClick={handleAttendanceCheck}
-                      disabled={isTodayChecked}
-                      className={`${styles.todayButton} ${isTodayChecked ? styles.todayButtonChecked : styles.todayButtonUnchecked}`}
+            {daysUntilRandomBox === 0 && attendanceStreak > 0 && (
+              <p className={styles.randomBoxHintReady}>7일 연속 달성! 출석 후 랜덤박스를 확인해 보세요.</p>
+            )}
+            <div className={styles.streakSevenRow} role="list" aria-label="연속 7일 출석 진행">
+              {Array.from({ length: 7 }, (_, i) => {
+                const step = i + 1
+                const done = streakFilledInCycle >= step
+                return (
+                  <div key={step} className={styles.streakStep} role="listitem">
+                    <div
+                      className={`${styles.streakStepDot} ${done ? styles.streakStepDotDone : styles.streakStepDotTodo}`}
+                      aria-label={`${step}/7 ${done ? '완료' : '미완료'}`}
                     >
-                      {isTodayChecked ? (
-                        <span className={`material-symbols-outlined ${styles.todayButtonIcon}`}>check</span>
-                      ) : (
-                        <span className={`material-symbols-outlined ${styles.starIcon}`}>star</span>
-                      )}
-                    </button>
-                  ) : (
-                    <div className={`${styles.dayDot} ${checkedDays[idx] ? styles.dayDotChecked : styles.dayDotUnchecked}`}>
-                      {checkedDays[idx] && (
-                        <span className={`material-symbols-outlined ${styles.dayDotIcon}`}>check</span>
-                      )}
+                      {done ? (
+                        <span className={`material-symbols-outlined ${styles.streakStepIcon}`}>check</span>
+                      ) : null}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                )
+              })}
+            </div>
+            <div className={styles.attendanceTodayRow}>
+              <button
+                type="button"
+                onClick={handleAttendanceCheck}
+                disabled={isTodayChecked}
+                className={`${styles.todayAttendanceCta} ${isTodayChecked ? styles.todayAttendanceCtaDone : styles.todayAttendanceCtaTodo}`}
+              >
+                {isTodayChecked ? (
+                  <>
+                    <span className={`material-symbols-outlined ${styles.todayAttendanceCtaIcon}`}>check_circle</span>
+                    오늘 출석 완료
+                  </>
+                ) : (
+                  <>
+                    <span className={`material-symbols-outlined ${styles.todayAttendanceCtaIcon}`}>star</span>
+                    오늘 출석하기
+                  </>
+                )}
+              </button>
             </div>
             {!isTodayChecked && (
-              <p className={styles.attendanceHint}>오늘의 출석체크를 해주세요! 👆</p>
+              <p className={styles.attendanceHint}>매일 한 번만 눌러도 연속이 이어져요.</p>
             )}
           </section>
 
@@ -665,7 +714,7 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
                 </div>
                 <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
               </button>
-              <button type="button" className={styles.menuItem}>
+              <button type="button" className={styles.menuItem} onClick={openSettings}>
                 <div className={styles.menuLeft}>
                   <div className={`${styles.menuIconWrap} ${styles.menuIconGray}`}>
                     <span className="material-symbols-outlined">person_outline</span>
@@ -704,17 +753,16 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
           onClose={() => setImagePreviewOpen(false)}
           size="lg"
           flush
-          panelClassName={styles.imagePreviewPanel}
           aria-labelledby="profile-image-preview-title"
         >
-          <div className={styles.imagePreviewInner}>
-            <h3 id="profile-image-preview-title" className={styles.imagePreviewTitle}>
+          <div className={`${mc.center} ${mc.flushBody}`}>
+            <h3 id="profile-image-preview-title" className={mc.titleCenter}>
               프로필 사진
             </h3>
             {profileImageUrl ? (
               <img src={profileImageUrl} alt="프로필 사진 전체 보기" className={styles.imagePreviewImg} />
             ) : null}
-            <button type="button" className={styles.imagePreviewClose} onClick={() => setImagePreviewOpen(false)}>
+            <button type="button" className={mc.btnSecondary} onClick={() => setImagePreviewOpen(false)}>
               닫기
             </button>
           </div>
@@ -722,28 +770,96 @@ function MyPage({ onGoHome, onCartClick, onOrdersClick, onCouponClick, onMapClic
 
         <AttendanceRandomBoxModal
           open={randomBoxOpen}
-          couponIdsBefore={randomBoxCouponIdsBefore}
-          devMockPrize={randomBoxMockPrize}
-          onClose={() => {
-            setRandomBoxOpen(false)
-            setRandomBoxMockPrize(null)
-          }}
+          onClose={() => setRandomBoxOpen(false)}
           onGoCoupons={onCouponClick}
         />
 
         <AppModal open={showAttendanceModal} onClose={() => setShowAttendanceModal(false)} size="sm">
-          <div className={styles.attendanceModalInner}>
-            <div className={styles.modalIconWrap}>
-              <span className={`material-symbols-outlined ${styles.modalIcon}`}>check_circle</span>
+          <div className={mc.center}>
+            <div className={mc.iconWrapLarge} aria-hidden>
+              <span className={`material-symbols-outlined ${mc.icon} ${mc.iconFill} ${mc.iconLarge}`}>
+                check_circle
+              </span>
             </div>
-            <h3 className={styles.modalTitle}>출석 완료!</h3>
-            <p className={styles.modalDesc}>{attendanceModalMessage}</p>
-            <p className={styles.modalSub}>
+            <h3 className={mc.titleCenter}>출석 완료!</h3>
+            <p className={mc.messageCenter}>{attendanceModalMessage}</p>
+            <p className={mc.submessage}>
               🔥 {attendanceStreak > 0 ? `${attendanceStreak}일째 연속 출석 중이에요!` : '내일도 이어가면 연속 출석이 쌓여요!'}
             </p>
-            <button type="button" onClick={() => setShowAttendanceModal(false)} className={styles.modalButton}>
+            <button type="button" onClick={() => setShowAttendanceModal(false)} className={mc.btnPrimary}>
               확인
             </button>
+          </div>
+        </AppModal>
+
+        <AppModal
+          open={settingsOpen}
+          onClose={() => !settingsSaving && !withdrawing && setSettingsOpen(false)}
+          size="md"
+        >
+          <div>
+            <h3 className={mc.titleLeft}>개인정보 설정</h3>
+            <div className={mc.field}>
+              <label className={mc.label}>닉네임</label>
+              <input
+                className={mc.input}
+                value={editNickname}
+                onChange={(e) => setEditNickname(e.target.value)}
+                placeholder="닉네임"
+                disabled={settingsSaving || withdrawing}
+              />
+            </div>
+            <div className={mc.field}>
+              <label className={mc.label}>휴대폰 번호</label>
+              <input
+                className={mc.input}
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder="010-1234-5678"
+                disabled={settingsSaving || withdrawing}
+              />
+              <p className={mc.hint}>하이픈 포함/미포함 모두 가능해요.</p>
+            </div>
+
+            <div className={mc.btnStack}>
+              <button
+                type="button"
+                className={mc.btnPrimary}
+                disabled={settingsSaving || withdrawing}
+                onClick={handleSaveSettings}
+              >
+                {settingsSaving ? '저장 중…' : '저장'}
+              </button>
+              <button
+                type="button"
+                className={mc.btnSecondary}
+                disabled={settingsSaving || withdrawing}
+                onClick={() => setSettingsOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className={mc.sectionDivider}>
+              <h4 className={mc.sectionTitle}>회원 탈퇴</h4>
+              <p className={mc.sectionDesc}>비밀번호 확인 후 탈퇴 처리됩니다.</p>
+              <input
+                className={mc.input}
+                type="password"
+                value={withdrawPassword}
+                onChange={(e) => setWithdrawPassword(e.target.value)}
+                placeholder="비밀번호"
+                disabled={settingsSaving || withdrawing}
+              />
+              <button
+                type="button"
+                className={`${mc.btnDanger} ${styles.withdrawBtnSpaced}`}
+                disabled={settingsSaving || withdrawing}
+                onClick={handleWithdraw}
+              >
+                {withdrawing ? '탈퇴 처리 중…' : '탈퇴하기'}
+              </button>
+            </div>
           </div>
         </AppModal>
       </div>

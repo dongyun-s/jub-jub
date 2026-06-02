@@ -52,6 +52,25 @@ export function getMyOrders() {
   return apiFetch<MyOrderItem[]>('/orders/me', { method: 'GET' })
 }
 
+/** 주문내역·리뷰 대상 — 결제 완료(또는 픽업 완료)만 노출 */
+export function isPaidOrderForHistory(
+  o: Pick<MyOrderItem, 'orderStatus' | 'paymentStatus' | 'paidAt'>,
+): boolean {
+  if (o.paymentStatus === 'PAID') return true
+  if (o.orderStatus === 'PAID' || o.orderStatus === 'COMPLETED') return true
+  if (o.paidAt != null && String(o.paidAt).trim() !== '') return true
+  return false
+}
+
+/** 홈 배너·지도 픽업 — 결제 완료했고 아직 픽업 전인 주문만 */
+export function isActivePickupOrder(
+  o: Pick<MyOrderItem, 'orderStatus' | 'paymentStatus' | 'paidAt'>,
+): boolean {
+  if (!isPaidOrderForHistory(o)) return false
+  if (o.orderStatus === 'COMPLETED') return false
+  return true
+}
+
 /** POST /api/v1/orders/{orderId}/complete — 픽업 완료 (결제 시 저장된 좌표·거리 사용) */
 export function completeOrderPickup(orderId: number) {
   return withAuthRetry(() =>

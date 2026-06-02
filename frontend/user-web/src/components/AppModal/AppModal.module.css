@@ -44,6 +44,16 @@
   padding: 1.5rem 1.25rem 1.25rem;
 }
 
+/* flush=true 일 때 패널 카드 외곽 (내부 레이아웃은 자식이 담당) */
+.panelFlushCard {
+  border-radius: 1.25rem;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(246, 49, 154, 0.1),
+    0 20px 40px -12px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
 .sizeSm {
   max-width: 20rem;
 }

@@ -14,18 +14,11 @@ interface RankingMemberStatsProps {
 }
 
 const statItems = [
-  { key: 'xp', icon: 'bolt', label: (e: RankingEntry) => `XP ${e.cumulativeXp.toLocaleString('ko-KR')}` },
   { key: 'order', icon: 'shopping_bag', label: (e: RankingEntry) => `픽업 ${e.orderCount}회` },
   {
     key: 'walk',
     icon: 'directions_walk',
     label: (e: RankingEntry) => formatWalkingDistance(e.walkingDistanceM),
-  },
-  { key: 'review', icon: 'rate_review', label: (e: RankingEntry) => `리뷰 ${e.reviewCount}개` },
-  {
-    key: 'attendance',
-    icon: 'local_fire_department',
-    label: (e: RankingEntry) => `연속 출석 ${e.attendanceStreak}일`,
   },
 ] as const
 
@@ -42,7 +35,7 @@ export default function RankingMemberStats({
       <span className={styles.compactMeta}>
         <span style={{ color: tierColors.color, fontWeight: 700 }}>{entry.tierLabel}</span>
         {' · '}
-        XP {entry.cumulativeXp.toLocaleString('ko-KR')} · 픽업 {entry.orderCount}회
+        {formatWalkingDistance(entry.walkingDistanceM)} · 픽업 {entry.orderCount}회
       </span>
     )
   }

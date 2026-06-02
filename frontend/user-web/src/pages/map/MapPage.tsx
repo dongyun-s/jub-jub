@@ -23,8 +23,18 @@ import BottomNav from '../../components/BottomNav'
 import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import { fetchSortedStores } from '../../api/store'
 import type { PickupDestination } from '../../hooks/useActivePickup'
+import { haversineDistanceMeters, estimateWalkMinutes } from '../../lib/geoDistance'
 import { formatStoreDistanceMeters } from '../../lib/storeUi'
+import {
+  applyTmapMarkerAppearance,
+  buildMarkerIconHtml,
+  getMarkerIconLayout,
+  markerConstructorIconOptions,
+  type MapTmapMarker,
+} from '../../lib/mapCategoryMarkers'
 import styles from './MapPage.module.css'
+
+export type { MapTmapMarker } from '../../lib/mapCategoryMarkers'
 
 interface MapPageProps {
   onBack?: () => void
@@ -157,8 +167,6 @@ function headingToOctantLabel(deg: number | null): string | null {
   return labels[Math.round(d / 45) % 8] ?? null
 }
 
-export type MapTmapMarker = { lat: number; lng: number; title?: string; /** 정북 0°, 시계 방향, 진북 기준 */ headingDeg?: number }
-
 type MapTmapCanvasProps = {
   className?: string
   center: { lat: number; lng: number }
@@ -199,8 +207,13 @@ type TmapSdk = {
   }
   LatLng: new (lat: number, lng: number) => unknown
   LatLngBounds: new () => { extend: (ll: unknown) => void }
+  Size: new (w: number, h: number) => unknown
+  Point: new (x: number, y: number) => unknown
   Marker: new (opts: Record<string, unknown>) => {
     setIconHTML?: (html: string) => void
+    setIconHtml?: (html: string) => void
+    setIcon?: (url: string) => void
+    setOffset?: (p: unknown) => void
     setMap?: (v: unknown) => void
   }
   Polyline: new (opts: { path: unknown[]; strokeColor: string; strokeWeight: number; map: unknown }) => {
@@ -210,12 +223,6 @@ type TmapSdk = {
 
 function getTmapv2(): TmapSdk | undefined {
   return (window as unknown as { Tmapv2?: TmapSdk }).Tmapv2
-}
-
-/** 진북 기준 방위(°) → 삼각 화설표 HTML (티맵 Marker iconHTML용) */
-function headingArrowIconHtml(headingDeg: number): string {
-  const d = ((headingDeg % 360) + 360) % 360
-  return `<div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;transform:rotate(${d}deg);transform-origin:50% 55%;"><span style="display:block;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:24px solid #2563eb;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));"></span></div>`
 }
 
 /** 티맵 Web 지도 캔버스 — 이 파일에서 MapPage와 함께 유지 */
@@ -313,13 +320,23 @@ export const MapTmapCanvas = forwardRef<MapTmapHandle, MapTmapCanvasProps>(funct
     let didFit = false
     try {
       for (const mk of parsedMarkers) {
-        const marker = new tv2.Marker({
+        const iconHtml = buildMarkerIconHtml(mk)
+        const layout = iconHtml ? getMarkerIconLayout(mk) : null
+        const markerOpts: Record<string, unknown> = {
           position: new tv2.LatLng(mk.lat, mk.lng),
           map,
           title: mk.title ?? '',
-        })
-        if (typeof mk.headingDeg === 'number' && Number.isFinite(mk.headingDeg)) {
-          marker.setIconHTML?.(headingArrowIconHtml(mk.headingDeg))
+        }
+        if (iconHtml) {
+          Object.assign(markerOpts, markerConstructorIconOptions(mk, iconHtml))
+          if (layout && tv2.Point) {
+            markerOpts.offset = new tv2.Point(layout.anchorX, layout.anchorY)
+          }
+        }
+        const marker = new tv2.Marker(markerOpts)
+        if (iconHtml) {
+          applyTmapMarkerAppearance(marker, mk, tv2, iconHtml)
+          requestAnimationFrame(() => applyTmapMarkerAppearance(marker, mk, tv2, iconHtml))
         }
         markerInstancesRef.current.push(marker)
       }
@@ -586,6 +603,7 @@ function MapPage({
         storeName: pickupDestination.name,
         storeImage: pickupDestination.imageUrl,
         storeAddress: pickupDestination.address || '주소 정보 없음',
+        storeCategory: pickupDestination.categoryName?.trim() || '매장',
         lat: pickupDestination.lat,
         lng: pickupDestination.lng,
       }
@@ -594,6 +612,7 @@ function MapPage({
       storeName: '픽업 매장',
       storeImage: STORE_LIST_CARD_IMAGES[0],
       storeAddress: '',
+      storeCategory: '매장',
       lat: MAP_DEFAULT_CENTER.lat,
       lng: MAP_DEFAULT_CENTER.lng,
     }
@@ -603,15 +622,11 @@ function MapPage({
   const [transportMode, setTransportMode] = useState<'walk' | 'bike' | 'car'>('walk')
   /** 픽업 탭: Tmap 경로 API 폴리라인·요약 */
   const [pickupRoutePath, setPickupRoutePath] = useState<{ lat: number; lng: number }[] | null>(null)
-  const [pickupRouteDistanceM, setPickupRouteDistanceM] = useState<number | null>(null)
-  const [pickupRouteTimeSec, setPickupRouteTimeSec] = useState<number | null>(null)
   /** 기기 방위(°). GPS heading / DeviceOrientation — 지원 단말·권한에만 값 존재 */
   const [userHeadingDeg, setUserHeadingDeg] = useState<number | null>(null)
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null)
   const [locationError, setLocationError] = useState<string | null>(null)
   const [isLoadingLocation, setIsLoadingLocation] = useState(false)
-  const [distance, setDistance] = useState('--')
-  const [walkTime, setWalkTime] = useState('--')
   /** watchPosition 과 getCurrentPosition 이 서로 덮어쓰지 않도록 마지막 반영 좌표 */
   const lastWatchLocationRef = useRef<{ lat: number; lng: number } | null>(null)
   /** 주변 매장 탭: 하단 맛집 시트 펼침(지도는 mapWrap 전체 크기 유지, 시트는 오버레이) */
@@ -681,11 +696,18 @@ function MapPage({
   const pickupBottomCardRef = useRef<HTMLDivElement>(null)
   // 픽업 카드 높이만큼 지도 카메라를 올리는 보정은 제거됨.
 
-  const pickupMarkers = useMemo(() => {
-    const dest = { lat: destinationData.lat, lng: destinationData.lng, title: destinationData.storeName }
+  const pickupMarkers = useMemo((): MapTmapMarker[] => {
+    const dest: MapTmapMarker = {
+      kind: 'destination',
+      lat: destinationData.lat,
+      lng: destinationData.lng,
+      title: destinationData.storeName,
+      category: destinationData.storeCategory,
+    }
     if (currentLocation) {
       return [
         {
+          kind: 'user',
           lat: currentLocation.lat,
           lng: currentLocation.lng,
           title: '현재 위치',
@@ -721,17 +743,28 @@ function MapPage({
     [currentLocation, destinationData]
   )
 
-  const nearbyMarkers = useMemo(() => {
-    if (!currentLocation) return []
-    return [
-      {
+  const nearbyMarkers = useMemo((): MapTmapMarker[] => {
+    const markers: MapTmapMarker[] = []
+    if (currentLocation) {
+      markers.push({
+        kind: 'user',
         lat: currentLocation.lat,
         lng: currentLocation.lng,
         title: '내 위치',
         ...(userHeadingDeg != null ? { headingDeg: userHeadingDeg } : {}),
-      },
-    ]
-  }, [currentLocation, userHeadingDeg])
+      })
+    }
+    for (const store of nearbyStores) {
+      markers.push({
+        kind: 'store',
+        lat: store.lat,
+        lng: store.lng,
+        title: store.name,
+        category: store.category,
+      })
+    }
+    return markers
+  }, [currentLocation, userHeadingDeg, nearbyStores])
 
   const userHeadingLabel = useMemo(() => headingToOctantLabel(userHeadingDeg), [userHeadingDeg])
 
@@ -770,12 +803,13 @@ function MapPage({
         lastWatchLocationRef.current = loc
         setIsLoadingLocation(false)
 
-        const dist = calculateDistance(latitude, longitude, destinationData.lat, destinationData.lng)
-        console.log('[MapPage] 목적지까지 거리:', dist, 'm')
-        setDistance(dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`)
-
-        const walkMinutes = Math.round(dist / 80)
-        setWalkTime(`도보 ${walkMinutes}분`)
+        const dist = haversineDistanceMeters(
+          latitude,
+          longitude,
+          destinationData.lat,
+          destinationData.lng,
+        )
+        console.log('[MapPage] 가게까지 직선 거리:', dist, 'm')
       },
       (error) => {
         console.log('[MapPage] 위치 가져오기 실패:', error.code, error.message)
@@ -801,22 +835,6 @@ function MapPage({
         maximumAge: 0,
       }
     )
-  }
-
-  // 두 좌표 사이의 거리 계산 (Haversine 공식)
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371e3 // 지구 반지름 (미터)
-    const φ1 = (lat1 * Math.PI) / 180
-    const φ2 = (lat2 * Math.PI) / 180
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-    return R * c
   }
 
   const goPickupStoreDetail = () => {
@@ -914,7 +932,7 @@ function MapPage({
             const moved =
               prev == null
                 ? true
-                : calculateDistance(prev.lat, prev.lng, latitude, longitude) >= minMoveM
+                : haversineDistanceMeters(prev.lat, prev.lng, latitude, longitude) >= minMoveM
             if (moved) {
               lastPush = now
               const loc = { lat: latitude, lng: longitude }
@@ -947,8 +965,6 @@ function MapPage({
   useEffect(() => {
     if (!hasActiveOrder || !currentLocation) {
       setPickupRoutePath(null)
-      setPickupRouteDistanceM(null)
-      setPickupRouteTimeSec(null)
       return
     }
 
@@ -967,19 +983,11 @@ function MapPage({
       .then((r) => {
         if (cancelled) return
         setPickupRoutePath(r.path.length >= 2 ? r.path : null)
-        setPickupRouteDistanceM(
-          typeof r.totalDistanceM === 'number' && Number.isFinite(r.totalDistanceM) ? r.totalDistanceM : null
-        )
-        setPickupRouteTimeSec(
-          typeof r.totalTimeSec === 'number' && Number.isFinite(r.totalTimeSec) ? r.totalTimeSec : null
-        )
       })
       .catch((e) => {
         if (cancelled) return
         console.warn('[MapPage] 경로 API 실패:', e)
         setPickupRoutePath(null)
-        setPickupRouteDistanceM(null)
-        setPickupRouteTimeSec(null)
       })
 
     return () => {
@@ -990,39 +998,49 @@ function MapPage({
   // 현재 위치 변경 시 주변 매장 거리 업데이트
   const getDistanceText = (storeLat: number, storeLng: number): string => {
     if (!currentLocation) return '--'
-    const dist = calculateDistance(currentLocation.lat, currentLocation.lng, storeLat, storeLng)
-    return dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`
+    const dist = haversineDistanceMeters(
+      currentLocation.lat,
+      currentLocation.lng,
+      storeLat,
+      storeLng,
+    )
+    return formatStoreDistanceMeters(dist) || '--'
   }
 
-  // 도보 시간 계산
   const getWalkTimeText = (storeLat: number, storeLng: number): string => {
     if (!currentLocation) return '--'
-    const dist = calculateDistance(currentLocation.lat, currentLocation.lng, storeLat, storeLng)
-    const minutes = Math.round(dist / 80)
-    return `${minutes}분`
+    const dist = haversineDistanceMeters(
+      currentLocation.lat,
+      currentLocation.lng,
+      storeLat,
+      storeLng,
+    )
+    return `${estimateWalkMinutes(dist)}분`
   }
 
+  /** 현재 위치 → 매장 직선 거리(경로 잔여 거리 아님) */
+  const distanceToStoreM = useMemo(() => {
+    if (!currentLocation) return null
+    return haversineDistanceMeters(
+      currentLocation.lat,
+      currentLocation.lng,
+      destinationData.lat,
+      destinationData.lng,
+    )
+  }, [currentLocation, destinationData.lat, destinationData.lng])
+
   const pickupDistanceLabel = useMemo(() => {
-    if (
-      pickupRouteDistanceM != null &&
-      Number.isFinite(pickupRouteDistanceM) &&
-      pickupRouteDistanceM >= 0
-    ) {
-      if (pickupRouteDistanceM < 1000) return `${Math.round(pickupRouteDistanceM)}m`
-      return `${(pickupRouteDistanceM / 1000).toFixed(1)}km`
-    }
-    return distance
-  }, [pickupRouteDistanceM, distance])
+    if (distanceToStoreM == null) return '—'
+    return formatStoreDistanceMeters(distanceToStoreM) || '—'
+  }, [distanceToStoreM])
 
   const pickupTimeLabel = useMemo(() => {
-    if (pickupRouteTimeSec != null && Number.isFinite(pickupRouteTimeSec) && pickupRouteTimeSec >= 0) {
-      const min = Math.max(1, Math.round(pickupRouteTimeSec / 60))
-      if (transportMode === 'walk') return `도보 약 ${min}분`
-      if (transportMode === 'bike') return `자전거 약 ${min}분`
-      return `차량 약 ${min}분`
-    }
-    return walkTime
-  }, [pickupRouteTimeSec, transportMode, walkTime])
+    if (distanceToStoreM == null) return '위치 확인 중…'
+    const min = estimateWalkMinutes(distanceToStoreM)
+    if (transportMode === 'walk') return `도보 약 ${min}분`
+    if (transportMode === 'bike') return `자전거 약 ${Math.max(1, Math.round(min * 0.45))}분`
+    return `차량 약 ${Math.max(1, Math.round(min * 0.25))}분`
+  }, [distanceToStoreM, transportMode])
 
   return (
     <Layout showBackground={false}>
@@ -1155,12 +1173,8 @@ function MapPage({
                         <div className={styles.destInfo}>
                           <h3 className={styles.destTime}>{pickupTimeLabel}</h3>
                           <p className={styles.destMeta}>
-                            {pickupDistanceLabel} •{' '}
-                            {currentLocation
-                              ? pickupRoutePath
-                                ? '경로 기준(Tmap)'
-                                : '직선 거리(경로 로드 전·실패 시)'
-                              : '위치 확인 중...'}
+                            가게까지 {pickupDistanceLabel}
+                            {currentLocation ? ' · 현재 위치 기준 직선 거리' : ''}
                           </p>
                         </div>
                         {currentLocation && (
@@ -1221,7 +1235,13 @@ function MapPage({
                 center={nearbyMapCenterForView}
                 zoom={NEARBY_MAP_ZOOM}
                 markers={nearbyMarkers}
-                fitMarkers={false}
+                fitMarkers={nearbyMarkers.length >= 2}
+                fitBoundsPadding={{
+                  top: 72,
+                  right: 32,
+                  bottom: Math.max(nearbyPanelOverlapPx + 16, 100),
+                  left: 32,
+                }}
               />
               <div className={styles.zoomGroup} aria-label="지도 줌 컨트롤">
                 <button

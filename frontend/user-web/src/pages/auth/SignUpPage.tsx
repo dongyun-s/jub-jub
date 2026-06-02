@@ -5,6 +5,7 @@
 
 import { useState } from 'react'
 import Layout from '../../components/Layout'
+import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import {
   signup,
@@ -37,10 +38,16 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
 
   const targetForSend = verifyChannel === 'EMAIL' ? email.trim() : phone.trim()
 
-  const handleSendCode = async () => {
+  const sendConfirmMessage =
+    verifyChannel === 'EMAIL'
+      ? `${targetForSend}로 인증 메일을 발송할까요?\n메일함·스팸함을 확인해 주세요.`
+      : `${targetForSend}로 인증 문자를 발송할까요?`
+
+  const requestSendCode = () => {
     setError(null)
     setInfo(null)
     if (verifyChannel === 'EMAIL') {
@@ -52,6 +59,10 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
       setError('휴대폰 번호를 입력해 주세요.')
       return
     }
+    setSendConfirmOpen(true)
+  }
+
+  const handleSendCode = async () => {
     setLoading(true)
     try {
       const res = await verifySend(verifyChannel, targetForSend)
@@ -257,7 +268,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
               </p>
               <button
                 type="button"
-                onClick={handleSendCode}
+                onClick={requestSendCode}
                 disabled={loading}
                 className="w-full rounded-full bg-primary py-2.5 text-sm font-medium text-white"
               >
@@ -313,7 +324,7 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
                 </p>
                 <button
                   type="button"
-                  onClick={handleSendCode}
+                  onClick={requestSendCode}
                   disabled={loading}
                   className="w-full rounded-full bg-primary py-2.5 text-sm font-medium text-white"
                 >
@@ -423,6 +434,19 @@ function SignUpPage({ onSignUp, onBack }: SignUpPageProps) {
           동의하는 것으로 간주됩니다.
         </p>
       </main>
+
+      <ConfirmModal
+        open={sendConfirmOpen}
+        title={verifyChannel === 'EMAIL' ? '인증 메일 발송' : '인증 문자 발송'}
+        message={sendConfirmMessage}
+        cancelLabel="취소"
+        confirmLabel="발송"
+        onCancel={() => setSendConfirmOpen(false)}
+        onConfirm={() => {
+          setSendConfirmOpen(false)
+          void handleSendCode()
+        }}
+      />
 
       <SimpleAlertModal
         open={Boolean(error)}

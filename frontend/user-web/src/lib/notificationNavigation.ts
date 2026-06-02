@@ -6,7 +6,7 @@ export type NotificationNavigateTarget =
   | { type: 'orders' }
   | { type: 'orderStatus'; orderId: number }
   | { type: 'reviewWrite'; payload: ReviewWritePayload }
-  | { type: 'mypage' }
+  | { type: 'coupon'; highlightExpiringSoon?: boolean }
 
 /** 알림 타입·필드에 따른 이동 대상 (읽음 처리 후 호출) */
 export async function resolveNotificationTarget(
@@ -41,8 +41,9 @@ export async function resolveNotificationTarget(
     }
 
     case 'COUPON_ISSUED':
+      return { type: 'coupon' }
     case 'COUPON_EXPIRING':
-      return { type: 'mypage' }
+      return { type: 'coupon', highlightExpiringSoon: true }
 
     default:
       return { type: 'orders' }

@@ -21,7 +21,6 @@ import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imag
 import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import {
   buildMenuCategoriesFromApi,
-  demoMenuCategories,
   type MenuItem,
   type MenuCategory,
 } from '../../lib/storeDetailMenu'
@@ -84,12 +83,6 @@ function MenuItemCard({
         <div className={styles.menuCardBottom}>
           <div className={styles.menuCardPriceWrap}>
             <span className={styles.menuCardPrice}>{formatPrice(item.price)}</span>
-            {item.xp && (
-              <div className={styles.menuCardXp}>
-                <span className={`material-symbols-outlined ${styles.menuCardXpIcon}`}>bolt</span>
-                <span className={styles.menuCardXpText}>+{item.xp} XP</span>
-              </div>
-            )}
           </div>
           <div className={styles.menuCardAddBtn}>
             <span className="material-symbols-outlined">add</span>
@@ -184,11 +177,8 @@ function StoreDetailPage({
   }, [storeId])
 
   const menuCategories = useMemo((): MenuCategory[] => {
-    if (detail?.menus?.length) {
-      const built = buildMenuCategoriesFromApi(detail.menus)
-      if (built.length > 0) return built
-    }
-    return demoMenuCategories
+    if (!detail?.menus?.length) return []
+    return buildMenuCategoriesFromApi(detail.menus)
   }, [detail])
 
   useEffect(() => {
@@ -199,9 +189,9 @@ function StoreDetailPage({
   const heroImage =
     STORE_LIST_CARD_IMAGES[Math.abs(Number(storeId)) % STORE_LIST_CARD_IMAGES.length]
   const storeName = (detail?.name ?? '매장').trim()
-  const addressLine = detail?.address ?? '서울시 강남구 역삼동'
-  const minOrderLabel = detail ? `${detail.minOrderAmount.toLocaleString()}원` : '12,000원'
-  const cookTimeLabel = detail ? `약 ${detail.cookingTimeMinutes}분` : '10-15분'
+  const addressLine = detail?.address?.trim() || '주소 정보 없음'
+  const minOrderLabel = detail ? `${detail.minOrderAmount.toLocaleString()}원` : '—'
+  const cookTimeLabel = detail ? `약 ${detail.cookingTimeMinutes}분` : '—'
 
   const tabs = [
     { id: 'menu', label: '메뉴' },
@@ -330,7 +320,7 @@ function StoreDetailPage({
         />
         {storeError && (
           <p className="mx-4 mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900" role="alert">
-            {storeError} · 데모 메뉴를 표시합니다.
+            {storeError}
           </p>
         )}
         {storeLoading && (
@@ -555,6 +545,12 @@ function StoreDetailPage({
                       </div>
                     )}
                   </div>
+                </div>
+              ) : menuCategories.length === 0 ? (
+                <div className={styles.menuEmpty}>
+                  <span className={`material-symbols-outlined ${styles.menuEmptyIcon}`}>restaurant_menu</span>
+                  <p className={styles.menuEmptyTitle}>등록된 메뉴가 없어요</p>
+                  <p className={styles.menuEmptyDesc}>매장에서 메뉴를 준비 중일 수 있어요.</p>
                 </div>
               ) : (
                 <div className={styles.menuDivide}>

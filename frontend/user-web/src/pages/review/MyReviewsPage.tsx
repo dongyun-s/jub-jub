@@ -7,19 +7,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
-import AppModal from '../../components/AppModal/AppModal'
+import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
 import { ApiError } from '../../api/authClient'
-import { deleteReview, fetchMyReviews, type ReviewDto } from '../../api/reviews'
+import { deleteReview, fetchMyReviews, type ReviewDto, type ReviewWritePayload } from '../../api/reviews'
 import { fetchStoreDetail } from '../../api/store'
 import { useProfile } from '../../hooks/useProfile'
 import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
-import { FEATURED_RESTAURANTS } from '../../constants'
+import { storeCardImageById } from '../../constants'
 import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imageUrl'
 import styles from './MyReviewsPage.module.css'
 
 interface MyReviewsPageProps {
   onBack?: () => void
+  onBackToMypage?: () => void
   onWriteReview?: () => void
+  onEditReview?: (payload: ReviewWritePayload) => void
   onGoHome?: () => void
   onCartClick?: () => void
   onOrdersClick?: () => void
@@ -30,6 +32,7 @@ interface MyReviewsPageProps {
 
 interface ReviewUi {
   id: number
+  orderId: number
   storeId: number
   storeName: string
   storeImage: string
@@ -52,8 +55,7 @@ function formatReviewDate(iso?: string): string {
 
 function storeThumb(storeId: number): string {
   return (
-    FEATURED_RESTAURANTS.find((r) => r.id === storeId)?.image ??
-    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'
+    storeCardImageById(storeId)
   )
 }
 
@@ -69,6 +71,7 @@ function mapDtoToUi(d: ReviewDto, storeName: string): ReviewUi {
   if (d.aiGeneratedHelped) kw.push('AI 도움 받음')
   return {
     id: d.reviewId,
+    orderId: d.orderId,
     storeId: d.storeId,
     storeName,
     storeImage: storeThumb(d.storeId),
@@ -82,7 +85,9 @@ function mapDtoToUi(d: ReviewDto, storeName: string): ReviewUi {
 
 function MyReviewsPage({
   onBack,
+  onBackToMypage,
   onWriteReview,
+  onEditReview,
   onGoHome,
   onCartClick,
   onOrdersClick,
@@ -142,9 +147,30 @@ function MyReviewsPage({
     void loadReviews()
   }, [loadReviews])
 
+  const handleEditClick = (review: ReviewUi) => {
+    onEditReview?.({
+      reviewId: review.id,
+      orderId: review.orderId,
+      storeId: review.storeId,
+      storeName: review.storeName,
+    })
+  }
+
   const handleDeleteClick = (id: number) => {
     setSelectedReviewId(id)
     setShowDeleteModal(true)
+  }
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack()
+      return
+    }
+    if (onBackToMypage) {
+      onBackToMypage()
+      return
+    }
+    onGoHome?.()
   }
 
   const handleDeleteConfirm = () => {
@@ -187,7 +213,7 @@ function MyReviewsPage({
     <Layout showBackground={false}>
       <div className={styles.root}>
         <header className={styles.header}>
-          <button type="button" onClick={onBack} className={styles.backButton}>
+          <button type="button" onClick={handleBack} className={styles.backButton} aria-label="뒤로 가기">
             <span className={`material-symbols-outlined ${styles.backIcon}`}>arrow_back</span>
           </button>
           <h1 className={styles.headerTitle}>리뷰 관리</h1>
@@ -196,13 +222,17 @@ function MyReviewsPage({
         <div className={styles.scrollArea}>
           {loading ? (
             <section className={styles.emptySection}>
-              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>hourglass_empty</span>
-              <p className={styles.emptyTitle}>불러오는 중…</p>
+              <div className={styles.emptyCardCompact}>
+                <span className={`material-symbols-outlined ${styles.emptyIconMuted}`}>hourglass_empty</span>
+                <p className={styles.emptyStatusText}>리뷰 목록을 불러오는 중이에요…</p>
+              </div>
             </section>
           ) : loadError ? (
             <section className={styles.emptySection}>
-              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>error</span>
-              <p className={styles.emptyTitle}>{loadError}</p>
+              <div className={styles.emptyCardCompact}>
+                <span className={`material-symbols-outlined ${styles.emptyIconError}`}>error</span>
+                <p className={styles.emptyStatusText}>{loadError}</p>
+              </div>
             </section>
           ) : reviews.length > 0 ? (
             <section className={styles.listSection}>
@@ -237,7 +267,11 @@ function MyReviewsPage({
                       </div>
                     )}
                     <div className={styles.cardActions}>
-                      <button type="button" className={styles.actionButton} disabled title="수정 API는 추후 연결 예정">
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        onClick={() => handleEditClick(review)}
+                      >
                         <span className={`material-symbols-outlined ${styles.actionIcon}`}>edit</span>
                         수정
                       </button>
@@ -255,36 +289,58 @@ function MyReviewsPage({
               </div>
             </section>
           ) : (
-            <section className={styles.emptySection}>
-              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>rate_review</span>
-              <p className={styles.emptyTitle}>작성한 리뷰가 없어요</p>
-              <p className={styles.emptyDesc}>맛있게 드신 곳의 리뷰를 남겨보세요!</p>
-              <button type="button" onClick={onWriteReview} className={styles.emptyCta}>
-                리뷰 쓰러가기
-              </button>
+            <section className={styles.emptySection} aria-labelledby="reviews-empty-title">
+              <div className={styles.emptyCard}>
+                <div className={styles.emptyIconWrap} aria-hidden>
+                  <span className={`material-symbols-outlined ${styles.emptyIcon}`}>rate_review</span>
+                </div>
+                <h2 id="reviews-empty-title" className={styles.emptyTitle}>
+                  아직 남긴 리뷰가 없어요
+                </h2>
+                <p className={styles.emptyLead}>
+                  픽업을 완료한 주문은
+                  <br />
+                  <strong className={styles.emptyLeadStrong}>주문 내역</strong>에서 리뷰를 작성할 수 있어요.
+                </p>
+                <ul className={styles.emptySteps}>
+                  <li>
+                    <span className={styles.emptyStepNum}>1</span>
+                    <span>주문 내역에서 픽업 완료 주문을 찾아요</span>
+                  </li>
+                  <li>
+                    <span className={styles.emptyStepNum}>2</span>
+                    <span>리뷰 쓰기를 눌러 별점과 한 줄평을 남겨요</span>
+                  </li>
+                </ul>
+                <p className={styles.emptyFootnote}>맛집 경험을 공유하면 다른 회원에게도 도움이 돼요.</p>
+                <div className={styles.emptyActions}>
+                  <button type="button" onClick={onWriteReview} className={styles.emptyCta}>
+                    주문 내역으로 이동
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onBackToMypage ?? onBack}
+                    className={styles.emptySecondary}
+                  >
+                    마이페이지로 돌아가기
+                  </button>
+                </div>
+              </div>
             </section>
           )}
         </div>
 
-        <AppModal open={showDeleteModal} onClose={() => !deleting && setShowDeleteModal(false)} size="md">
-          <h3 className={styles.modalTitle}>리뷰 삭제</h3>
-          <p className={styles.modalDesc}>
-            정말 이 리뷰를 삭제하시겠어요?<br />삭제된 리뷰는 복구할 수 없습니다.
-          </p>
-          <div className={styles.modalActions}>
-            <button
-              type="button"
-              disabled={deleting}
-              onClick={() => setShowDeleteModal(false)}
-              className={styles.modalCancel}
-            >
-              취소
-            </button>
-            <button type="button" disabled={deleting} onClick={handleDeleteConfirm} className={styles.modalConfirm}>
-              {deleting ? '삭제 중…' : '삭제'}
-            </button>
-          </div>
-        </AppModal>
+        <ConfirmModal
+          open={showDeleteModal}
+          title="리뷰 삭제"
+          message={'정말 이 리뷰를 삭제하시겠어요?\n삭제된 리뷰는 복구할 수 없습니다.'}
+          confirmLabel={deleting ? '삭제 중…' : '삭제'}
+          confirmTone="danger"
+          confirmDisabled={deleting}
+          cancelDisabled={deleting}
+          onCancel={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteConfirm}
+        />
 
         <BottomNav
           active="mypage"
