@@ -1,14 +1,21 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icon } from '../components/Icon'
+import { NewOrderAlertHost } from '../components/NewOrderAlertHost/NewOrderAlertHost'
+import { OwnerNotificationBanner } from '../components/OwnerNotificationBanner/OwnerNotificationBanner'
+import { OwnerOrdersProvider } from '../context/OwnerOrdersProvider'
+import { OwnerSalesProvider } from '../context/OwnerSalesProvider'
 import styles from './OwnerShell.module.css'
 
-const nav = [
+const nav: { to: string; label: string; icon: string; end?: boolean }[] = [
   { to: '/dashboard', label: '대시보드', icon: 'dashboard' },
-  { to: '/orders', label: '주문내역', icon: 'receipt_long' },
+  { to: '/sales', label: '영업 상태', icon: 'storefront' },
+  { to: '/orders', label: '실시간 주문', icon: 'receipt_long', end: true },
+  { to: '/orders/completed', label: '완료 주문', icon: 'task_alt' },
+  { to: '/store', label: '매장 정보', icon: 'store' },
   { to: '/menu', label: '메뉴관리', icon: 'restaurant_menu' },
   { to: '/payments', label: '결제내역', icon: 'payments' },
   { to: '/reviews', label: '리뷰관리', icon: 'rate_review' },
-] as const
+]
 
 export function OwnerShell() {
   const { pathname } = useLocation()
@@ -17,16 +24,24 @@ export function OwnerShell() {
     <div className={styles.root}>
       <aside className={styles.sidebar}>
         <div className={styles.logoWrap}>
-          <span className={styles.logo}>L.</span>
+          <img src="/logo.png" alt="JubJub" className={styles.logoImg} width={36} height={36} />
+          <span className={styles.logoText}>줍줍</span>
         </div>
         <nav className={styles.nav}>
-          {nav.map(({ to, label, icon }) => (
+          {nav.map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
               to={to}
-              end={to !== '/menu'}
+              end={end ?? to !== '/menu'}
               className={({ isActive }: { isActive: boolean }) => {
-                const active = to === '/menu' ? pathname.startsWith('/menu') : isActive
+                const active =
+                  to === '/menu'
+                    ? pathname.startsWith('/menu')
+                    : to === '/store'
+                      ? pathname.startsWith('/store')
+                      : to === '/orders'
+                      ? pathname === '/orders'
+                      : isActive
                 return [styles.navItem, active ? styles.navItemActive : ''].filter(Boolean).join(' ')
               }}
             >
@@ -44,7 +59,13 @@ export function OwnerShell() {
         </div>
       </aside>
       <div className={styles.content}>
-        <Outlet />
+        <OwnerSalesProvider>
+          <OwnerOrdersProvider>
+            <OwnerNotificationBanner />
+            <NewOrderAlertHost />
+            <Outlet />
+          </OwnerOrdersProvider>
+        </OwnerSalesProvider>
       </div>
     </div>
   )

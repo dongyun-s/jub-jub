@@ -1,0 +1,207 @@
+.monoNum {
+  font-variant-numeric: tabular-nums;
+}
+
+.main {
+  margin-top: var(--owner-header-h);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--owner-header-h));
+  overflow: hidden;
+  background: var(--owner-surface-lowest);
+}
+
+.boardWithDetail {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.listPane {
+  flex: 0 0 min(20rem, 34vw);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid color-mix(in srgb, var(--owner-outline-variant) 12%, transparent);
+  background: var(--owner-surface-low);
+}
+
+.listPaneHead {
+  flex-shrink: 0;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--owner-outline-variant) 10%, transparent);
+}
+
+.listPaneTitle {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--owner-on-surface);
+}
+
+.liveLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 20%, transparent);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+  text-decoration: none;
+}
+
+.liveLink:hover {
+  background: var(--owner-surface-high);
+}
+
+.toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 1rem;
+  flex-wrap: wrap;
+}
+
+.toolbarText {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.toolbarText strong {
+  color: var(--owner-on-surface);
+}
+
+.toolbarHint {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.625rem;
+  background: var(--owner-surface-high);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--owner-primary-container);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  filter: brightness(1.05);
+}
+
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.list::-webkit-scrollbar {
+  display: none;
+}
+
+.row {
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 2px solid transparent;
+  background: var(--owner-surface-highest);
+  text-align: left;
+  color: inherit;
+}
+
+.row:hover {
+  border-color: color-mix(in srgb, var(--owner-tertiary) 25%, transparent);
+}
+
+.rowSelected {
+  border-color: var(--owner-tertiary);
+  background: color-mix(in srgb, var(--owner-tertiary-container) 10%, var(--owner-surface-highest));
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.orderNo {
+  font-size: 1.125rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  color: var(--owner-on-surface);
+}
+
+.summary {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  flex-shrink: 0;
+}
+
+.time {
+  font-size: 0.6875rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.amount {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--owner-on-surface);
+}
+
+@media (max-width: 1100px) {
+  .main {
+    height: auto;
+    min-height: calc(100vh - var(--owner-header-h));
+    overflow: auto;
+  }
+
+  .boardWithDetail {
+    flex-direction: column;
+  }
+
+  .listPane {
+    flex: none;
+    max-height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--owner-outline-variant) 12%, transparent);
+  }
+}

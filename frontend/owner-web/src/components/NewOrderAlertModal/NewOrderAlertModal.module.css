@@ -1,0 +1,127 @@
+.wrap {
+  text-align: center;
+  padding: 0.25rem 0 0;
+}
+
+.orderNo {
+  margin: 0.5rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+  color: var(--owner-on-surface);
+}
+
+.summary {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+}
+
+.amount {
+  margin: 0.5rem 0 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--owner-on-surface-variant);
+}
+
+.note {
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--owner-primary-container) 10%, transparent);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-align: left;
+  color: var(--owner-on-surface);
+}
+
+.pickupBlock {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--owner-outline-variant) 15%, transparent);
+  text-align: left;
+}
+
+.pickupLead {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--owner-primary-container);
+  text-align: center;
+}
+
+.notifyHint {
+  margin: 1rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--owner-on-surface-variant);
+}
+
+.notifyLink {
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--owner-primary-container);
+  text-decoration: underline;
+}
+
+.btnStart {
+  margin-top: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, #ff4d8d 0%, #b90a5a 100%);
+  padding: 0.875rem 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: 0 8px 24px -8px color-mix(in srgb, var(--owner-primary) 50%, transparent);
+}
+
+.btnStart:active {
+  transform: scale(0.98);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.btnSecondary {
+  cursor: pointer;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 25%, transparent);
+  background: var(--owner-surface-high);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+}
+
+.btnReject {
+  cursor: pointer;
+  border: none;
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--owner-error);
+}
+
+.btnReject:hover {
+  background: color-mix(in srgb, var(--owner-error-container) 15%, transparent);
+}

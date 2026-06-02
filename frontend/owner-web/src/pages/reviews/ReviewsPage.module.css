@@ -410,3 +410,14 @@
 .fab:active {
   transform: scale(0.9);
 }
+
+.loadingHint,
+.errorHint {
+  padding: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.errorHint {
+  color: var(--owner-error);
+}
