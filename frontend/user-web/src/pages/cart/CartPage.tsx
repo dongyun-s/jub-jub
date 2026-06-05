@@ -17,6 +17,7 @@ import {
   deleteCartItem,
   type ServerCartLineUi,
 } from '../../api/cart'
+import { getMe } from '../../api/auth'
 import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
 import { ApiError } from '../../api/authClient'
 import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
@@ -210,6 +211,7 @@ function CartPage({
         }
 
         const orderName = buildPortOneOrderName(storeLabel, cartStoreId, cartItems)
+        const me = await getMe().catch(() => null)
 
         // 1) 주문 생성 (서버가 장바구니 금액 검증)
         const order = await createOrder({
@@ -235,18 +237,14 @@ function CartPage({
           paymentId: prepared.merchantUid,
           orderName,
           customer: {
-            email: 'test@jubjub.com',
-            fullName: '홍길동',
-            phoneNumber: '01012345678',
+            email: me?.email?.trim() || '',
+            fullName: me?.name?.trim() || me?.nickname?.trim() || '회원',
+            phoneNumber: me?.phone?.replace(/\D/g, '') || '',
           },
           totalAmount: prepared.requestedAmount,
           currency: 'CURRENCY_KRW',
           payMethod: 'CARD',
         })
-
-        // (DEBUG) 결제 결과 추적: transactionId 누락 원인 파악용
-        // eslint-disable-next-line no-console
-        console.log('[PortOne] paymentResult', paymentResult)
 
         /**
          * 결제창이 닫혔거나 실패한 경우 transactionId 가 없을 수 있음.

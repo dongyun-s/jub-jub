@@ -783,12 +783,10 @@ function MapPage({
 
   // 현재 위치 가져오기
   const getCurrentLocation = () => {
-    console.log('[MapPage] 위치 가져오기 시작')
     setIsLoadingLocation(true)
     setLocationError(null)
 
     if (!navigator.geolocation) {
-      console.log('[MapPage] Geolocation API 지원 안됨')
       setLocationError('이 브라우저에서는 위치 서비스를 지원하지 않습니다.')
       setIsLoadingLocation(false)
       return
@@ -797,22 +795,12 @@ function MapPage({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords
-        console.log('[MapPage] 위치 가져오기 성공:', latitude, longitude)
         const loc = { lat: latitude, lng: longitude }
         setCurrentLocation(loc)
         lastWatchLocationRef.current = loc
         setIsLoadingLocation(false)
-
-        const dist = haversineDistanceMeters(
-          latitude,
-          longitude,
-          destinationData.lat,
-          destinationData.lng,
-        )
-        console.log('[MapPage] 가게까지 직선 거리:', dist, 'm')
       },
       (error) => {
-        console.log('[MapPage] 위치 가져오기 실패:', error.code, error.message)
         setIsLoadingLocation(false)
         switch (error.code) {
           case error.PERMISSION_DENIED:

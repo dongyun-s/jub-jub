@@ -1,6 +1,6 @@
 /**
  * CategoryDetailPage.tsx
- * 카테고리 상세 — 정렬(기본/거리/평점)은 useStoreList 훅 경유 (API 연동 전 목 데이터)
+ * 카테고리 상세 — 정렬(기본/거리/평점)은 useStoreList 훅 경유 (실 API)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
