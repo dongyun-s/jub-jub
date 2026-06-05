@@ -1,8 +1,10 @@
 /**
- * 출석 랜덤박스 (백엔드: 누적 출석 7회마다 issueAttendanceRandomBox)
- * - API는 당첨 결과를 내려주지 않으므로 쿠폰함 diff로 판별
+ * 출석 랜덤박스 — 명세 v1
+ * - POST /rewards/attendance → isRandomBoxAvailable (7일 연속 출석)
+ * - POST /rewards/random-box → WIN_1000 | WIN_100 | LOSE
  */
-import { fetchAttendanceHistory, fetchMyCoupons } from '../api/rewards'
+import type { RandomBoxApiResult } from '../api/rewards'
+import { fetchAttendanceHistory, postRandomBoxOpen } from '../api/rewards'
 
 export type AttendanceBoxPrize = '1000' | '100' | 'NONE'
 
@@ -31,11 +33,7 @@ function monthTasksForLifetimeCount(): { year: number; month: number }[] {
   return tasks
 }
 
-/**
- * 누적 출석 일수(서로 다른 날짜 기준).
- * 과거: 24개월 동시 요청 → ngrok/서버 과부하·401 연쇄 가능.
- * 현재: 캐시 + in-flight 공유 + 소량 동시(2)만 허용.
- */
+/** 달력·통계용 누적 출석 일수 (랜덤박스 자격과는 별개) */
 export async function countServerLifetimeAttendance(force = false): Promise<number> {
   if (!force && lifetimeCache && Date.now() - lifetimeCache.cachedAt < LIFETIME_CACHE_MS) {
     return lifetimeCache.count
@@ -56,7 +54,7 @@ export async function countServerLifetimeAttendance(force = false): Promise<numb
             const res = await fetchAttendanceHistory({ year, month })
             for (const d of res.attendedDates) dates.add(d)
           } catch {
-            /* 월별 조회 실패는 무시 */
+            /* ignore */
           }
         }),
       )
@@ -72,30 +70,55 @@ export async function countServerLifetimeAttendance(force = false): Promise<numb
   return lifetimeInflight
 }
 
-/** 백엔드 AttendanceService: totalAttendanceCount % 7 == 0 */
-export function isAttendanceRandomBoxMilestone(totalCount: number): boolean {
-  return totalCount > 0 && totalCount % 7 === 0
-}
-
-export function attendanceUntilNextRandomBox(totalCount: number): number {
-  if (totalCount <= 0) return 7
-  const rem = totalCount % 7
-  return rem === 0 ? 7 : 7 - rem
-}
-
-/** 출석 POST 직후 새로 생긴 쿠폰으로 당첨 판별 */
-export async function resolveAttendanceBoxPrizeFromCoupons(
-  couponIdsBefore: Set<number>,
-): Promise<AttendanceBoxPrize> {
-  const coupons = await fetchMyCoupons()
-  const fresh = coupons.filter((c) => !couponIdsBefore.has(c.memberCouponId))
-  if (fresh.some((c) => c.discountAmount >= 1000)) return '1000'
-  if (fresh.some((c) => c.discountAmount >= 100)) return '100'
+/** API result → UI prize */
+export function mapRandomBoxApiResult(result: RandomBoxApiResult): AttendanceBoxPrize {
+  if (result === 'WIN_1000') return '1000'
+  if (result === 'WIN_100') return '100'
   return 'NONE'
+}
+
+/** 상자 선택 시 서버에서 확률 추첨 */
+export async function openAttendanceRandomBox(): Promise<AttendanceBoxPrize> {
+  const { result } = await postRandomBoxOpen()
+  return mapRandomBoxApiResult(result)
+}
+
+/** 주간 그리드 기준 연속 출석 일수 (레거시·테스트용) */
+export function consecutiveStreakFromWeek(checkedDays: boolean[]): number {
+  const today = new Date().getDay()
+  const todayIndex = today === 0 ? 6 : today - 1
+  let streak = 0
+  for (let i = todayIndex; i >= 0; i--) {
+    if (!checkedDays[i]) break
+    streak += 1
+  }
+  return streak
+}
+
+/**
+ * rolling 연속 출석 일수 기준, 7일마다 랜덤박스 주기(요일 무관).
+ * - filledInCycle: 이번 7일 주기에서 채운 칸 수(1~7), 0이면 아직 없음
+ * - 다음 박스까지: filled이 7 미만이면 (7 - filled)일
+ */
+export function sevenDayRewardCycleProgress(consecutiveRollingDays: number): {
+  filledInCycle: number
+  daysUntilRandomBox: number
+} {
+  if (consecutiveRollingDays <= 0) {
+    return { filledInCycle: 0, daysUntilRandomBox: 7 }
+  }
+  const filledInCycle = ((consecutiveRollingDays - 1) % 7) + 1
+  const daysUntilRandomBox = filledInCycle >= 7 ? 0 : 7 - filledInCycle
+  return { filledInCycle, daysUntilRandomBox }
+}
+
+/** UI·힌트용: rolling 연속 일수 → 랜덤박스까지 남은 일수 */
+export function daysUntilRandomBoxStreak(consecutiveRollingDays: number): number {
+  return sevenDayRewardCycleProgress(consecutiveRollingDays).daysUntilRandomBox
 }
 
 export function prizeLabel(prize: AttendanceBoxPrize): string {
   if (prize === '1000') return '1,000원 쿠폰'
   if (prize === '100') return '100원 쿠폰'
-  return '꽁'
+  return '꽝'
 }

@@ -1,16 +1,17 @@
 /**
- * RankingPage.tsx — 주간/전체 랭킹 + 내 순위 (API 연동 전: 목 데이터)
+ * RankingPage.tsx — 전체 누적 랭킹 + 내 순위
  */
 
-import { useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
 import TierBadge, { getTierThemeForLabel } from '../../components/TierBadge/TierBadge'
-import RankingMemberStats from '../../components/RankingMemberStats/RankingMemberStats'
+import RankingEntryAvatar from '../../components/RankingEntryAvatar/RankingEntryAvatar'
+import RankingMemberCard from '../../components/RankingMemberCard/RankingMemberCard'
 import MyRankingCard from '../../components/MyRankingCard/MyRankingCard'
-import type { RankingEntryDto, RankingPeriod } from '../../api/ranking'
+import type { RankingEntryDto } from '../../api/ranking'
 import { useMyRanking } from '../../hooks/useMyRanking'
 import { useRankings } from '../../hooks/useRankings'
+import { formatWalkingDistance } from '../../lib/rankingDisplay'
 import { TIER_THEMES } from '../../lib/rewardTierTheme'
 import styles from './RankingPage.module.css'
 
@@ -32,16 +33,12 @@ const rankMedalIcon: Record<number, string> = {
   3: 'military_tech',
 }
 
+/** 명예의 전당 — 3열 포디엄용 컴팩트 카드 (좁은 칸에 맞게 세로 통계) */
 function PodiumCard({ entry, elevated }: { entry: RankingEntryDto; elevated?: boolean }) {
   const theme = getTierThemeForLabel(entry.tierLabel)
   return (
     <article
       className={`${styles.podiumCard} ${elevated ? styles.podiumCardFirst : ''}`}
-      style={{
-        ['--tier-ring' as string]: theme.myAvatarRing,
-        ['--tier-glow' as string]: theme.myAvatarGlow,
-        ['--tier-shadow' as string]: theme.gradeCardShadow,
-      }}
     >
       <div
         className={styles.podiumCardBg}
@@ -56,69 +53,28 @@ function PodiumCard({ entry, elevated }: { entry: RankingEntryDto; elevated?: bo
           <span className="material-symbols-outlined">{rankMedalIcon[entry.rank] ?? 'tag'}</span>
           {entry.rank}위
         </span>
-        <div className={styles.podiumAvatarWrap} style={{ boxShadow: theme.myAvatarGlow }}>
-          <img
-            src={entry.avatarUrl}
-            alt=""
-            className={styles.podiumAvatar}
-            style={{ borderColor: theme.myAvatarRing }}
-          />
-        </div>
-        <p className={styles.podiumName} style={{ color: theme.badgeAccent }}>
-          {entry.nickname}
-        </p>
-        <TierBadge label={entry.tierLabel} variant="gradient" size="md" className={styles.podiumTier} />
-        <p className={styles.podiumXp} style={{ color: theme.badgeAccent }}>
-          XP {entry.cumulativeXp.toLocaleString('ko-KR')}
-        </p>
-      </div>
-    </article>
-  )
-}
-
-function RankingRow({ entry }: { entry: RankingEntryDto }) {
-  const theme = getTierThemeForLabel(entry.tierLabel)
-  return (
-    <article
-      className={styles.card}
-      style={{
-        ['--tier-accent' as string]: theme.myGoalBadgeColor,
-        ['--tier-ring' as string]: theme.myAvatarRing,
-      }}
-    >
-      <div
-        className={styles.cardAccent}
-        style={{ backgroundImage: theme.gradeCardBackground }}
-        aria-hidden
-      />
-      <span
-        className={styles.rankBadge}
-        style={{
-          color: theme.myTierNameColor,
-          backgroundColor: `${theme.myGoalBadgeColor}18`,
-          borderColor: `${theme.myGoalBadgeColor}35`,
-          boxShadow: theme.myTierProgressGlow,
-        }}
-      >
-        {entry.rank}
-      </span>
-      <img
-        src={entry.avatarUrl}
-        alt=""
-        className={styles.thumb}
-        style={{
-          borderColor: theme.myAvatarRing,
-          boxShadow: theme.myAvatarGlow,
-        }}
-      />
-      <div className={styles.info}>
-        <div className={styles.nameRow}>
-          <p className={styles.name} style={{ color: theme.myTierNameColor }}>
-            {entry.nickname}
-          </p>
-          <TierBadge label={entry.tierLabel} variant="gradient" />
-        </div>
-        <RankingMemberStats entry={entry} themed />
+        <RankingEntryAvatar
+          imageUrl={entry.avatarUrl}
+          theme={theme}
+          size={elevated ? 'podiumElevated' : 'podium'}
+          className={styles.podiumAvatar}
+        />
+        <TierBadge label={entry.tierLabel} variant="gradient" size="sm" className={styles.podiumTier} />
+        <p className={styles.podiumName}>{entry.nickname}</p>
+        <dl className={styles.podiumStats}>
+          <div className={styles.podiumStatRow}>
+            <dt>순위</dt>
+            <dd>{entry.rank}위</dd>
+          </div>
+          <div className={styles.podiumStatRow}>
+            <dt>거리</dt>
+            <dd>{formatWalkingDistance(entry.walkingDistanceM)}</dd>
+          </div>
+          <div className={styles.podiumStatRow}>
+            <dt>픽업</dt>
+            <dd>{entry.orderCount}회</dd>
+          </div>
+        </dl>
       </div>
     </article>
   )
@@ -133,21 +89,17 @@ function RankingPage({
   onMypageClick,
   cartCount = 0,
 }: RankingPageProps) {
-  const [period, setPeriod] = useState<RankingPeriod>('WEEKLY')
-  const { entries, loading, error, isMock } = useRankings(period)
-  const { myRanking, loading: myLoading, isMock: myMock } = useMyRanking(period)
+  const { entries, totalUsers, loading, error } = useRankings()
+  const { myRanking, loading: myLoading } = useMyRanking()
 
   const top3 = entries.filter((e) => e.rank <= 3)
   const rest = entries.filter((e) => e.rank > 3)
-  const podiumSecond = top3.find((e) => e.rank === 2)
   const podiumFirst = top3.find((e) => e.rank === 1)
+  const podiumSecond = top3.find((e) => e.rank === 2)
   const podiumThird = top3.find((e) => e.rank === 3)
 
-  const heroTitle = period === 'WEEKLY' ? '이번 주 TOP 줍줍러' : '전체 누적 TOP 줍줍러'
-  const heroDesc =
-    period === 'WEEKLY'
-      ? '누적 도보 이동 거리 기준 주간 회원 순위'
-      : '누적 도보 이동 거리 기준 전체 회원 순위'
+  const heroTitle = '전체 누적 TOP 줍줍러'
+  const heroDesc = '누적 도보 이동 거리 기준 전체 회원 순위'
 
   return (
     <Layout showBackground={false}>
@@ -158,29 +110,6 @@ function RankingPage({
           </button>
           <h1 className={styles.headerTitle}>회원 랭킹</h1>
         </header>
-
-        <div className={styles.periodTabs} role="tablist" aria-label="랭킹 기간">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={period === 'WEEKLY'}
-            className={period === 'WEEKLY' ? styles.periodTabActive : styles.periodTab}
-            onClick={() => setPeriod('WEEKLY')}
-          >
-            주간 랭킹
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={period === 'ALL'}
-            className={period === 'ALL' ? styles.periodTabActive : styles.periodTab}
-            onClick={() => setPeriod('ALL')}
-          >
-            전체 랭킹
-          </button>
-        </div>
-
-        <MyRankingCard data={myRanking} loading={myLoading} isMock={myMock} />
 
         <div className={styles.scrollArea}>
           <section
@@ -199,9 +128,11 @@ function RankingPage({
                 <h2 className={styles.heroTitle}>{heroTitle}</h2>
                 <p className={styles.heroDesc}>{heroDesc}</p>
               </div>
-              <span className={styles.heroBadge}>{period === 'WEEKLY' ? 'WEEKLY' : 'ALL'}</span>
+              <span className={styles.heroBadge}>ALL</span>
             </div>
           </section>
+
+          <MyRankingCard data={myRanking} loading={myLoading} />
 
           {loading && (
             <p className={styles.loadingMessage}>랭킹을 불러오는 중…</p>
@@ -229,8 +160,17 @@ function RankingPage({
                   </h3>
                   <div className={styles.list}>
                     {rest.map((entry) => (
-                      <RankingRow key={`${period}-${entry.rank}`} entry={entry} />
+                      <RankingMemberCard
+                        key={entry.rank}
+                        tierLabel={entry.tierLabel}
+                        nickname={entry.nickname}
+                        avatarUrl={entry.avatarUrl}
+                        rankLabel={`${entry.rank}위`}
+                        walkingDistanceM={entry.walkingDistanceM}
+                        orderCount={entry.orderCount}
+                      />
                     ))}
+
                   </div>
                 </section>
               ) : null}
@@ -238,9 +178,7 @@ function RankingPage({
           )}
 
           <p className={styles.footerNote}>
-            {isMock
-              ? '데모 데이터 · API 연동 시 VITE_LIVE_API_RANKING=true'
-              : '실시간 랭킹'}
+            {`실시간 랭킹 · 총 ${totalUsers.toLocaleString('ko-KR')}명`}
             {error ? ` · ${error}` : ''}
           </p>
         </div>

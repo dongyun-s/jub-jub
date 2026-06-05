@@ -1,6 +1,15 @@
 import type { FeaturedRestaurant } from '../constants'
 import styles from '../pages/home/HomePage.module.css'
 
+/** 카드 우측 배지 — 카테고리명 (거리·픽업 시간은 메타 줄에 표시) */
+function restaurantCategoryBadge(item: FeaturedRestaurant): string | null {
+  return (
+    item.hashtags
+      .map((h) => (h.startsWith('#') ? h.slice(1) : h))
+      .find((name) => name && name !== '줍줍') ?? null
+  )
+}
+
 interface FeaturedRestaurantListProps {
   restaurants: FeaturedRestaurant[]
   onCardClick?: (id: number) => void
@@ -9,7 +18,9 @@ interface FeaturedRestaurantListProps {
 function FeaturedRestaurantList({ restaurants, onCardClick }: FeaturedRestaurantListProps) {
   return (
     <div className={styles.restaurantList}>
-      {restaurants.map((item) => (
+      {restaurants.map((item) => {
+        const categoryBadge = restaurantCategoryBadge(item)
+        return (
         <button
           key={item.id}
           type="button"
@@ -49,7 +60,9 @@ function FeaturedRestaurantList({ restaurants, onCardClick }: FeaturedRestaurant
                   {item.delivery} • {item.minOrder}
                 </p>
               </div>
-              <span className={styles.restaurantPointChip}>포인트 {item.points}</span>
+              {categoryBadge ? (
+                <span className={styles.restaurantBadgeChip}>{categoryBadge}</span>
+              ) : null}
             </div>
             <div className={styles.restaurantHashtags}>
               {item.hashtags.map((tag, idx) => (
@@ -60,7 +73,8 @@ function FeaturedRestaurantList({ restaurants, onCardClick }: FeaturedRestaurant
             </div>
           </div>
         </button>
-      ))}
+        )
+      })}
     </div>
   )
 }

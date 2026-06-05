@@ -1,40 +1,25 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { OwnerHeader } from '../../components/OwnerHeader'
 import { Icon } from '../../components/Icon'
+import { useOwnerSales } from '../../context/OwnerSalesProvider'
+import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
 import styles from './DashboardPage.module.css'
 
 export function DashboardPage() {
-  const [salesPaused, setSalesPaused] = useState(false)
+  const {
+    salesPaused,
+    resumeSales,
+    isScheduledPause,
+    remainingMinutesLabel,
+    formatResumeAtLabel,
+  } = useOwnerSales()
+  const { store, mockMode } = useOwnerStoreDetail()
 
   return (
     <>
       <OwnerHeader
         title="대시보드"
-        showSearch
-        right={
-          <div className={styles.toggleWrap}>
-            <button
-              type="button"
-              onClick={() => setSalesPaused((p) => !p)}
-              className={styles.toggleBtn}
-            >
-              {salesPaused ? (
-                <span className={styles.statusPaused}>
-                  <span className={styles.dotSolid} />
-                  영업 중지
-                  <Icon name="play_circle" className={styles.iconXs} />
-                </span>
-              ) : (
-                <span className={styles.statusOpen}>
-                  <span className={styles.dotPulse} />
-                  영업 중
-                  <Icon name="pause_circle" className={styles.iconXs} />
-                </span>
-              )}
-            </button>
-          </div>
-        }
+        subtitle={mockMode ? `${store?.name ?? ''} · 예시 데이터` : store?.name}
       />
       <main className={styles.main}>
         {salesPaused ? (
@@ -42,13 +27,26 @@ export function DashboardPage() {
             <div className={styles.warningLeft}>
               <Icon name="warning" style={{ fontSize: '1.875rem', color: '#f97316' }} />
               <div>
-                <h4 className={styles.warningTitle}>현재 영업이 중지된 상태입니다</h4>
+                <h4 className={styles.warningTitle}>
+                  {isScheduledPause ? '일시 중지 중입니다' : '현재 영업이 중지된 상태입니다'}
+                </h4>
                 <p className={styles.warningText}>
-                  고객이 메뉴를 주문할 수 없습니다. 상단에서 영업을 재개하세요.
+                  {isScheduledPause && remainingMinutesLabel ? (
+                    <>
+                      <strong className={styles.warningStrong}>{remainingMinutesLabel}</strong>
+                      {formatResumeAtLabel() ? ` · ${formatResumeAtLabel()} 재개` : null}.{' '}
+                    </>
+                  ) : (
+                    <>고객이 메뉴를 주문할 수 없습니다. </>
+                  )}
+                  <Link to="/sales" className={styles.warningLink}>
+                    영업 상태
+                  </Link>
+                  에서 변경·재개할 수 있습니다.
                 </p>
               </div>
             </div>
-            <button type="button" className={styles.resumeBtn} onClick={() => setSalesPaused(false)}>
+            <button type="button" className={styles.resumeBtn} onClick={resumeSales}>
               영업 재개하기
             </button>
           </div>

@@ -1,36 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchMyRanking, type MyRankingDto, type RankingPeriod } from '../api/ranking'
-import { getCachedMemberProfileId } from '../lib/authStorage'
-import { LIVE_API } from '../lib/liveApi'
-import { getMockMyRanking } from '../lib/mocks/ranking'
+import { fetchMyRanking, type MyRankingDto } from '../api/ranking'
 
-export function useMyRanking(period: RankingPeriod) {
+export function useMyRanking() {
   const [data, setData] = useState<MyRankingDto | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isMock, setIsMock] = useState(!LIVE_API.ranking)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      if (LIVE_API.ranking) {
-        const res = await fetchMyRanking(period)
-        setData(res)
-        setIsMock(false)
-      } else {
-        setData(getMockMyRanking(period, getCachedMemberProfileId()))
-        setIsMock(true)
-      }
+      const res = await fetchMyRanking()
+      setData(res)
     } catch {
-      setData(getMockMyRanking(period, getCachedMemberProfileId()))
-      setIsMock(true)
+      setData(null)
     } finally {
       setLoading(false)
     }
-  }, [period])
+  }, [])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  return { myRanking: data, loading, isMock, reload: load }
+  return { myRanking: data, loading, reload: load }
 }

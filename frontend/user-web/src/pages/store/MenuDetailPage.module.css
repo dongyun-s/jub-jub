@@ -121,27 +121,6 @@
   color: transparent;
 }
 
-.xpBadge {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  background-color: rgb(255 251 235);
-  padding: 0.375rem 0.75rem;
-  border-radius: 9999px;
-}
-
-.xpIcon {
-  color: rgb(245 158 11);
-  font-size: 1.125rem;
-  font-variation-settings: 'FILL' 1;
-}
-
-.xpText {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: rgb(217 119 6);
-}
-
 .optionsSection {
   border-top: 2rem solid rgb(248 250 252);
 }

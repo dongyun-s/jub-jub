@@ -1,13 +1,15 @@
 /**
  * 리뷰 API — `/api/reviews/*` (Vite `/api` 프록시·직접 호출 공통)
  */
-import { apiFetch } from './authClient'
+import { apiFetch, ApiError } from './authClient'
 
-/** 주문내역·주문현황에서 리뷰 작성 화면으로 넘길 맥락 */
+/** 주문내역·리뷰 관리에서 리뷰 작성/수정 화면으로 넘길 맥락 */
 export interface ReviewWritePayload {
   storeName: string
   orderId: number
   storeId: number
+  /** 있으면 수정 모드 */
+  reviewId?: number
 }
 
 export interface AiReviewGenerateBody {
@@ -79,8 +81,17 @@ export function createReview(body: ReviewCreateBody) {
   })
 }
 
-export function getReview(reviewId: number) {
-  return apiFetch<ReviewDto>(`/api/reviews/${reviewId}`, { method: 'GET' })
+export async function fetchReview(reviewId: number): Promise<ReviewDto> {
+  const raw = await apiFetch<unknown>(`/api/reviews/${reviewId}`, { method: 'GET' })
+  const inner =
+    typeof raw === 'object' && raw !== null && 'success' in raw && (raw as { success?: boolean }).success === true
+      ? (raw as { data?: unknown }).data
+      : raw
+  const dto = normalizeReviewDto(inner)
+  if (!dto) {
+    throw new ApiError('리뷰 정보 형식이 올바르지 않습니다.', { status: 200 })
+  }
+  return dto
 }
 
 function num(v: unknown, fallback = 0): number {

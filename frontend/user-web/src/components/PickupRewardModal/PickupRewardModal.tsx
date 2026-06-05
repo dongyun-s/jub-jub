@@ -7,6 +7,7 @@ import AppModal from '../AppModal/AppModal'
 import type { PickupRewardBreakdown } from '../../lib/pickupReward'
 import { formatWalkedDistance } from '../../lib/pickupReward'
 import TierIcon from '../TierIcon/TierIcon'
+import mc from '../AppModal/modalContent.module.css'
 import styles from './PickupRewardModal.module.css'
 
 interface PickupRewardModalProps {
@@ -29,7 +30,6 @@ function PickupRewardModal({
   const titleId = useId()
   const descId = useId()
 
-  const showXp = rewards != null && rewards.earnedXp > 0
   const showDistance = rewards != null && rewards.walkedMeters > 0
   const showOrderCount = rewards != null && rewards.orderCountGain > 0
 
@@ -91,22 +91,6 @@ function PickupRewardModal({
         </div>
       ) : (
         <ul className={styles.rewardList}>
-          {showXp && rewards && (
-            <li className={styles.rewardRow}>
-              <div className={styles.rewardIconWrap}>
-                <span
-                  className={`material-symbols-outlined ${styles.rewardIcon}`}
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  star
-                </span>
-              </div>
-              <div className={styles.rewardText}>
-                <span className={styles.rewardLabel}>경험치</span>
-                <span className={styles.rewardValue}>+{rewards.earnedXp} XP</span>
-              </div>
-            </li>
-          )}
           {showDistance && rewards && (
             <li className={styles.rewardRow}>
               <div className={`${styles.rewardIconWrap} ${styles.rewardIconWrapDistance}`}>
@@ -132,7 +116,7 @@ function PickupRewardModal({
               </div>
             </li>
           )}
-          {!showXp && !showDistance && !showOrderCount && (
+          {!showDistance && !showOrderCount && (
             <li className={styles.rewardRowMuted}>
               <p>보상은 처리됐습니다. 홈·마이페이지에서 잠시 후 다시 확인해 주세요.</p>
             </li>
@@ -142,14 +126,19 @@ function PickupRewardModal({
 
       <div className={styles.actions}>
         {onWriteReview && !loading && (
-          <button type="button" className={styles.btnSecondary} onClick={onWriteReview}>
+          <button
+            type="button"
+            className={mc.btnSecondary}
+            onClick={onWriteReview}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}
+          >
             <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>
               rate_review
             </span>
             리뷰 남기기
           </button>
         )}
-        <button type="button" className={styles.btnPrimary} onClick={onClose} disabled={loading}>
+        <button type="button" className={mc.btnPrimary} onClick={onClose} disabled={loading}>
           확인
         </button>
       </div>

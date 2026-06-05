@@ -1,10 +1,6 @@
 import { fetchRewardMe, type RewardMeResponse } from '../api/rewards'
 
-/** 백엔드 OrderService.completePickup → PickupCompletedEvent 기본 XP */
-export const PICKUP_EARNED_XP = 100
-
 export type PickupRewardBreakdown = {
-  earnedXp: number
   walkedMeters: number
   orderCountGain: number
   totalOrderCount: number
@@ -50,8 +46,6 @@ export function buildPickupRewardBreakdown(
     (before.tierName !== after.tierName && orderCountGain > 0)
 
   return {
-    /** 픽업 완료 API 성공 시 서버가 고정 지급하는 XP */
-    earnedXp: PICKUP_EARNED_XP,
     walkedMeters,
     orderCountGain,
     totalOrderCount: after.orderCount,

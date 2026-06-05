@@ -10,7 +10,7 @@ import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
 import SimpleAlertModal, { type SimpleAlertVariant } from '../../components/SimpleAlertModal/SimpleAlertModal'
-import { FEATURED_RESTAURANTS } from '../../constants'
+import { storeCardImageById } from '../../constants'
 import {
   addCartItem,
   clearCart,
@@ -22,7 +22,12 @@ import { ApiError } from '../../api/authClient'
 import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
 import { getAccessToken, setCachedMemberProfileId } from '../../lib/authStorage'
 import { resolveUserCoords } from '../../lib/geolocation'
-import { ECO_DISCOUNT_AMOUNT, estimateFinalPaymentAmount } from '../../lib/orderPricing'
+import {
+  buildPortOneOrderName,
+  ECO_DISCOUNT_AMOUNT,
+  estimateFinalPaymentAmount,
+} from '../../lib/orderPricing'
+import { fetchStoreDetail } from '../../api/store'
 import styles from './CartPage.module.css'
 
 interface AppliedCoupon {
@@ -63,22 +68,9 @@ interface CartPageProps {
   onRefreshCart?: () => Promise<void>
   /** GET /carts 의 storeName */
   pickupStoreName?: string | null
+  /** 픽업 매장 카드 탭 — 매장 있으면 상세, 없으면 App에서 카테고리(전체)로 */
+  onPickupStoreClick?: () => void
 }
-
-/** App에서 장바구니를 관리하지 않을 때 사용하는 기본 데이터 (홈 카드와 통일) */
-const defaultCartItems: CartItem[] = [
-  {
-    id: FEATURED_RESTAURANTS[0].id,
-    menuId: FEATURED_RESTAURANTS[0].id,
-    name: '테스트 메뉴 (100원)',
-    options: '기본',
-    price: 100,
-    quantity: 1,
-    image: FEATURED_RESTAURANTS[0].image,
-    optionIds: [],
-    requestMemo: '',
-  },
-]
 
 function CartPage({ 
   onBack: _onBack, 
@@ -99,8 +91,9 @@ function CartPage({
   cartStoreId = null,
   onRefreshCart,
   pickupStoreName = null,
+  onPickupStoreClick,
 }: CartPageProps) {
-  const [internalCartItems, setInternalCartItems] = useState<CartItem[]>(defaultCartItems)
+  const [internalCartItems, setInternalCartItems] = useState<CartItem[]>([])
 
   /** App에서 cartItems/onCartItemsChange 전달 시 외부 상태 사용, 없으면 내부 상태 */
   const cartItems = externalCartItems ?? internalCartItems
@@ -200,13 +193,23 @@ function CartPage({
 
     setIsProcessing(true)
 
-    const orderName = cartItems.map((item) => item.name).join(', ')
-
     void (async () => {
       try {
         const PortOne = await import(
           /* @vite-ignore */ 'https://cdn.portone.io/v2/browser-sdk.esm.js'
         )
+
+        let storeLabel = pickupStoreName?.trim() || ''
+        if (!storeLabel && cartStoreId != null) {
+          try {
+            const detail = await fetchStoreDetail(cartStoreId)
+            storeLabel = detail.name?.trim() || `매장 #${cartStoreId}`
+          } catch {
+            storeLabel = `매장 #${cartStoreId}`
+          }
+        }
+
+        const orderName = buildPortOneOrderName(storeLabel, cartStoreId, cartItems)
 
         // 1) 주문 생성 (서버가 장바구니 금액 검증)
         const order = await createOrder({
@@ -217,43 +220,6 @@ function CartPage({
         })
         if (order.memberProfileId != null) {
           setCachedMemberProfileId(order.memberProfileId)
-        }
-
-        // (DEBUG/임시) 주문내역 화면 표시용 로컬 저장 — 서버 주문내역 API 연결 전까지 사용
-        try {
-          const key = '__jubjub_local_orders'
-          const raw = window.localStorage.getItem(key)
-          const prev = raw ? (JSON.parse(raw) as unknown[]) : []
-          const storeImage =
-            FEATURED_RESTAURANTS.find((r) => r.id === cartStoreId)?.image ??
-            cartItems[0]?.image ??
-            null
-          const menuSummary =
-            cartItems.length === 0
-              ? '주문'
-              : cartItems.length === 1
-                ? cartItems[0].name
-                : `${cartItems[0].name} 외 ${cartItems.length - 1}건`
-
-          const next = [
-            {
-              orderId: order.orderId,
-              storeId: cartStoreId,
-              storeName: pickupStoreName?.trim() || `매장 #${cartStoreId}`,
-              menuSummary,
-              totalAmount: order.originalAmount ?? subtotal,
-              finalAmount: order.finalAmount,
-              image: storeImage,
-              createdAt: new Date().toISOString(),
-              orderStatus: order.orderStatus,
-              paymentStatus: 'READY',
-              memberProfileId: order.memberProfileId,
-            },
-            ...prev,
-          ].slice(0, 50)
-          window.localStorage.setItem(key, JSON.stringify(next))
-        } catch {
-          /* ignore */
         }
 
         // 2) 결제 준비 (merchantUid 발급/READY 레코드 생성)
@@ -267,7 +233,7 @@ function CartPage({
           storeId,
           channelKey,
           paymentId: prepared.merchantUid,
-          orderName: orderName.length > 40 ? `${orderName.substring(0, 40)}...` : orderName,
+          orderName,
           customer: {
             email: 'test@jubjub.com',
             fullName: '홍길동',
@@ -316,12 +282,7 @@ function CartPage({
         }
 
         // 4) 결제 확정 — 사용자 위치로 픽업 거리 저장 (백엔드 필수)
-        const storeCoords = FEATURED_RESTAURANTS.find((r) => r.id === cartStoreId)
-        const geoFallback =
-          storeCoords?.lat != null && storeCoords?.lng != null
-            ? { latitude: storeCoords.lat, longitude: storeCoords.lng }
-            : null
-        const userCoords = await resolveUserCoords(geoFallback)
+        const userCoords = await resolveUserCoords(null)
 
         const confirmed = await confirmPayment({
           merchantUid: prepared.merchantUid,
@@ -332,25 +293,39 @@ function CartPage({
 
         // (DEBUG) 환불 기능 삭제로 결제 추적 저장 제거
 
-        // (DEBUG/임시) 방금 주문을 PAID로 업데이트 (로컬 주문내역)
+        // 결제 완료된 주문만 로컬에 저장 (결제창만 닫은 READY 주문은 주문내역에 안 보이게)
         try {
           const key = '__jubjub_local_orders'
           const raw = window.localStorage.getItem(key)
-          const prev = raw ? (JSON.parse(raw) as any[]) : []
-          const next = prev.map((o) =>
-            o?.orderId === order.orderId
-              ? {
-                  ...o,
-                  orderStatus: 'PAID',
-                  paymentStatus: confirmed.paymentStatus,
-                  finalAmount: confirmed.paidAmount ?? order.finalAmount,
-                  paidAt: confirmed.paidAt,
-                  paymentRecordId: confirmed.paymentRecordId,
-                  transactionId: confirmed.transactionId,
-                }
-              : o,
+          const prev = raw ? (JSON.parse(raw) as unknown[]) : []
+          const storeImage =
+            cartItems[0]?.image ?? (cartStoreId != null ? storeCardImageById(cartStoreId) : null)
+          const menuSummary =
+            cartItems.length === 0
+              ? '주문'
+              : cartItems.length === 1
+                ? cartItems[0].name
+                : `${cartItems[0].name} 외 ${cartItems.length - 1}건`
+          const row = {
+            orderId: order.orderId,
+            storeId: cartStoreId,
+            storeName: storeLabel || `매장 #${cartStoreId}`,
+            menuSummary,
+            totalAmount: order.originalAmount ?? subtotal,
+            finalAmount: confirmed.paidAmount ?? order.finalAmount,
+            image: storeImage,
+            createdAt: new Date().toISOString(),
+            orderStatus: 'PAID',
+            paymentStatus: confirmed.paymentStatus ?? 'PAID',
+            paidAt: confirmed.paidAt,
+            paymentRecordId: confirmed.paymentRecordId,
+            memberProfileId: order.memberProfileId,
+          }
+          const withoutDup = (Array.isArray(prev) ? prev : []).filter(
+            (o) => (o as { orderId?: number })?.orderId !== order.orderId,
           )
-          window.localStorage.setItem(key, JSON.stringify(next))
+          window.localStorage.setItem(key, JSON.stringify([row, ...withoutDup].slice(0, 50)))
+          window.dispatchEvent(new Event('jubjub:orders-updated'))
         } catch {
           /* ignore */
         }
@@ -538,7 +513,16 @@ function CartPage({
         <div className={styles.scrollArea}>
           {/* 픽업 매장 정보 */}
           <section className={styles.pickupSection}>
-            <div className={styles.pickupCard}>
+            <button
+              type="button"
+              className={styles.pickupCard}
+              onClick={() => onPickupStoreClick?.()}
+              aria-label={
+                cartStoreId != null && pickupStoreName?.trim()
+                  ? `${pickupStoreName.trim()} 매장 정보 보기`
+                  : '맛집 던전에서 매장 선택하기'
+              }
+            >
               <div className={styles.pickupIcon}>
                 <span className="material-symbols-outlined text-primary text-2xl">storefront</span>
               </div>
@@ -553,10 +537,10 @@ function CartPage({
                     : '메뉴를 담으면 픽업 매장이 표시됩니다.'}
                 </p>
               </div>
-              <button className={styles.pickupChevron}>
+              <span className={styles.pickupChevron} aria-hidden>
                 <span className="material-symbols-outlined">chevron_right</span>
-              </button>
-            </div>
+              </span>
+            </button>
           </section>
 
           {/* 주문 내역 */}
@@ -590,10 +574,7 @@ function CartPage({
 
                   {/* 이미지 */}
                   <img
-                    src={
-                      item.image ??
-                      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
-                    }
+                    src={item.image ?? storeCardImageById(cartStoreId)}
                     alt={item.name}
                     className={styles.orderItemImage}
                   />

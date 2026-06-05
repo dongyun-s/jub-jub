@@ -1,0 +1,30 @@
+import { apiV1Fetch } from './authClient'
+
+export interface MenuDto {
+  menuId: number
+  name: string
+  price: number
+  description: string
+  isSoldOut: boolean
+  rewardXp: number
+}
+
+export interface StoreDetailDto {
+  storeId: number
+  name: string
+  address: string
+  phoneNumber: string
+  originInfo: string
+  cookingTimeMinutes: number
+  minOrderAmount: number
+  /** 매장 업종 (API 연동 시) */
+  categoryId?: number | null
+  menus: MenuDto[]
+}
+
+export function fetchStoreDetail(storeId: number, options?: { skipAuth?: boolean }) {
+  return apiV1Fetch<StoreDetailDto>(`/stores/${storeId}`, {
+    method: 'GET',
+    skipAuth: options?.skipAuth ?? true,
+  })
+}

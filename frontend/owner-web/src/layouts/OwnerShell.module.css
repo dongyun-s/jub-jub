@@ -26,15 +26,21 @@
 .logoWrap {
   display: flex;
   height: var(--owner-header-h);
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem;
 }
 
-.logo {
-  font-size: 1.25rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: -0.04em;
+.logoImg {
+  border-radius: 0.625rem;
+  object-fit: cover;
+}
+
+.logoText {
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--owner-primary-container);
 }
 

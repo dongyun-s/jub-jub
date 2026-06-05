@@ -15,12 +15,20 @@ import { useNearbyRestaurants } from '../../hooks/useStoreList'
 import { useRankings } from '../../hooks/useRankings'
 import { useUserLocation } from '../../hooks/useUserLocation'
 import type { FeaturedRestaurant } from '../../constants'
-import { FEATURED_RESTAURANTS, HOME_CATEGORIES } from '../../constants'
+import { HOME_CATEGORIES } from '../../constants'
+import { resolveCategoryTheme } from '../../lib/mapCategoryMarkers'
 import type { RankingEntryDto } from '../../api/ranking'
 import { formatRankingStripDistanceKm, formatRankingStripMeta } from '../../lib/rankingDisplay'
-import { getAttendanceStreak, isAttendanceMarkedDone } from '../../lib/rewardAttendance'
+import {
+  clearLocalAttendanceMark,
+  getAttendanceStreak,
+  isAttendanceMarkedDone,
+  isoDateLocal,
+  markAttendanceDone,
+  syncAttendanceStreakFromServer,
+} from '../../lib/rewardAttendance'
 import { useProfile } from '../../hooks/useProfile'
-import { fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
+import { fetchAttendanceHistory, fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
 import { getAccessToken } from '../../lib/authStorage'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
 import TierIcon from '../../components/TierIcon/TierIcon'
@@ -74,10 +82,10 @@ function HomePage({
 }: HomePageProps) {
   const { profile } = useProfile()
   const [searchQuery, setSearchQuery] = useState('')
-  const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>(FEATURED_RESTAURANTS)
+  const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>([])
   const { coords, loading: geoLoading } = useUserLocation()
   const { restaurants: nearbyRestaurants, hint: nearbyHint } = useNearbyRestaurants(coords, geoLoading)
-  const { entries: weeklyRankings } = useRankings('WEEKLY')
+  const { entries: rankingEntries } = useRankings()
   const [rewardMe, setRewardMe] = useState<RewardMeResponse | null>(null)
   const [rewardLoading, setRewardLoading] = useState(false)
   const [rewardFetchFailed, setRewardFetchFailed] = useState(false)
@@ -134,19 +142,51 @@ function HomePage({
   }, [profile?.email])
 
   useEffect(() => {
+    let cancelled = false
+
     const readAttendance = () => {
       if (typeof window === 'undefined') return
       setAttendanceDoneToday(isAttendanceMarkedDone(profile?.email))
       setAttendanceStreak(getAttendanceStreak(profile?.email))
     }
-    readAttendance()
-    window.addEventListener('focus', readAttendance)
-    window.addEventListener('jubjub-attendance-local', readAttendance)
-    document.addEventListener('visibilitychange', readAttendance)
+
+    const syncFromServer = async () => {
+      if (!getAccessToken()) {
+        readAttendance()
+        return
+      }
+      const todayIso = isoDateLocal(new Date())
+      try {
+        const now = new Date()
+        const history = await fetchAttendanceHistory({
+          year: now.getFullYear(),
+          month: now.getMonth() + 1,
+        })
+        if (cancelled) return
+        const serverToday = history.attendedDates.includes(todayIso)
+        syncAttendanceStreakFromServer(profile?.email, history.attendedDates)
+        if (serverToday) {
+          markAttendanceDone(profile?.email)
+        } else {
+          clearLocalAttendanceMark(profile?.email, todayIso)
+        }
+        setAttendanceDoneToday(serverToday)
+        setAttendanceStreak(getAttendanceStreak(profile?.email))
+      } catch {
+        if (!cancelled) readAttendance()
+      }
+    }
+
+    void syncFromServer()
+    const onRefresh = () => void syncFromServer()
+    window.addEventListener('focus', onRefresh)
+    window.addEventListener('jubjub-attendance-local', onRefresh)
+    document.addEventListener('visibilitychange', onRefresh)
     return () => {
-      window.removeEventListener('focus', readAttendance)
-      window.removeEventListener('jubjub-attendance-local', readAttendance)
-      document.removeEventListener('visibilitychange', readAttendance)
+      cancelled = true
+      window.removeEventListener('focus', onRefresh)
+      window.removeEventListener('jubjub-attendance-local', onRefresh)
+      document.removeEventListener('visibilitychange', onRefresh)
     }
   }, [profile?.email])
 
@@ -157,14 +197,14 @@ function HomePage({
   }, [nearbyRestaurants])
 
   useEffect(() => {
-    if (weeklyRankings.length <= 1) return
+    if (rankingEntries.length <= 1) return
     const timer = window.setInterval(() => {
-      setRankingCarouselIndex((prev) => (prev + 1) % weeklyRankings.length)
+      setRankingCarouselIndex((prev) => (prev + 1) % rankingEntries.length)
     }, 3000)
     return () => window.clearInterval(timer)
-  }, [weeklyRankings.length])
+  }, [rankingEntries.length])
 
-  const rankingDisplayEntry = weeklyRankings[rankingCarouselIndex]
+  const rankingDisplayEntry = rankingEntries[rankingCarouselIndex]
 
   const ordersForNext =
     rewardMe != null && rewardMe.nextTierRequiredCount > 0
@@ -308,7 +348,13 @@ function HomePage({
                   </span>
                 </div>
                 <span className={styles.gradeBenefit}>
-                  XP {rewardMe != null ? rewardMe.cumulativeXp.toLocaleString('ko-KR') : rewardLoading ? '…' : '—'}
+                  {distanceKm != null
+                    ? `도보 ${distanceKm}km`
+                    : rewardLoading
+                      ? '…'
+                      : !getAccessToken()
+                        ? '로그인 후 확인'
+                        : '—'}
                 </span>
               </div>
               <div className={styles.gradeAvatar}>
@@ -426,38 +472,45 @@ function HomePage({
             <span className={styles.sectionTitle}>던전 카테고리</span>
           </div>
           <div className={styles.categoryGrid}>
-            {HOME_CATEGORIES.map((cat, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className={styles.categoryButton}
-                onClick={() => goToCategory(cat.label === '더보기' ? '전체' : cat.label)}
-              >
-                <div className={styles.categoryIconWrapper}>
-                  <span className="material-symbols-outlined text-3xl text-gray-700 group-hover:text-primary">{cat.icon}</span>
-                </div>
-                <span className="text-xs font-bold text-gray-600">{cat.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 던전 프로모션 배너 */}
-        <div className={styles.promoWrapper}>
-          <div className={styles.promoCard}>
-            <div className="z-10">
-              <span className={styles.promoChip}>새로운 미션</span>
-              <p className={styles.promoTitle}>
-                주말 한정 경험치 2배!
-                <br />
-                포장 시 추가 3,000G 할인
-              </p>
-            </div>
-            <div className={styles.promoCircleBig} />
-            <div className={styles.promoCircleSmall} />
-            <div className={styles.promoIcon}>
-              <span className="material-symbols-outlined text-white/80 text-4xl">auto_awesome</span>
-            </div>
+            {HOME_CATEGORIES.map((cat, idx) => {
+              const isMore = cat.label === '더보기'
+              const theme = isMore ? null : resolveCategoryTheme(cat.label)
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  className={styles.categoryButton}
+                  onClick={() => goToCategory(isMore ? '전체' : cat.label)}
+                >
+                  <div
+                    className={styles.categoryIconWrapper}
+                    data-themed={theme ? 'true' : undefined}
+                    style={
+                      theme
+                        ? ({
+                            '--cat-from': theme.from,
+                            '--cat-to': theme.to,
+                            '--cat-glow': theme.glow,
+                          } as React.CSSProperties)
+                        : undefined
+                    }
+                  >
+                    <span
+                      className={`material-symbols-outlined text-3xl ${styles.categoryIcon}`}
+                      style={theme ? { color: theme.to } : undefined}
+                    >
+                      {cat.icon}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs font-bold ${styles.categoryLabel}`}
+                    style={theme ? { color: theme.to } : undefined}
+                  >
+                    {cat.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -481,10 +534,24 @@ function HomePage({
             <p className="px-4 pb-2 text-xs text-slate-500">{nearbyHint}</p>
           )}
 
-          <FeaturedRestaurantList
-            restaurants={restaurants}
-            onCardClick={(id) => onStoreSelect?.(id)}
-          />
+          {restaurants.length > 0 ? (
+            <FeaturedRestaurantList
+              restaurants={restaurants}
+              onCardClick={(id) => onStoreSelect?.(id)}
+            />
+          ) : (
+            <div className={styles.listEmpty}>
+              <span className={`material-symbols-outlined ${styles.listEmptyIcon}`}>storefront</span>
+              <p className={styles.listEmptyTitle}>
+                {geoLoading ? '주변 매장을 찾는 중이에요' : '주변에 표시할 매장이 없어요'}
+              </p>
+              <p className={styles.listEmptyDesc}>
+                {geoLoading
+                  ? '잠시만 기다려 주세요.'
+                  : '위치 권한을 허용하거나 카테고리에서 매장을 찾아보세요.'}
+              </p>
+            </div>
+          )}
         </div>
       </main>
 

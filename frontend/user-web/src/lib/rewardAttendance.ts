@@ -29,6 +29,10 @@ export function weekIsoDatesMondayFirst(ref: Date = new Date()): string[] {
  * 로그인 직후 호출: 이번 주(월~일) anon 출석 키를 계정 이메일 키로 옮김.
  * 예전에 비로그인·프로필 로드 전에 출석만 했을 때 마이페이지 주간 칸에 보이게 함.
  */
+/**
+ * 로그인 직후: 이번 주 anon 출석만 해당 이메일로 옮김.
+ * 이미 그 이메일 키가 있으면 덮어쓰지 않음(다른 계정 잔여 anon이 새 가입 계정으로 넘어가는 것 방지).
+ */
 export function migrateWeeklyAnonAttendanceToEmail(primaryEmail: string): void {
   if (typeof window === 'undefined') return
   const email = primaryEmail.trim()
@@ -37,6 +41,10 @@ export function migrateWeeklyAnonAttendanceToEmail(primaryEmail: string): void {
     const anonKey = `jubjub_attendance_anon_${date}`
     if (window.localStorage.getItem(anonKey) !== '1') continue
     const primaryKey = `jubjub_attendance_${email}_${date}`
+    if (window.localStorage.getItem(primaryKey) === '1') {
+      window.localStorage.removeItem(anonKey)
+      continue
+    }
     window.localStorage.setItem(primaryKey, '1')
     window.localStorage.removeItem(anonKey)
   }
@@ -69,13 +77,31 @@ export function attendanceStorageKey(profileEmail?: string | null): string {
   return `jubjub_attendance_${id}_${isoDateLocal(new Date())}`
 }
 
-/** 과거 anon 키까지 함께 보며 출석 완료 여부 판별 */
+/** 로컬 출석 표시 제거 (서버에 없을 때 잘못된 완료 UI 방지) */
+export function clearLocalAttendanceMark(profileEmail: string | undefined | null, date?: string): void {
+  if (typeof window === 'undefined') return
+  const d = date ?? isoDateLocal(new Date())
+  const id = attendancePrimaryId(profileEmail)
+  window.localStorage.removeItem(`jubjub_attendance_${id}_${d}`)
+  if (id !== 'anon') {
+    window.localStorage.removeItem(`jubjub_attendance_anon_${d}`)
+  }
+}
+
+/**
+ * 로그인 계정: 해당 이메일 키만 본다.
+ * 비로그인(anon)일 때만 anon 키를 본다 — 다른 계정에 브라우저 캐시가 섞이지 않게.
+ */
 export function isAttendanceMarkedDone(profileEmail?: string | null): boolean {
   if (typeof window === 'undefined') return false
   const date = isoDateLocal(new Date())
-  const primary = `jubjub_attendance_${attendancePrimaryId(profileEmail)}_${date}`
-  const legacyAnon = `jubjub_attendance_anon_${date}`
-  return window.localStorage.getItem(primary) === '1' || window.localStorage.getItem(legacyAnon) === '1'
+  const id = attendancePrimaryId(profileEmail)
+  const primary = `jubjub_attendance_${id}_${date}`
+  if (window.localStorage.getItem(primary) === '1') return true
+  if (id === 'anon') {
+    return window.localStorage.getItem(`jubjub_attendance_anon_${date}`) === '1'
+  }
+  return false
 }
 
 export function markAttendanceDone(profileEmail?: string | null): void {
@@ -103,6 +129,65 @@ function ymdAddDays(delta: number): string {
   n.setHours(0, 0, 0, 0)
   n.setDate(n.getDate() + delta)
   return isoDateLocal(n)
+}
+
+function ymdAddDaysFrom(refYmd: string, delta: number): string {
+  const parts = refYmd.trim().split('-')
+  if (parts.length !== 3) return refYmd
+  const y = Number(parts[0])
+  const m = Number(parts[1]) - 1
+  const d = Number(parts[2])
+  const dt = new Date(y, m, d)
+  if (Number.isNaN(dt.getTime())) return refYmd
+  dt.setHours(0, 0, 0, 0)
+  dt.setDate(dt.getDate() + delta)
+  return isoDateLocal(dt)
+}
+
+/**
+ * 서버 history(attendedDates) 기준 "연속 출석" 계산.
+ * - 오늘이 미출석이어도 "어제까지 연속"이면 그 값 유지 (UI에서 '연속 N일' 표시용)
+ * - 주간(월~일)과 무관한 rolling streak
+ */
+export function computeRollingAttendanceStreakFromDates(attendedDates: string[]): {
+  streak: number
+  lastAttendedDate: string | null
+} {
+  const set = new Set(attendedDates.map((s) => s.trim()).filter(Boolean))
+  const today = isoDateLocal(new Date())
+  const yesterday = ymdAddDays(-1)
+
+  const start = set.has(today) ? today : set.has(yesterday) ? yesterday : null
+  if (!start) return { streak: 0, lastAttendedDate: null }
+
+  let streak = 0
+  let cur = start
+  while (set.has(cur)) {
+    streak += 1
+    cur = ymdAddDaysFrom(cur, -1)
+    if (streak > 3660) break
+  }
+  return { streak, lastAttendedDate: start }
+}
+
+/**
+ * 서버 history 기반으로 로컬 streak 상태 동기화 (새 기기/새로고침에서도 연속 출석 유지)
+ */
+export function syncAttendanceStreakFromServer(
+  profileEmail: string | undefined | null,
+  attendedDates: string[],
+): void {
+  if (typeof window === 'undefined') return
+  const { streak, lastAttendedDate } = computeRollingAttendanceStreakFromDates(attendedDates)
+  const key = streakStorageKey(profileEmail)
+  if (!lastAttendedDate || streak <= 0) {
+    window.localStorage.removeItem(key)
+    return
+  }
+  window.localStorage.setItem(
+    key,
+    JSON.stringify({ lastAttendedDate, currentStreak: streak } as StreakState),
+  )
 }
 
 /**

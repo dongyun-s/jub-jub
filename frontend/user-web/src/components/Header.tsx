@@ -39,8 +39,13 @@ function Header({
     <header className={styles.header}>
       {/* 왼쪽: 뒤로가기 또는 로고 */}
       <div className={styles.side}>
-        {showBack && onBack ? (
-          <button type="button" onClick={onBack} className={styles.backButton}>
+        {showBack ? (
+          <button
+            type="button"
+            onClick={() => onBack?.()}
+            className={styles.backButton}
+            aria-label="뒤로 가기"
+          >
             <span className={`material-symbols-outlined ${styles.backIcon}`}>arrow_back</span>
           </button>
         ) : (

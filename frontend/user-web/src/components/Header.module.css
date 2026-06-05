@@ -27,11 +27,19 @@
 }
 
 .backButton {
+  position: relative;
+  z-index: 2;
   width: 2.5rem;
   height: 2.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.backButton:hover {
+  background-color: rgb(243 244 246);
 }
 
 .backIcon {

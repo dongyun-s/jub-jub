@@ -1,0 +1,79 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.wrapCompact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.labelCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+}
+
+.hint {
+  font-size: 0.6875rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.stepBtn {
+  display: flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 25%, transparent);
+  border-radius: 0.625rem;
+  background: var(--owner-surface-highest);
+  color: var(--owner-on-surface);
+}
+
+.stepBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--owner-primary-container) 50%, transparent);
+  color: var(--owner-primary-container);
+}
+
+.stepBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.value {
+  min-width: 3.5rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--owner-primary-container);
+}
+
+.wrapCompact .controls {
+  justify-content: center;
+}
+
+.wrapCompact .value {
+  min-width: 4rem;
+  font-size: 1.125rem;
+}

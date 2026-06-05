@@ -10,7 +10,7 @@
   max-width: 80rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .headRow {
@@ -27,6 +27,25 @@
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--owner-on-surface);
+}
+
+.categoryBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--owner-primary-container) 35%, transparent);
+  background: color-mix(in srgb, var(--owner-primary-container) 10%, transparent);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--owner-primary-container);
+  text-decoration: none;
+}
+
+.categoryBadge:hover {
+  background: color-mix(in srgb, var(--owner-primary-container) 18%, transparent);
 }
 
 .desc {
@@ -132,8 +151,36 @@
   transition: transform 0.5s;
 }
 
-.card:hover .thumb {
-  transform: scale(1.05);
+.thumbPlaceholder {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  background: var(--owner-surface-high);
+  color: var(--owner-primary-container);
+  font-size: 2.5rem;
+}
+
+.searchRow {
+  max-width: 20rem;
+}
+
+.loadingHint {
+  padding: 2rem;
+  color: var(--owner-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.btnAddInline {
+  display: inline-flex;
+  padding: 0.65rem 1.25rem;
+  border-radius: 9999px;
+  background: var(--owner-primary-container);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .tag {
@@ -327,9 +374,10 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
+  gap: 1rem;
   border-radius: 0.75rem;
   background: var(--owner-surface-low);
-  padding: 1.5rem;
+  padding: 1rem 1.25rem;
 }
 
 .stat {

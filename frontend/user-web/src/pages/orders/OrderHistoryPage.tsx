@@ -1,10 +1,10 @@
 /**
  * OrderHistoryPage.tsx
  * 주문 내역 페이지 (탭: 주문내역)
- * - 최근 주문 / 과거 주문 탭, 주문 카드(리뷰 쓰기 버튼), 검색, 하단 네비
+ * - 최근 주문: 리뷰 미작성 / 지난 주문: 리뷰 작성 완료
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
@@ -12,6 +12,7 @@ import {
   formatOrderMenuSummary,
   formatPickupDistance,
   getMyOrders,
+  isPaidOrderForHistory,
   type MyOrderItem,
 } from '../../api/orders'
 import type { OrderStatus } from '../../api/payment'
@@ -21,7 +22,11 @@ import { ApiError } from '../../api/authClient'
 import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
 import { useProfile } from '../../hooks/useProfile'
 import type { PickupDestination } from '../../hooks/useActivePickup'
-import type { OrderContextRow } from '../../lib/orderResolve'
+import {
+  readLocalOrdersPendingApiSync,
+  syncLocalOrdersWithApiList,
+  type OrderContextRow,
+} from '../../lib/orderResolve'
 import { storeCardImage } from '../../lib/storeGeo'
 import styles from './OrderHistoryPage.module.css'
 
@@ -49,7 +54,6 @@ interface OrderItem {
   date: string
   menu: string
   price: number
-  xp: number
   distance: string
   image: string
   status: 'completed' | 'reviewed'
@@ -77,8 +81,23 @@ type LocalOrder = {
   totalAmount?: number
   image?: string | null
   createdAt: string
+  orderStatus?: string
   paymentStatus?: string
   paidAt?: string | null
+}
+
+function readPaidLocalOrders(): LocalOrder[] {
+  try {
+    const raw = window.localStorage.getItem('__jubjub_local_orders')
+    const parsed = raw ? (JSON.parse(raw) as LocalOrder[]) : []
+    const paidOnly = Array.isArray(parsed) ? parsed.filter(isLocalOrderPaid) : []
+    if (Array.isArray(parsed) && paidOnly.length !== parsed.length) {
+      window.localStorage.setItem('__jubjub_local_orders', JSON.stringify(paidOnly))
+    }
+    return paidOnly
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -110,6 +129,13 @@ function applyReviewedStatus(orders: OrderItem[], reviewedOrderIds: Set<number>)
   return orders.map((o) =>
     reviewedOrderIds.has(o.id) ? { ...o, status: 'reviewed' as const } : o,
   )
+}
+
+function isLocalOrderPaid(o: LocalOrder): boolean {
+  if (o.paymentStatus === 'PAID') return true
+  if (o.orderStatus === 'PAID' || o.orderStatus === 'COMPLETED') return true
+  if (o.paidAt != null && String(o.paidAt).trim() !== '') return true
+  return false
 }
 
 function parseOrderDisplayDate(date: string): number {
@@ -155,13 +181,21 @@ function OrderHistoryPage({
   const activeOrderSubtitle =
     activeOrder?.menuSummary?.trim() || '주문 현황에서 단계를 확인하세요.'
 
-  useEffect(() => {
+  const reloadMyOrdersApi = useCallback(() => {
+    if (!getAccessToken()) {
+      setMyOrdersApi([])
+      setMyOrdersLoading(false)
+      setMyOrdersError(null)
+      return
+    }
     setMyOrdersLoading(true)
     setMyOrdersError(null)
     void (async () => {
       try {
         const list = await getMyOrders()
-        setMyOrdersApi(Array.isArray(list) ? list : [])
+        const paidOnly = Array.isArray(list) ? list.filter(isPaidOrderForHistory) : []
+        syncLocalOrdersWithApiList(paidOnly)
+        setMyOrdersApi(paidOnly)
       } catch (e) {
         setMyOrdersError(
           e instanceof ApiError
@@ -178,14 +212,29 @@ function OrderHistoryPage({
   }, [])
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem('__jubjub_local_orders')
-      const parsed = raw ? (JSON.parse(raw) as LocalOrder[]) : []
-      setLocalOrders(Array.isArray(parsed) ? parsed : [])
-    } catch {
-      setLocalOrders([])
-    }
+    reloadMyOrdersApi()
+  }, [reloadMyOrdersApi])
+
+  const reloadLocalOrders = useCallback(() => {
+    setLocalOrders(readPaidLocalOrders())
   }, [])
+
+  useEffect(() => {
+    reloadLocalOrders()
+  }, [reloadLocalOrders])
+
+  useEffect(() => {
+    const onOrdersUpdated = () => {
+      reloadLocalOrders()
+      reloadMyOrdersApi()
+    }
+    window.addEventListener('focus', onOrdersUpdated)
+    window.addEventListener('jubjub:orders-updated', onOrdersUpdated)
+    return () => {
+      window.removeEventListener('focus', onOrdersUpdated)
+      window.removeEventListener('jubjub:orders-updated', onOrdersUpdated)
+    }
+  }, [reloadLocalOrders, reloadMyOrdersApi])
 
   useEffect(() => {
     const loadReviewedOrderIds = () => {
@@ -243,7 +292,6 @@ function OrderHistoryPage({
           date: formatDate(o.orderedAt),
           menu: formatOrderMenuSummary(o),
           price: o.finalAmount,
-          xp: 0,
           distance: formatPickupDistance(o.pickupDistanceMeters),
           image: storeId > 0 ? storeCardImage(storeId) : storeCardImage(1),
           status: 'completed' as const,
@@ -253,7 +301,8 @@ function OrderHistoryPage({
     )
   }, [myOrdersApi, localOrders, storeNameToId])
 
-  const myOrders: OrderItem[] = useMemo(() => {
+  const pendingLocalOrders: OrderItem[] = useMemo(() => {
+    if (!getAccessToken()) return []
     const formatDate = (iso: string) => {
       const d = new Date(iso)
       if (Number.isNaN(d.getTime())) return iso
@@ -262,54 +311,41 @@ function OrderHistoryPage({
       const dd = String(d.getDate()).padStart(2, '0')
       return `${yy}.${mm}.${dd}`
     }
-
+    const apiIds = new Set(myOrdersApi.map((o) => o.orderId))
     return dedupeOrdersById(
-      localOrders.map((o) => {
+      readLocalOrdersPendingApiSync(apiIds).map((o) => {
         const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
-        const paid = o.paymentStatus === 'PAID'
         return {
           id: o.orderId,
           storeId: o.storeId,
           storeName: o.storeName,
-          date: formatDate(o.createdAt),
-          menu: o.menuSummary,
+          date: formatDate(o.createdAt ?? ''),
+          menu: o.menuSummary ?? '주문',
           price,
-          xp: 0,
           distance: '',
-          image: o.image?.trim() || storeCardImage(o.storeId),
-          status: paid ? ('completed' as const) : ('completed' as const),
+          image: storeCardImage(o.storeId),
+          status: 'completed' as const,
         }
       }),
     )
-  }, [localOrders])
+  }, [myOrdersApi])
 
   const allOrders = useMemo(() => {
-    const base = dedupeOrdersById([...apiOrders, ...myOrders])
+    const base = dedupeOrdersById([...apiOrders, ...pendingLocalOrders])
     return applyReviewedStatus(base, reviewedOrderIds)
-  }, [apiOrders, myOrders, reviewedOrderIds])
+  }, [apiOrders, pendingLocalOrders, reviewedOrderIds])
 
+  /** 최근 주문 — 리뷰를 아직 쓰지 않은 주문 */
   const recentTabOrders = useMemo(
-    () =>
-      sortOrdersByDateDesc(
-        allOrders.filter(
-          (o) =>
-            o.status !== 'reviewed' &&
-            (!o.orderStatus || o.orderStatus === 'PAID' || o.orderStatus === 'READY'),
-        ),
-      ),
+    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status !== 'reviewed')),
     [allOrders],
   )
 
-  const pastTabOrders = useMemo(() => {
-    const reviewedFromLive = allOrders.filter((o) => o.status === 'reviewed')
-    const completedFromLive = allOrders.filter(
-      (o) =>
-        o.status !== 'reviewed' &&
-        o.orderStatus != null &&
-        (o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED'),
-    )
-    return sortOrdersByDateDesc(dedupeOrdersById([...reviewedFromLive, ...completedFromLive]))
-  }, [allOrders])
+  /** 지난 주문 — 리뷰 작성이 완료된 주문 */
+  const pastTabOrders = useMemo(
+    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status === 'reviewed')),
+    [allOrders],
+  )
 
   const orders = activeTab === 'recent' ? recentTabOrders : pastTabOrders
 
@@ -382,9 +418,24 @@ function OrderHistoryPage({
 
           <div className={styles.listWrapper}>
             {orders.length === 0 && !myOrdersLoading && (
-              <p style={{ padding: '24px 16px', fontSize: 14, color: 'rgb(107 114 128)', textAlign: 'center' }}>
-                {activeTab === 'recent' ? '최근 주문이 없습니다.' : '지난 주문이 없습니다.'}
-              </p>
+              <div className={styles.emptyState}>
+                <span
+                  className={`material-symbols-outlined ${styles.emptyStateIcon}`}
+                  aria-hidden
+                >
+                  {activeTab === 'recent' ? 'rate_review' : 'check_circle'}
+                </span>
+                <p className={styles.emptyStateTitle}>
+                  {activeTab === 'recent'
+                    ? '리뷰를 남길 주문이 없어요'
+                    : '작성한 리뷰 주문이 없어요'}
+                </p>
+                <p className={styles.emptyStateText}>
+                  {activeTab === 'recent'
+                    ? '픽업을 완료하면 이곳에서 리뷰를 작성할 수 있어요.'
+                    : '리뷰를 남기면 이 탭에서 확인할 수 있어요.'}
+                </p>
+              </div>
             )}
             {orders.map((order) => (
               <div
@@ -420,12 +471,6 @@ function OrderHistoryPage({
                     </p>
                     <div className={styles.orderStatsRow}>
                       <span className={styles.orderPrice}>{formatPrice(order.price)}</span>
-                      <span className={styles.orderXp}>
-                        <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          star
-                        </span>
-                        <span className="font-bold text-xs">{order.xp} XP</span>
-                      </span>
                       <span className={styles.orderDistance}>
                         <span className="material-symbols-outlined text-sm">near_me</span>
                         <span className="text-xs">{order.distance}</span>

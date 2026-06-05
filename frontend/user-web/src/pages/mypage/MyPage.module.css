@@ -186,28 +186,6 @@
   user-select: none;
 }
 
-.imagePreviewPanel {
-  max-width: min(96vw, 32rem) !important;
-  width: 100%;
-}
-
-.imagePreviewInner {
-  padding: 1rem 1.125rem 1.125rem;
-  background: #ffffff;
-  border-radius: 1.25rem;
-  box-shadow:
-    0 0 0 1px rgba(246, 49, 154, 0.1),
-    0 20px 40px -12px rgba(0, 0, 0, 0.18);
-}
-
-.imagePreviewTitle {
-  margin: 0 0 0.75rem;
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: rgb(31 41 55);
-  text-align: center;
-}
-
 .imagePreviewImg {
   display: block;
   width: 100%;
@@ -215,26 +193,11 @@
   height: auto;
   object-fit: contain;
   border-radius: 0.5rem;
-  margin: 0 auto;
+  margin: 0 auto 1rem;
 }
 
-.imagePreviewClose {
-  display: block;
-  width: 100%;
-  margin-top: 1rem;
-  padding: 0.625rem 1rem;
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: rgb(55 65 81);
-  background: rgb(243 244 246);
-  border: none;
-  border-radius: 0.75rem;
-  cursor: pointer;
-}
-
-.imagePreviewClose:hover {
-  background: rgb(229 231 235);
+.withdrawBtnSpaced {
+  margin-top: 0.75rem;
 }
 
 .profileName {
@@ -425,12 +388,112 @@
   border-radius: 0.25rem;
 }
 
+.questSubtext {
+  margin: -0.5rem 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(100 116 139);
+  line-height: 1.4;
+}
+
 .randomBoxHint {
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
   font-weight: 600;
   color: rgb(100 116 139);
   text-align: center;
+}
+
+.randomBoxHintReady {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  text-align: center;
+}
+
+.streakSevenRow {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.streakStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.streakStepDot {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streakStepDotDone {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  filter: drop-shadow(0 0 4px rgba(246, 49, 154, 0.5));
+}
+
+.streakStepDotTodo {
+  background-color: rgb(229 231 235);
+  color: rgb(148 163 184);
+}
+
+.streakStepIcon {
+  font-size: 1rem;
+}
+
+.attendanceTodayRow {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: center;
+}
+
+.todayAttendanceCta {
+  width: 100%;
+  max-width: 22rem;
+  border-radius: 9999px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.todayAttendanceCtaTodo {
+  background-color: #ffffff;
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+}
+
+.todayAttendanceCtaTodo:hover {
+  background-color: rgba(246, 49, 154, 0.08);
+}
+
+.todayAttendanceCtaTodo:active {
+  transform: scale(0.98);
+}
+
+.todayAttendanceCtaDone {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  filter: drop-shadow(0 0 4px #f6319a);
+}
+
+.todayAttendanceCtaIcon {
+  font-size: 1.125rem;
+  font-variation-settings: 'FILL' 1;
 }
 
 .weekGrid {
@@ -644,65 +707,4 @@
 
 .chevron {
   color: rgb(156 163 175);
-}
-
-.attendanceModalInner {
-  text-align: center;
-}
-
-.modalIconWrap {
-  width: 5rem;
-  height: 5rem;
-  background-color: rgba(246, 49, 154, 0.1);
-  border-radius: 9999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 1rem;
-}
-
-.modalIcon {
-  color: var(--color-primary);
-  font-size: 3rem;
-  font-variation-settings: 'FILL' 1;
-}
-
-.modalTitle {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: rgb(17 24 39);
-  margin-bottom: 0.5rem;
-}
-
-.modalDesc {
-  font-size: 0.875rem;
-  color: rgb(107 114 128);
-  margin-bottom: 0.25rem;
-}
-
-.modalSub {
-  font-size: 0.875rem;
-  color: var(--color-primary);
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-}
-
-.modalButton {
-  width: 100%;
-  padding: 0.8rem 1rem;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #ec4899 0%, var(--color-primary) 100%);
-  box-shadow: 0 4px 12px rgba(246, 49, 154, 0.35);
-  transition: transform 150ms ease;
-}
-
-.modalButton:hover {
-  filter: brightness(1.05);
-}
-
-.modalButton:active {
-  transform: scale(0.98);
 }

@@ -56,6 +56,75 @@
   color: rgb(31 41 55);
 }
 
+.expiringBanner {
+  margin-top: 0.5rem;
+  padding: 0 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(180 83 9);
+}
+
+.couponCardSoon {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+}
+
+.expiryRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+}
+
+.expiryBadge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(243 244 246);
+  color: rgb(75 85 99);
+}
+
+.expiryBadgeSoon {
+  background: rgb(254 243 199);
+  color: rgb(180 83 9);
+}
+
+.expiryBadgeCritical {
+  background: rgb(254 226 226);
+  color: rgb(185 28 28);
+}
+
+.expiryTrack {
+  height: 4px;
+  margin-top: 0.375rem;
+  border-radius: 999px;
+  background: rgb(229 231 235);
+  overflow: hidden;
+}
+
+.expiryBar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.expiryBarNormal {
+  background: linear-gradient(90deg, #f472b6, #ec4899);
+}
+
+.expiryBarSoon {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.expiryBarCritical {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+
+.expiryBarExpired {
+  background: rgb(156 163 175);
+}
+
 .tabRow {
   display: flex;
   margin: 0 1rem;
@@ -102,6 +171,18 @@
   gap: 1rem;
 }
 
+.couponCardInactive {
+  opacity: 0.88;
+}
+
+.couponCardInactive .couponIconWrap {
+  background-image: linear-gradient(to bottom right, rgb(203 213 225), rgb(148 163 184));
+}
+
+.couponCardInactive .couponTitle {
+  color: rgb(100 116 139);
+}
+
 .couponIconWrap {
   width: 4rem;
   height: 4rem;
@@ -137,6 +218,12 @@
   margin-top: 0.25rem;
 }
 
+.couponExpirySub {
+  font-size: 0.6875rem;
+  color: rgb(148 163 184);
+  margin-top: 0.125rem;
+}
+
 .couponCondition {
   font-size: 0.75rem;
   color: var(--color-primary);
@@ -170,6 +257,20 @@
 
 .useButton:active {
   transform: scale(0.95);
+}
+
+.statusExpired,
+.statusUsed {
+  background-image: none;
+  background-color: rgb(243 244 246);
+  color: rgb(100 116 139);
+  opacity: 1;
+  pointer-events: none;
+}
+
+.statusUsed {
+  color: rgb(71 85 105);
+  font-weight: 800;
 }
 
 .promoBanner {

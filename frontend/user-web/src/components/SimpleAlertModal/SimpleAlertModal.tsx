@@ -1,18 +1,10 @@
 /**
-
  * 확인 한 번으로 닫는 단순 안내 모달 (로그인 실패 등)
-
  */
 
-
-
 import { useId } from 'react'
-
 import AppModal from '../AppModal/AppModal'
-
-import styles from './SimpleAlertModal.module.css'
-
-
+import mc from '../AppModal/modalContent.module.css'
 
 export type SimpleAlertVariant = 'info' | 'success' | 'error'
 
@@ -32,8 +24,6 @@ interface SimpleAlertModalProps {
   onClose: () => void
 }
 
-
-
 export default function SimpleAlertModal({
   open,
   title = '알림',
@@ -42,64 +32,37 @@ export default function SimpleAlertModal({
   variant = 'error',
   onClose,
 }: SimpleAlertModalProps) {
-
   const titleId = useId()
-
   const descId = useId()
 
-
+  const iconClass =
+    variant === 'success'
+      ? `${mc.icon} ${mc.iconFill}`
+      : variant === 'info'
+        ? mc.icon
+        : mc.icon
 
   return (
-
     <AppModal
-
       open={open}
-
       onClose={onClose}
-
       size="sm"
-
       role="alertdialog"
-
       aria-labelledby={titleId}
-
       aria-describedby={descId}
-
     >
-
-      <div className={styles.iconWrap} aria-hidden>
-
-        <span
-          className={`material-symbols-outlined ${styles.icon} ${
-            variant === 'success' ? styles.iconSuccess : variant === 'info' ? styles.iconInfo : ''
-          }`}
-        >
-          {ICON_BY_VARIANT[variant]}
-        </span>
-
+      <div className={mc.iconWrap} aria-hidden>
+        <span className={`material-symbols-outlined ${iconClass}`}>{ICON_BY_VARIANT[variant]}</span>
       </div>
-
-      <h2 id={titleId} className={styles.title}>
-
+      <h2 id={titleId} className={mc.titleCenter}>
         {title}
-
       </h2>
-
-      <p id={descId} className={styles.message}>
-
+      <p id={descId} className={mc.messageCenter}>
         {message}
-
       </p>
-
-      <button type="button" className={styles.btn} onClick={onClose}>
-
+      <button type="button" className={mc.btnPrimary} onClick={onClose}>
         {confirmLabel}
-
       </button>
-
     </AppModal>
-
   )
-
 }
-

@@ -11,6 +11,7 @@ export type StoreGeo = {
   lat: number
   lng: number
   imageUrl: string
+  categoryName?: string
 }
 
 let listCache: StoreListItem[] | null = null
@@ -62,6 +63,7 @@ export async function fetchStoreGeo(storeId: number): Promise<StoreGeo | null> {
     lat,
     lng,
     imageUrl: storeCardImage(storeId),
+    categoryName: row?.categoryName?.trim() || undefined,
   }
 }
 

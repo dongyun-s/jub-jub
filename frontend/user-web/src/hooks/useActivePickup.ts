@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchStoreGeo, type StoreGeo } from '../lib/storeGeo'
 import {
-  getActivePaidOrderFromLocal,
   resolveActivePaidOrder,
   resolveOrderById,
   type OrderContextRow,
@@ -45,7 +44,7 @@ export function useActivePickup(focusOrderId?: number | null) {
         setDestination(null)
       }
     } catch {
-      setActiveOrder(getActivePaidOrderFromLocal())
+      setActiveOrder(null)
       setDestination(null)
     } finally {
       setLoading(false)

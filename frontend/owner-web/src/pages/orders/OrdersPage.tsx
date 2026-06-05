@@ -1,191 +1,257 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { OwnerHeader } from '../../components/OwnerHeader'
 import { Icon } from '../../components/Icon'
+import { EmptyState } from '../../components/EmptyState/EmptyState'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
+import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
+import { PickupTimeStepper } from '../../components/PickupTimeStepper/PickupTimeStepper'
+import { useOwnerOrders } from '../../context/OwnerOrdersProvider'
+import { useOwnerSales } from '../../context/OwnerSalesProvider'
+import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
+import { useOwnerCookingTime } from '../../hooks/useOwnerCookingTime'
+import { useHorizontalDragScroll } from '../../hooks/useHorizontalDragScroll'
+import { ActiveOrderCard, NewOrderCard } from './orderCards'
+import { OrderDetailPanel } from './OrderDetailPanel'
 import styles from './OrdersPage.module.css'
 
-type OrderRow = {
-  id: string
-  label: string
-  summary: string
-  amount: string
-  time: string
-  status: 'new' | 'progress'
-}
-
-const orders: OrderRow[] = [
-  { id: '8824-01', label: '신규', summary: '수비드 스테이크 외 2건', amount: '42,500원', time: '방금 전', status: 'new' },
-  { id: '8824-00', label: '진행 중', summary: '트러플 머쉬룸 리조또', amount: '28,000원', time: '5분 전', status: 'progress' },
-  { id: '8823-99', label: '진행 중', summary: '시그니처 플래터', amount: '56,000원', time: '12분 전', status: 'progress' },
-  { id: '8823-98', label: '진행 중', summary: '하우스 와인 2잔', amount: '32,000원', time: '18분 전', status: 'progress' },
-]
-
 export function OrdersPage() {
-  const [selectedId, setSelectedId] = useState(orders[0]?.id ?? '')
-  const selected = orders.find((o) => o.id === selectedId) ?? orders[0]
-  const newCount = orders.filter((o) => o.status === 'new').length
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { storeId, store, mockMode } = useOwnerStoreDetail()
+  const { baseMinutes, setBaseMinutes } = useOwnerCookingTime(storeId, store?.cookingTimeMinutes)
+  const {
+    orders,
+    newOrders,
+    activeOrders,
+    useMock,
+    handleStartCooking,
+    handlePickupMinutesChange,
+    handleCookDone,
+    handlePickupDone,
+    rejectOrder,
+    simulateIncomingOrder,
+  } = useOwnerOrders()
+  const { salesPaused, isScheduledPause, remainingMinutesLabel } = useOwnerSales()
+
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [rejectTargetId, setRejectTargetId] = useState<number | null>(null)
+  const [alertOpen, setAlertOpen] = useState(false)
+  const [alertMessage, setAlertMessage] = useState('')
+
+  const selectedOrder = useMemo(
+    () => orders.find((o) => o.orderId === selectedId) ?? null,
+    [orders, selectedId],
+  )
+
+  useEffect(() => {
+    const fromNav = (location.state as { selectOrderId?: number } | null)?.selectOrderId
+    if (fromNav != null && orders.some((o) => o.orderId === fromNav)) {
+      setSelectedId(fromNav)
+      navigate(location.pathname, { replace: true, state: {} })
+      return
+    }
+  }, [location.state, location.pathname, orders, navigate])
+
+  useEffect(() => {
+    if (selectedId != null && orders.some((o) => o.orderId === selectedId)) return
+    if (newOrders[0]) setSelectedId(newOrders[0].orderId)
+    else if (activeOrders[0]) setSelectedId(activeOrders[0].orderId)
+    else setSelectedId(null)
+  }, [orders, newOrders, activeOrders, selectedId])
+
+  const {
+    scrollRef: newOrdersScrollRef,
+    isDragging: isNewOrdersDragging,
+    shouldIgnoreClick: shouldIgnoreNewOrderClick,
+    handlers: newOrdersScrollHandlers,
+    captureHandlers: newOrdersScrollCaptureHandlers,
+  } = useHorizontalDragScroll()
+
+  const confirmReject = () => {
+    if (rejectTargetId == null) return
+    rejectOrder(rejectTargetId)
+    setRejectTargetId(null)
+  }
+
+  const showSoon = (action: string) => {
+    setAlertMessage(`${action}은 API 연동 후 동작합니다.`)
+    setAlertOpen(true)
+  }
+
+  const hasNew = newOrders.length > 0
+  const cookingCount = activeOrders.filter((o) => o.status === 'progress').length
+  const readyCount = activeOrders.filter((o) => o.status === 'ready').length
 
   return (
     <>
-      <OwnerHeader title="주문내역" subtitle="실시간 POS" />
+      <OwnerHeader
+        title="실시간 주문"
+        subtitle={mockMode ? `${store?.name ?? ''} · 예시 데이터` : store?.name}
+      />
+
       <main className={styles.main}>
-        <section className={styles.listPane}>
-          <div className={styles.listHead}>
-            <h2 className={styles.listTitle}>
-              실시간 주문 <span className={`${styles.badgeNew} ${styles.monoNum}`}>{newCount}</span>
-            </h2>
-          </div>
-          <div className={styles.listScroll}>
-            {orders.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => setSelectedId(o.id)}
-                className={[
-                  styles.orderBtn,
-                  o.status === 'new' ? styles.orderBtnNew : styles.orderBtnProg,
-                  selectedId === o.id ? styles.orderBtnSelected : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                <div className={styles.orderTop}>
-                  <span className={`${styles.orderId} ${styles.monoNum}`}>#{o.id}</span>
-                  <span
-                    className={[styles.tag, o.status === 'new' ? styles.tagNew : styles.tagProg].join(' ')}
-                  >
-                    {o.label}
-                  </span>
-                </div>
-                <p className={styles.summary}>{o.summary}</p>
-                <div className={styles.orderFoot}>
-                  <span className={styles.time}>{o.time}</span>
-                  <span
-                    className={`${styles.amount} ${styles.monoNum} ${o.status === 'new' ? styles.amountHighlight : ''}`}
-                  >
-                    {o.amount}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.detailPane}>
-          {selected ? (
-            <>
-              <div className={styles.detailHead}>
-                <div>
-                  <div className={styles.titleRow}>
-                    <h3 className={`${styles.orderNo} ${styles.monoNum}`}>#{selected.id}</h3>
-                    {selected.status === 'new' ? (
-                      <span className={styles.pillNew}>신규 주문</span>
-                    ) : (
-                      <span className={styles.pillCook}>조리 중</span>
-                    )}
-                  </div>
-                  <p className={styles.metaRow}>
-                    <Icon name="schedule" style={{ fontSize: '0.875rem' }} />
-                    오후 02:31 주문 접수 (배달)
-                  </p>
-                </div>
-                <div className={styles.actions}>
-                  <button type="button" className={styles.btnSecondary}>
-                    <Icon name="print" />
-                    주문지 출력
-                  </button>
-                  <button type="button" className={styles.btnDanger}>
-                    거절
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.bodyRow}>
-                <div className={styles.linesCol}>
-                  <h4 className={styles.sectionLabel}>주문 내역</h4>
-                  <div>
-                    <div className={styles.lineItem}>
-                      <div className={styles.lineLeft}>
-                        <div className={styles.idx}>1</div>
-                        <div>
-                          <p className={styles.lineName}>수비드 부채살 스테이크</p>
-                          <p className={styles.lineOpt}>옵션: 미디엄 레어, 가니쉬 추가</p>
-                        </div>
-                      </div>
-                      <span className={`${styles.linePrice} ${styles.monoNum}`}>34,000원</span>
-                    </div>
-                    <div className={styles.lineItem}>
-                      <div className={styles.lineLeft}>
-                        <div className={styles.idx}>2</div>
-                        <div>
-                          <p className={styles.lineName}>시저 샐러드</p>
-                          <p className={styles.lineOpt}>옵션: 드레싱 따로</p>
-                        </div>
-                      </div>
-                      <span className={`${styles.linePrice} ${styles.monoNum}`}>8,500원</span>
-                    </div>
-                  </div>
-                  <div className={styles.noteBox}>
-                    <div className={styles.noteHead}>
-                      <Icon name="chat_bubble" style={{ color: 'var(--owner-primary-container)' }} />
-                      <h5 className={styles.noteTitle}>고객 요청사항</h5>
-                    </div>
-                    <p className={styles.noteText}>
-                      문 앞에 두고 벨 눌러주세요. 스테이크 소스 넉넉히 부탁드립니다!
-                    </p>
-                  </div>
-                </div>
-
-                <div className={styles.sideCol}>
-                  <div className={styles.payCard}>
-                    <h4 className={styles.payTitle}>결제 정보</h4>
-                    <div className={styles.payRows}>
-                      <div className={styles.payRow}>
-                        <span className={styles.payLabel}>주문 금액</span>
-                        <span className={styles.monoNum}>42,500원</span>
-                      </div>
-                      <div className={styles.payRow}>
-                        <span className={styles.payLabel}>배달 팁</span>
-                        <span className={styles.monoNum}>3,500원</span>
-                      </div>
-                      <div className={styles.payRow}>
-                        <span className={styles.payLabel}>할인 금액</span>
-                        <span className={`${styles.monoNum} ${styles.payDiscount}`}>-3,500원</span>
-                      </div>
-                    </div>
-                    <div className={styles.payTotal}>
-                      <div className={styles.totalRow}>
-                        <span className={styles.totalLabel}>합계</span>
-                        <span className={`${styles.totalAmt} ${styles.monoNum}`}>42,500원</span>
-                      </div>
-                      <p className={styles.payMethod}>결제 수단: 신용카드 (일시불)</p>
-                    </div>
-                  </div>
-                  <div className={styles.btnStack}>
-                    <button type="button" className={styles.btnAccept}>
-                      주문 수락
-                    </button>
-                    <button type="button" className={styles.btnDisabled} disabled>
-                      조리 완료
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
+        <section className={styles.pickupToolbar} aria-label="매장 기본 픽업 시간">
+          <PickupTimeStepper
+            label="기본 조리·픽업 시간"
+            hint="신규 주문에서 픽업 시간을 정한 뒤 조리 시작하세요."
+            minutes={baseMinutes}
+            onChange={setBaseMinutes}
+          />
+          {mockMode ? (
+            <button type="button" className={styles.mockIncomingBtn} onClick={simulateIncomingOrder}>
+              테스트 주문 들어오기
+            </button>
           ) : null}
         </section>
+
+        <div className={styles.boardWithDetail}>
+        <div className={styles.liveBoard}>
+          <section
+            className={[styles.newZone, hasNew ? styles.newZoneAlert : styles.newZoneIdle].filter(Boolean).join(' ')}
+            aria-live="polite"
+          >
+            <div className={styles.zoneHead}>
+              <h2 className={styles.zoneTitle}>
+                <Icon name="notifications_active" />
+                신규 주문
+                {hasNew ? <span className={`${styles.zoneCount} ${styles.monoNum}`}>{newOrders.length}</span> : null}
+              </h2>
+              <p className={styles.zoneHint}>
+                {hasNew ? '카드 선택 → 우측에서 상세·조리 시작' : '새 주문이 들어오면 이곳에 표시됩니다'}
+              </p>
+            </div>
+
+            {!useMock ? (
+              <EmptyState
+                icon="cloud_off"
+                title="주문 API 미연동"
+                description="VITE_OWNER_USE_MOCK=true 로 예시 화면을 확인할 수 있습니다."
+              />
+            ) : hasNew ? (
+              <div
+                ref={newOrdersScrollRef}
+                className={[styles.newGrid, isNewOrdersDragging ? styles.newGridDragging : '']
+                  .filter(Boolean)
+                  .join(' ')}
+                {...newOrdersScrollHandlers}
+                {...newOrdersScrollCaptureHandlers}
+              >
+                {newOrders.map((o) => (
+                  <NewOrderCard
+                    key={o.orderId}
+                    order={o}
+                    baseMinutes={baseMinutes}
+                    selected={selectedId === o.orderId}
+                    onSelect={setSelectedId}
+                    shouldIgnoreClick={shouldIgnoreNewOrderClick}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className={styles.newEmpty}>
+                <Icon name="check_circle" style={{ fontSize: '2rem', opacity: 0.4 }} />
+                <p>대기 중인 신규 주문이 없습니다</p>
+              </div>
+            )}
+          </section>
+
+          <section className={styles.cookingZone}>
+            <div className={styles.zoneHead}>
+              <h2 className={styles.zoneTitle}>
+                <Icon name="skillet" />
+                조리 중 · 픽업 대기
+                <span className={`${styles.zoneCountMuted} ${styles.monoNum}`}>{activeOrders.length}</span>
+              </h2>
+              <div className={styles.cookingStats}>
+                {cookingCount > 0 ? (
+                  <span className={styles.statCooking}>
+                    조리 {cookingCount}
+                  </span>
+                ) : null}
+                {readyCount > 0 ? (
+                  <span className={styles.statReady}>
+                    픽업 대기 {readyCount}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {activeOrders.length === 0 ? (
+              <div className={styles.cookingEmpty}>
+                <Icon name="soup_kitchen" style={{ fontSize: '2.5rem', opacity: 0.35 }} />
+                <p>진행 중인 주문이 없습니다</p>
+                <p className={styles.cookingEmptyHint}>신규 주문에서 조리 시작을 누르면 여기에 표시됩니다</p>
+              </div>
+            ) : (
+              <div className={styles.activeGrid}>
+                {activeOrders.map((o) => (
+                  <ActiveOrderCard
+                    key={o.orderId}
+                    order={o}
+                    baseMinutes={baseMinutes}
+                    selected={selectedId === o.orderId}
+                    onSelect={setSelectedId}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <Link
+            to="/sales"
+            className={[styles.statusFab, salesPaused ? styles.statusFabPaused : ''].filter(Boolean).join(' ')}
+          >
+            <div className={styles.statusFabInner}>
+              <span className={[styles.statusDot, salesPaused ? styles.statusDotPaused : ''].filter(Boolean).join(' ')} />
+              <span className={styles.statusText}>{mockMode ? '예시 POS' : 'POS 정상'}</span>
+            </div>
+            <div className={styles.divider} />
+            <span className={styles.statusOpenLabel}>
+              {salesPaused ? (
+                isScheduledPause && remainingMinutesLabel ? (
+                  <>
+                    일시 중지
+                    <span className={styles.statusRemain}>{remainingMinutesLabel}</span>
+                  </>
+                ) : isScheduledPause ? (
+                  '일시 중지'
+                ) : (
+                  '영업 중지'
+                )
+              ) : (
+                '영업 중'
+              )}
+            </span>
+          </Link>
+        </div>
+
+        <OrderDetailPanel
+          order={selectedOrder}
+          baseMinutes={baseMinutes}
+          onPickupMinutesChange={handlePickupMinutesChange}
+          onStartCooking={(id) => {
+            handleStartCooking(id)
+          }}
+          onReject={setRejectTargetId}
+          onCookDone={handleCookDone}
+          onPickupDone={handlePickupDone}
+          onPrint={() => showSoon('주문지 출력')}
+        />
+        </div>
       </main>
 
-      <div className={styles.statusFab}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className={styles.statusDot} />
-          <span className={styles.statusText}>POS 시스템 정상</span>
-        </div>
-        <div className={styles.divider} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Icon name="restaurant" style={{ fontSize: '0.875rem' }} />
-          <span className={styles.statusOpenLabel}>영업 중</span>
-        </div>
-      </div>
+      <ConfirmModal
+        open={rejectTargetId != null}
+        title="주문 거절"
+        message="이 주문을 거절할까요? 고객에게 취소 안내가 필요합니다."
+        confirmLabel="거절"
+        confirmTone="danger"
+        onCancel={() => setRejectTargetId(null)}
+        onConfirm={confirmReject}
+      />
+
+      <SimpleAlertModal open={alertOpen} title="안내" message={alertMessage} variant="info" onClose={() => setAlertOpen(false)} />
     </>
   )
 }

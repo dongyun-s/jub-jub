@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import AppModal from '../AppModal/AppModal'
-import styles from './ConfirmModal.module.css'
+import mc from '../AppModal/modalContent.module.css'
 
 interface ConfirmModalProps {
   open: boolean
@@ -8,6 +8,10 @@ interface ConfirmModalProps {
   message: string
   cancelLabel?: string
   confirmLabel?: string
+  /** 확인 버튼 스타일 */
+  confirmTone?: 'primary' | 'danger'
+  confirmDisabled?: boolean
+  cancelDisabled?: boolean
   onCancel: () => void
   onConfirm: () => void
 }
@@ -18,6 +22,9 @@ export default function ConfirmModal({
   message,
   cancelLabel = '취소',
   confirmLabel = '확인',
+  confirmTone = 'primary',
+  confirmDisabled = false,
+  cancelDisabled = false,
   onCancel,
   onConfirm,
 }: ConfirmModalProps) {
@@ -33,24 +40,28 @@ export default function ConfirmModal({
       aria-labelledby={titleId}
       aria-describedby={descId}
     >
-      <div className={styles.iconWrap} aria-hidden>
-        <span className={`material-symbols-outlined ${styles.icon}`}>help</span>
+      <div className={mc.iconWrap} aria-hidden>
+        <span className={`material-symbols-outlined ${mc.icon}`}>help</span>
       </div>
-      <h2 id={titleId} className={styles.title}>
+      <h2 id={titleId} className={mc.titleCenter}>
         {title}
       </h2>
-      <p id={descId} className={styles.message}>
+      <p id={descId} className={mc.messageCenter}>
         {message}
       </p>
-      <div className={styles.btnRow}>
-        <button type="button" className={styles.btnCancel} onClick={onCancel}>
+      <div className={mc.btnRow}>
+        <button type="button" className={mc.btnCancel} onClick={onCancel} disabled={cancelDisabled}>
           {cancelLabel}
         </button>
-        <button type="button" className={styles.btnConfirm} onClick={onConfirm}>
+        <button
+          type="button"
+          className={confirmTone === 'danger' ? mc.btnDanger : mc.btnPrimary}
+          onClick={onConfirm}
+          disabled={confirmDisabled}
+        >
           {confirmLabel}
         </button>
       </div>
     </AppModal>
   )
 }
-
