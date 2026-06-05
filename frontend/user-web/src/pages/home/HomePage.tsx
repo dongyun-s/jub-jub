@@ -31,6 +31,7 @@ import { useProfile } from '../../hooks/useProfile'
 import { fetchAttendanceHistory, fetchRewardMe, type RewardMeResponse } from '../../api/rewards'
 import { getAccessToken } from '../../lib/authStorage'
 import { resolveDisplayImageUrl } from '../../lib/imageUrl'
+import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
 import TierIcon from '../../components/TierIcon/TierIcon'
 import { getTierLabelEn, getTierTheme } from '../../lib/rewardTierTheme'
 import styles from './HomePage.module.css'
@@ -83,7 +84,7 @@ function HomePage({
   const { profile } = useProfile()
   const [searchQuery, setSearchQuery] = useState('')
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>([])
-  const { coords, loading: geoLoading } = useUserLocation()
+  const { coords, loading: geoLoading, locationError, retry: retryLocation } = useUserLocation()
   const { restaurants: nearbyRestaurants, hint: nearbyHint } = useNearbyRestaurants(coords, geoLoading)
   const { entries: rankingEntries } = useRankings()
   const [rewardMe, setRewardMe] = useState<RewardMeResponse | null>(null)
@@ -274,6 +275,14 @@ function HomePage({
           onChange={setSearchQuery}
           onSubmit={handleSearchSubmit}
         />
+
+        {locationError && (
+          <LocationPermissionBanner
+            message={locationError}
+            onRetry={() => void retryLocation()}
+            loading={geoLoading}
+          />
+        )}
 
         {/* 진행 중인 주문 배너 */}
         {hasActiveOrder && (
@@ -548,7 +557,9 @@ function HomePage({
               <p className={styles.listEmptyDesc}>
                 {geoLoading
                   ? '잠시만 기다려 주세요.'
-                  : '위치 권한을 허용하거나 카테고리에서 매장을 찾아보세요.'}
+                  : locationError
+                    ? '위치(GPS) 권한을 허용하면 주변 매장을 볼 수 있어요.'
+                    : '카테고리에서 매장을 찾아보세요.'}
               </p>
             </div>
           )}

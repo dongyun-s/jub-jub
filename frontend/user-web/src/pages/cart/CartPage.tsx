@@ -22,7 +22,7 @@ import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
 import { ApiError } from '../../api/authClient'
 import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
 import { getAccessToken, setCachedMemberProfileId } from '../../lib/authStorage'
-import { resolveUserCoords } from '../../lib/geolocation'
+import { GeolocationError, resolveUserCoords } from '../../lib/geolocation'
 import {
   buildPortOneOrderName,
   ECO_DISCOUNT_AMOUNT,
@@ -346,19 +346,11 @@ function CartPage({
         setIsProcessing(false)
       } catch (e) {
         setIsProcessing(false)
-        if (e instanceof Error && e.message === 'GEO_DENIED') {
+        if (e instanceof GeolocationError) {
           showCartAlert({
-            title: '위치 권한 필요',
-            message: '결제 완료 처리를 위해 위치 권한을 허용해 주세요.',
-            variant: 'info',
-          })
-          return
-        }
-        if (e instanceof Error && e.message === 'GEO_UNAVAILABLE') {
-          showCartAlert({
-            title: '위치 정보 없음',
-            message: '이 기기에서는 위치 정보를 사용할 수 없어 결제를 완료할 수 없습니다.',
-            variant: 'error',
+            title: '위치(GPS) 권한 필요',
+            message: e.message,
+            variant: e.reason === 'UNAVAILABLE' ? 'error' : 'info',
           })
           return
         }

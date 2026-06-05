@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { haversineDistanceMeters, estimateWalkMinutes } from '../lib/geoDistance'
+import { GeolocationError, geolocationErrorMessage, getUserCoords } from '../lib/geolocation'
 import { formatStoreDistanceMeters } from '../lib/storeUi'
 
 type LatLng = { lat: number; lng: number }
@@ -10,51 +11,34 @@ export function useDistanceToCoords(target: LatLng | null) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (target == null) {
       setUserLocation(null)
       setLoading(false)
+      setError(null)
       return
     }
 
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError('위치 서비스를 사용할 수 없습니다.')
-      setLoading(false)
-      return
-    }
-
-    let cancelled = false
     setLoading(true)
     setError(null)
-
-    const apply = (lat: number, lng: number) => {
-      if (cancelled) return
-      setUserLocation({ lat, lng })
+    try {
+      const coords = await getUserCoords()
+      setUserLocation({ lat: coords.latitude, lng: coords.longitude })
+    } catch (e) {
+      setUserLocation(null)
+      if (e instanceof GeolocationError) {
+        setError(e.message)
+      } else {
+        setError(geolocationErrorMessage('UNKNOWN'))
+      }
+    } finally {
       setLoading(false)
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => apply(pos.coords.latitude, pos.coords.longitude),
-      () => {
-        if (!cancelled) {
-          setError('현재 위치를 가져오지 못했습니다.')
-          setLoading(false)
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
-    )
-
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => apply(pos.coords.latitude, pos.coords.longitude),
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
-    )
-
-    return () => {
-      cancelled = true
-      navigator.geolocation.clearWatch(watchId)
-    }
   }, [target?.lat, target?.lng])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const distanceMeters = useMemo(() => {
     if (!userLocation || !target) return null
@@ -76,5 +60,5 @@ export function useDistanceToCoords(target: LatLng | null) {
     return `도보 약 ${estimateWalkMinutes(distanceMeters)}분`
   }, [distanceMeters])
 
-  return { userLocation, distanceLabel, walkTimeLabel, distanceMeters, loading, error }
+  return { userLocation, distanceLabel, walkTimeLabel, distanceMeters, loading, error, retry: load }
 }

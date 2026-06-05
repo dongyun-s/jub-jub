@@ -28,6 +28,7 @@ import {
   type PickupRewardBreakdown,
 } from '../../lib/pickupReward'
 import { useDistanceToCoords } from '../../hooks/useDistanceToCoords'
+import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
 import { MapTmapCanvas } from '../map/MapPage'
 import type { MapTmapMarker } from '../../lib/mapCategoryMarkers'
 import styles from './OrderStatusPage.module.css'
@@ -228,6 +229,7 @@ function OrderStatusPage({
     walkTimeLabel: storeWalkTimeLabel,
     loading: storeDistanceLoading,
     error: storeDistanceError,
+    retry: retryStoreDistance,
   } = useDistanceToCoords(storeCoords)
 
   const completePickup = () => {
@@ -324,6 +326,13 @@ function OrderStatusPage({
         </header>
 
         <div className={styles.scrollArea}>
+          {storeDistanceError && (
+            <LocationPermissionBanner
+              message={storeDistanceError}
+              onRetry={() => void retryStoreDistance()}
+              loading={storeDistanceLoading}
+            />
+          )}
           <div className={styles.mapWrap}>
             {storeMapLat != null && storeMapLng != null ? (
               <MapTmapCanvas

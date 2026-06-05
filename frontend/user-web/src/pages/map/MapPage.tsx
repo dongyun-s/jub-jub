@@ -23,6 +23,7 @@ import BottomNav from '../../components/BottomNav'
 import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import { fetchSortedStores } from '../../api/store'
 import type { PickupDestination } from '../../hooks/useActivePickup'
+import { GeolocationError, geolocationErrorMessage, getUserCoords } from '../../lib/geolocation'
 import { haversineDistanceMeters, estimateWalkMinutes } from '../../lib/geoDistance'
 import { formatStoreDistanceMeters } from '../../lib/storeUi'
 import {
@@ -786,43 +787,20 @@ function MapPage({
     setIsLoadingLocation(true)
     setLocationError(null)
 
-    if (!navigator.geolocation) {
-      setLocationError('이 브라우저에서는 위치 서비스를 지원하지 않습니다.')
-      setIsLoadingLocation(false)
-      return
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-        const loc = { lat: latitude, lng: longitude }
+    void getUserCoords()
+      .then((coords) => {
+        const loc = { lat: coords.latitude, lng: coords.longitude }
         setCurrentLocation(loc)
         lastWatchLocationRef.current = loc
+      })
+      .catch((e) => {
+        setLocationError(
+          e instanceof GeolocationError ? e.message : geolocationErrorMessage('UNKNOWN'),
+        )
+      })
+      .finally(() => {
         setIsLoadingLocation(false)
-      },
-      (error) => {
-        setIsLoadingLocation(false)
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setLocationError('위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.')
-            break
-          case error.POSITION_UNAVAILABLE:
-            setLocationError('위치 정보를 사용할 수 없습니다.')
-            break
-          case error.TIMEOUT:
-            setLocationError('위치 요청 시간이 초과되었습니다. 다시 시도해주세요.')
-            break
-          default:
-            setLocationError('위치를 가져올 수 없습니다.')
-        }
-      },
-      {
-        /** false였을 때 네트워크 추정·오래된 캐시로 수십~수백 m 어긋날 수 있음 */
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 0,
-      }
-    )
+      })
   }
 
   const goPickupStoreDetail = () => {
@@ -1122,6 +1100,17 @@ function MapPage({
               {locationError && (
                 <div className={styles.locationError}>
                   <p className={styles.locationErrorText}>{locationError}</p>
+                  <button
+                    type="button"
+                    className={styles.locationErrorRetry}
+                    onClick={getCurrentLocation}
+                    disabled={isLoadingLocation}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      my_location
+                    </span>
+                    {isLoadingLocation ? '확인 중…' : '위치 권한 다시 요청'}
+                  </button>
                 </div>
               )}
 
@@ -1278,6 +1267,17 @@ function MapPage({
               {locationError && (
                 <div className={styles.locationError}>
                   <p className={styles.locationErrorText}>{locationError}</p>
+                  <button
+                    type="button"
+                    className={styles.locationErrorRetry}
+                    onClick={getCurrentLocation}
+                    disabled={isLoadingLocation}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                      my_location
+                    </span>
+                    {isLoadingLocation ? '확인 중…' : '위치 권한 다시 요청'}
+                  </button>
                 </div>
               )}
 
