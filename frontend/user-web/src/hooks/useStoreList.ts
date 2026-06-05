@@ -16,7 +16,6 @@ type UseStoreListParams = {
   sortOrder: StoreSortOrder
   coords: GeoCoords | null
   geoLoading: boolean
-  usedFallback: boolean
 }
 
 export function useStoreList({
@@ -24,7 +23,6 @@ export function useStoreList({
   sortOrder,
   coords,
   geoLoading,
-  usedFallback,
 }: UseStoreListParams) {
   const [restaurants, setRestaurants] = useState<FeaturedRestaurant[]>([])
   const [loading, setLoading] = useState(false)
@@ -54,11 +52,7 @@ export function useStoreList({
         if (list.length === 0) {
           setHint('3km 이내에 해당하는 매장이 없습니다.')
         } else {
-          setHint(
-            usedFallback
-              ? '위치를 가져오지 못해 기본 좌표 기준 3km 이내 매장입니다.'
-              : '현재 위치 기준 3km 이내 매장입니다.',
-          )
+          setHint('현재 위치 기준 3km 이내 매장입니다.')
         }
       } catch {
         setRestaurants([])
@@ -81,7 +75,7 @@ export function useStoreList({
     } finally {
       setLoading(false)
     }
-  }, [activeTab, sortOrder, coords, usedFallback])
+  }, [activeTab, sortOrder, coords])
 
   useEffect(() => {
     if ((sortOrder === 'distance' || sortOrder === 'rating') && geoLoading) {

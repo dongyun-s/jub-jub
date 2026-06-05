@@ -1,6 +1,6 @@
 /**
  * CategoryDetailPage.tsx
- * 카테고리 상세 — 정렬(기본/거리/평점)은 useStoreList 훅 경유 (API 연동 전 목 데이터)
+ * 카테고리 상세 — 정렬(기본/거리/평점)은 useStoreList 훅 경유 (실 API)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -8,6 +8,7 @@ import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
 import FeaturedRestaurantList from '../../components/FeaturedRestaurantList'
+import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
 import SearchBar from '../../components/SearchBar'
 import { useDragScroll } from '../../hooks'
 import { useStoreList } from '../../hooks/useStoreList'
@@ -46,13 +47,12 @@ function CategoryDetailPage({
   const [sortOrder, setSortOrder] = useState<'default' | 'distance' | 'rating'>('default')
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const { coords, loading: geoLoading, usedFallback } = useUserLocation()
+  const { coords, loading: geoLoading, locationError, retry: retryLocation } = useUserLocation()
   const { restaurants, loading: storesLoading, hint: storeListHint, error: storeListError } = useStoreList({
     activeTab,
     sortOrder,
     coords,
     geoLoading,
-    usedFallback,
   })
   const { scrollRef, isDragging, shouldIgnoreClick, handlers } = useDragScroll()
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -122,6 +122,14 @@ function CategoryDetailPage({
         onChange={setSearchQuery}
         placeholder="공략할 맛집 던전을 검색하세요!"
       />
+
+      {locationError && (sortOrder === 'distance' || sortOrder === 'rating') && (
+        <LocationPermissionBanner
+          message={locationError}
+          onRetry={() => void retryLocation()}
+          loading={geoLoading}
+        />
+      )}
 
       <div className={styles.tabWrapper}>
         <div

@@ -13,6 +13,11 @@ import type { ReviewWritePayload } from '../../api/reviews'
 import type { PickupDestination } from '../../hooks/useActivePickup'
 import type { OrderContextRow } from '../../lib/orderResolve'
 import { completeOrderPickup } from '../../api/orders'
+import {
+  fetchOrderTracking,
+  mapTrackingToOrderStep,
+  type OrderStep,
+} from '../../api/orderTracking'
 import { ApiError } from '../../api/authClient'
 import { getActivePaidOrderFromLocal } from '../../lib/orderResolve'
 import { getAccessToken } from '../../lib/authStorage'
@@ -23,6 +28,7 @@ import {
   type PickupRewardBreakdown,
 } from '../../lib/pickupReward'
 import { useDistanceToCoords } from '../../hooks/useDistanceToCoords'
+import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
 import { MapTmapCanvas } from '../map/MapPage'
 import type { MapTmapMarker } from '../../lib/mapCategoryMarkers'
 import styles from './OrderStatusPage.module.css'
@@ -44,10 +50,7 @@ interface OrderStatusPageProps {
   cartCount?: number
 }
 
-type OrderStep = 'received' | 'cooking' | 'ready' | 'completed'
-
-/** 조리중 → 픽업준비(조리 완료) 자동 전환 대기 시간 (ms) */
-const COOKING_TO_READY_MS = 15_000
+const TRACKING_POLL_MS = 10_000
 
 const LOCAL_ORDERS_KEY = '__jubjub_local_orders'
 
@@ -90,7 +93,7 @@ function formatOrderNumber(orderId: number) {
   return String(orderId)
 }
 
-function formatPickupTime(iso?: string) {
+function formatPickupTime(iso?: string | null) {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
@@ -120,15 +123,14 @@ function OrderStatusPage({
   pickupContextLoading = false,
   cartCount = 0,
 }: OrderStatusPageProps) {
-  const [orderStep, setOrderStep] = useState<OrderStep>('cooking')
+  const [orderStep, setOrderStep] = useState<OrderStep>('received')
+  const [estimatedPickupTime, setEstimatedPickupTime] = useState<string | null>(null)
+  const [trackingLoading, setTrackingLoading] = useState(false)
   const [rewardModalOpen, setRewardModalOpen] = useState(false)
   const [rewardModalLoading, setRewardModalLoading] = useState(false)
   const [pickupRewards, setPickupRewards] = useState<PickupRewardBreakdown | null>(null)
   const [pickupSubmitting, setPickupSubmitting] = useState(false)
   const [pickupError, setPickupError] = useState<string | null>(null)
-  const [cookingSecondsLeft, setCookingSecondsLeft] = useState(
-    Math.ceil(COOKING_TO_READY_MS / 1000),
-  )
 
   useEffect(() => {
     if (activeOrder?.pickupCompleted || activeOrder?.orderStatus === 'COMPLETED') {
@@ -136,11 +138,48 @@ function OrderStatusPage({
     }
   }, [activeOrder])
 
+  useEffect(() => {
+    const orderId = activeOrder?.orderId
+    if (!orderId || !getAccessToken()) return
+    if (activeOrder?.pickupCompleted || activeOrder?.orderStatus === 'COMPLETED') return
+
+    let cancelled = false
+    let trackingDone = false
+
+    const poll = async () => {
+      if (cancelled || trackingDone) return
+      setTrackingLoading(true)
+      try {
+        const data = await fetchOrderTracking(orderId)
+        if (cancelled) return
+        setEstimatedPickupTime(data.estimatedPickupTime)
+        const step = mapTrackingToOrderStep(data.trackingStatus, data.paymentOrderStatus)
+        setOrderStep(step)
+        if (step === 'completed') trackingDone = true
+      } catch {
+        if (!cancelled && activeOrder?.orderStatus === 'COMPLETED') {
+          setOrderStep('completed')
+          trackingDone = true
+        }
+      } finally {
+        if (!cancelled) setTrackingLoading(false)
+      }
+    }
+
+    void poll()
+    const intervalId = window.setInterval(() => void poll(), TRACKING_POLL_MS)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [activeOrder?.orderId, activeOrder?.orderStatus, activeOrder?.pickupCompleted])
+
   const display = useMemo(() => {
     if (!activeOrder) return emptyDisplay
     return {
       orderNumber: formatOrderNumber(activeOrder.orderId),
-      pickupTime: formatPickupTime(activeOrder.createdAt),
+      pickupTime: formatPickupTime(estimatedPickupTime ?? activeOrder.createdAt),
       menuName: activeOrder.menuSummary?.trim() || '주문',
       storeId: activeOrder.storeId,
       storeName: activeOrder.storeName,
@@ -148,7 +187,7 @@ function OrderStatusPage({
       distance: '',
       estimatedTime: '',
     }
-  }, [activeOrder, pickupDestination])
+  }, [activeOrder, pickupDestination, estimatedPickupTime])
 
   const reviewPayload = useMemo((): ReviewWritePayload => {
     if (activeOrder) {
@@ -164,22 +203,6 @@ function OrderStatusPage({
       storeName: display.storeName,
     }
   }, [activeOrder, display.storeId, display.storeName])
-
-  useEffect(() => {
-    if (orderStep !== 'cooking') return
-    setCookingSecondsLeft(Math.ceil(COOKING_TO_READY_MS / 1000))
-    const intervalId = window.setInterval(() => {
-      setCookingSecondsLeft((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(intervalId)
-          setOrderStep('ready')
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => window.clearInterval(intervalId)
-  }, [orderStep])
 
   const currentStepIndex = steps.findIndex((s) => s.key === orderStep)
 
@@ -206,6 +229,7 @@ function OrderStatusPage({
     walkTimeLabel: storeWalkTimeLabel,
     loading: storeDistanceLoading,
     error: storeDistanceError,
+    retry: retryStoreDistance,
   } = useDistanceToCoords(storeCoords)
 
   const completePickup = () => {
@@ -302,6 +326,13 @@ function OrderStatusPage({
         </header>
 
         <div className={styles.scrollArea}>
+          {storeDistanceError && (
+            <LocationPermissionBanner
+              message={storeDistanceError}
+              onRetry={() => void retryStoreDistance()}
+              loading={storeDistanceLoading}
+            />
+          )}
           <div className={styles.mapWrap}>
             {storeMapLat != null && storeMapLng != null ? (
               <MapTmapCanvas
@@ -409,16 +440,27 @@ function OrderStatusPage({
                 )
               })}
             </div>
+            {orderStep === 'received' && (
+              <div className={styles.cookingWaitBox}>
+                <div className={styles.cookingWaitIcon}>
+                  <span className={`material-symbols-outlined ${styles.cookingWaitIconSpan}`}>receipt_long</span>
+                </div>
+                <p className={styles.cookingWaitTitle}>주문이 접수되었어요</p>
+                <p className={styles.cookingWaitDesc}>
+                  {trackingLoading ? '매장 상태를 확인하는 중…' : '매장에서 주문을 확인하고 있어요.'}
+                </p>
+              </div>
+            )}
             {orderStep === 'cooking' && (
               <div className={styles.cookingWaitBox}>
                 <div className={styles.cookingWaitIcon}>
                   <span className={`material-symbols-outlined ${styles.cookingWaitIconSpan}`}>skillet</span>
                 </div>
                 <p className={styles.cookingWaitTitle}>조리 중이에요</p>
-                <p className={styles.cookingWaitDesc}>조리가 끝나면 픽업완료 버튼을 눌러주세요.</p>
-                <p className={styles.cookingCountdown}>
-                  <span className="material-symbols-outlined">timer</span>
-                  픽업 준비까지 약 <strong>{cookingSecondsLeft}</strong>초
+                <p className={styles.cookingWaitDesc}>
+                  {estimatedPickupTime
+                    ? `픽업 예정 ${formatPickupTime(estimatedPickupTime)}`
+                    : '조리가 끝나면 픽업 준비 알림이 올 거예요.'}
                 </p>
               </div>
             )}

@@ -17,11 +17,12 @@ import {
   deleteCartItem,
   type ServerCartLineUi,
 } from '../../api/cart'
+import { getMe } from '../../api/auth'
 import { confirmPayment, createOrder, preparePayment } from '../../api/payment'
 import { ApiError } from '../../api/authClient'
 import { calculateRewardDiscount, type RewardCalculateResponse } from '../../api/rewards'
 import { getAccessToken, setCachedMemberProfileId } from '../../lib/authStorage'
-import { resolveUserCoords } from '../../lib/geolocation'
+import { GeolocationError, resolveUserCoords } from '../../lib/geolocation'
 import {
   buildPortOneOrderName,
   ECO_DISCOUNT_AMOUNT,
@@ -210,6 +211,7 @@ function CartPage({
         }
 
         const orderName = buildPortOneOrderName(storeLabel, cartStoreId, cartItems)
+        const me = await getMe().catch(() => null)
 
         // 1) 주문 생성 (서버가 장바구니 금액 검증)
         const order = await createOrder({
@@ -235,18 +237,14 @@ function CartPage({
           paymentId: prepared.merchantUid,
           orderName,
           customer: {
-            email: 'test@jubjub.com',
-            fullName: '홍길동',
-            phoneNumber: '01012345678',
+            email: me?.email?.trim() || '',
+            fullName: me?.name?.trim() || me?.nickname?.trim() || '회원',
+            phoneNumber: me?.phone?.replace(/\D/g, '') || '',
           },
           totalAmount: prepared.requestedAmount,
           currency: 'CURRENCY_KRW',
           payMethod: 'CARD',
         })
-
-        // (DEBUG) 결제 결과 추적: transactionId 누락 원인 파악용
-        // eslint-disable-next-line no-console
-        console.log('[PortOne] paymentResult', paymentResult)
 
         /**
          * 결제창이 닫혔거나 실패한 경우 transactionId 가 없을 수 있음.
@@ -348,19 +346,11 @@ function CartPage({
         setIsProcessing(false)
       } catch (e) {
         setIsProcessing(false)
-        if (e instanceof Error && e.message === 'GEO_DENIED') {
+        if (e instanceof GeolocationError) {
           showCartAlert({
-            title: '위치 권한 필요',
-            message: '결제 완료 처리를 위해 위치 권한을 허용해 주세요.',
-            variant: 'info',
-          })
-          return
-        }
-        if (e instanceof Error && e.message === 'GEO_UNAVAILABLE') {
-          showCartAlert({
-            title: '위치 정보 없음',
-            message: '이 기기에서는 위치 정보를 사용할 수 없어 결제를 완료할 수 없습니다.',
-            variant: 'error',
+            title: '위치(GPS) 권한 필요',
+            message: e.message,
+            variant: e.reason === 'UNAVAILABLE' ? 'error' : 'info',
           })
           return
         }
