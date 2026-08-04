@@ -58,6 +58,7 @@ public class SecurityConfig {
                                 "/api/test",
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
+                                "/api/v1/owner/auth/**",
                                 "/api/v1/auth/verify/**",
                                 "/api/v1/auth/reissue",
                                 "/api/v1/auth/find-id",

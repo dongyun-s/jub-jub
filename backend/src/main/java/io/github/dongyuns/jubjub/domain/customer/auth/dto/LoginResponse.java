@@ -10,5 +10,6 @@ public record LoginResponse(
         String accessToken,  // 1번 인수
         String refreshToken, // 2번 인수 (🌟 새로 추가된 부분!)
         String email,        // 3번 인수
-        String nickname      // 4번 인수
+        String nickname,      // 4번 인수
+        String role
 ) {}

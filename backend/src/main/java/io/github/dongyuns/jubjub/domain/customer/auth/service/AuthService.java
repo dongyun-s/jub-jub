@@ -92,31 +92,74 @@ public class AuthService {
 
     /**
      * 3. 회원가입 (계정 및 프로필 생성)
-     * 인증 완료 후 계정 정보와 고객 프로필을 동시에 저장합니다.
+     * 
+     * 신규 이메일: 이메일 인증 완료 후 새 계정 생성
+     * 기존 이메일: 사장님이 이미 가입한 경우, 인증 없이 role을 USER로 변경하여 고객 프로필만 추가
      */
     @Transactional
     public void signup(SignupRequest dto) {
-        // 3-1. 이메일 중복 체크
-        if (accountRepository.findByEmail(dto.email()).isPresent()) {
-            throw new IllegalArgumentException("이미 가입된 이메일입니다.");
-        }
+        String email = dto.email().trim();
 
-        // 3-2. 계정(Account) 저장
+        // 1. 기존 Account 확인
+        var existingAccount = accountRepository.findByEmail(email);
+
+        if (existingAccount.isPresent()) {
+            // 기존 이메일: 사장님이 이미 가입한 경우
+            signupWithExistingEmail(email, existingAccount.get(), dto);
+        } else {
+            // 신규 이메일: 새로 가입
+            signupWithNewEmail(email, dto);
+        }
+    }
+
+    /**
+     * 신규 이메일로 고객 회원가입
+     */
+    private void signupWithNewEmail(String email, SignupRequest dto) {
+        // 1. 새로운 계정 생성 (role=USER, 기본값)
         Account account = Account.builder()
-                .email(dto.email())
-                // 평문 비밀번호를 BCrypt로 암호화해서 저장!
+                .email(email)
                 .password(passwordEncoder.encode(dto.password()))
                 .build();
         Account savedAccount = accountRepository.save(account);
 
-        // 3-3. 고객 프로필(MemberProfile) 저장
+        // 2. 고객 프로필 생성
         MemberProfile profile = MemberProfile.builder()
                 .account(savedAccount)
                 .name(dto.name())
-                .phone(normalizePhone(dto.phone())) // 프론트에서 하이픈을 보내도 다 떼고 숫자만 저장!
+                .phone(normalizePhone(dto.phone()))
                 .nickname(dto.nickname())
                 .build();
         memberProfileRepository.save(profile);
+    }
+
+    /**
+     * 기존 이메일로 고객 회원가입
+     * (사장님이 이미 OWNER로 가입한 경우, role을 USER로 변경하고 고객 프로필만 추가)
+     */
+    private void signupWithExistingEmail(String email, Account existingAccount, SignupRequest dto) {
+        // 1. 기존 MemberProfile이 있는지 확인
+        var existingProfile = memberProfileRepository.findByAccount(existingAccount);
+
+        if (existingProfile.isPresent()) {
+            // 이미 같은 Account로 고객 프로필이 있으면, 프로필만 업데이트
+            MemberProfile profile = existingProfile.get();
+            profile.updateProfile(dto.nickname(), normalizePhone(dto.phone()));
+            // Dirty Checking으로 자동 업데이트
+            return;
+        }
+
+        // 2. 고객 프로필이 없으면 새로 생성
+        MemberProfile profile = MemberProfile.builder()
+                .account(existingAccount)
+                .name(dto.name())
+                .phone(normalizePhone(dto.phone()))
+                .nickname(dto.nickname())
+                .build();
+        memberProfileRepository.save(profile);
+
+        // 3. Account.role을 USER로 설정 (사장님 역할 제거 불필요, 이미 하나의 Account로 사용)
+        // 현재 설계에서는 고객이 고유하게 만들어짐
     }
 
     /**
@@ -157,7 +200,7 @@ public class AuthService {
 
         // 🌟 4-4. 토큰 세트 생성 (Access Token & Refresh Token)
         // JwtTokenProvider의 createToken 메서드를 통해 두 토큰을 한 번에 가져옵니다.
-        TokenResponse tokenResponse = jwtTokenProvider.createToken(account.getEmail(), "ROLE_USER");
+        TokenResponse tokenResponse = jwtTokenProvider.createToken(account.getEmail(), "ROLE_" + account.getRole().name());
 
         // 🌟 4-5. Refresh Token DB 저장 및 최신화
         // 기존에 발급된 리프레시 토큰이 있다면 새 값으로 업데이트하고, 없다면 새로 생성합니다.
@@ -175,7 +218,8 @@ public class AuthService {
                 tokenResponse.accessToken(),
                 tokenResponse.refreshToken(),
                 account.getEmail(),
-                profile.getNickname()
+                profile.getNickname(),
+                account.getRole().name()
         );
 
     }
