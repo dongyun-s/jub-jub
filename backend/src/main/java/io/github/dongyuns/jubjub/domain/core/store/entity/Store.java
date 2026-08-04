@@ -15,7 +15,7 @@ public class Store {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private Long ownerProfileId; // 매장주 프로필 ID (외래키 역할)
     private Integer categoryId; // 카테고리번호 (외래키 역할)
 
@@ -48,9 +48,20 @@ public class Store {
         this.phoneNumber = phoneNumber;
         this.latitude = latitude;
         this.longitude = longitude;
-        this.cookingTimeMinutes = cookingTimeMinutes;
-        this.status = status;
+        this.cookingTimeMinutes = cookingTimeMinutes > 0 ? cookingTimeMinutes : 15;
+        this.status = status == null || status.isBlank() ? "OPEN" : status;
         this.originInfo = originInfo;
         this.minOrderAmount = minOrderAmount;
+    }
+
+    public void updateStatus(String status) {
+        this.status = status;
+    }
+
+    public void updateLocationAndCategory(String address, double latitude, double longitude, int categoryId) {
+        this.address = address;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.categoryId = categoryId;
     }
 }

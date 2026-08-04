@@ -4,8 +4,13 @@ import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
+    Optional<Store> findByOwnerProfileId(Long ownerProfileId);
+
+    boolean existsByOwnerProfileId(Long ownerProfileId);
+
     List<Store> findByCategoryIdOrderByIdAsc(Integer categoryId);
 
     List<Store> findByLatitudeBetweenAndLongitudeBetween(

@@ -10,4 +10,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class TmapProperties {
     private String appKey;
     private String pedestrianUrl;
+    private String geocodingUrl;
 }

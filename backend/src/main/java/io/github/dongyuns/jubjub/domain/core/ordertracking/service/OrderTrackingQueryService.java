@@ -5,6 +5,7 @@ import io.github.dongyuns.jubjub.domain.core.account.entity.Account;
 import io.github.dongyuns.jubjub.domain.core.account.repository.AccountRepository;
 import io.github.dongyuns.jubjub.domain.customer.ordertracking.dto.OrderTrackingResponse;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.entity.OrderTracking;
+import io.github.dongyuns.jubjub.domain.core.ordertracking.repository.OrderTrackingRepository;
 import io.github.dongyuns.jubjub.domain.core.member.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.core.member.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.domain.core.order.entity.Order;
@@ -21,6 +22,7 @@ public class OrderTrackingQueryService {
     private final AccountRepository accountRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final OrderRepository orderRepository;
+    private final OrderTrackingRepository orderTrackingRepository;
     private final OrderTrackingLifecycleService orderTrackingLifecycleService;
 
     @Transactional
@@ -40,7 +42,8 @@ public class OrderTrackingQueryService {
             throw new BusinessException("ORDER_FORBIDDEN", "본인 주문만 조회할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        OrderTracking tracking = orderTrackingLifecycleService.ensureTracking(order);
+        OrderTracking tracking = orderTrackingRepository.findByOrderId(orderId)
+                .orElseGet(() -> orderTrackingLifecycleService.ensureTracking(order));
         return OrderTrackingResponse.from(order, tracking);
     }
 }

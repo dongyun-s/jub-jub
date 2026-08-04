@@ -25,4 +25,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Payment p where p.id = :id")
     Optional<Payment> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Payment p where p.order.id = :orderId and p.status = :status")
+    Optional<Payment> findByOrderIdAndStatusForUpdate(
+            @Param("orderId") Long orderId,
+            @Param("status") io.github.dongyuns.jubjub.domain.core.payment.entity.PaymentStatus status
+    );
 }

@@ -103,18 +103,20 @@ public class OrderTrackingNotificationService {
     private String titleOf(OrderTrackingStatus status) {
         return switch (status) {
             case RECEIVED -> "주문이 접수되었어요";
-            case COOKING -> "주문이 조리중이에요";
+            case COOKING -> "주문 수락 및 조리 시작";
             case READY_FOR_PICKUP -> "픽업 준비 완료";
             case PICKED_UP -> "픽업이 완료되었어요";
+            case REJECTED -> "주문이 거절되었어요";
         };
     }
 
     private String messageOf(Order order, OrderTracking tracking) {
         return switch (tracking.getStatus()) {
             case RECEIVED -> "주문이 정상적으로 접수되었습니다. 주문 현황에서 진행 상태를 확인해 주세요.";
-            case COOKING -> order.getStore().getName() + "에서 주문을 조리하고 있습니다.";
+            case COOKING -> order.getStore().getName() + "에서 주문을 수락하고 조리를 시작했습니다.";
             case READY_FOR_PICKUP -> "주문하신 메뉴가 픽업 준비되었습니다. 매장에 방문해 주세요.";
             case PICKED_UP -> "주문이 픽업 완료 처리되었습니다. 이용해주셔서 감사합니다.";
+            case REJECTED -> "매장 사정으로 주문이 거절되어 결제가 전액 환불되었습니다.";
         };
     }
 }

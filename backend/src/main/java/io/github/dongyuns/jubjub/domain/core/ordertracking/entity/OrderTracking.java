@@ -83,13 +83,30 @@ public class OrderTracking extends BaseTimeEntity {
                 .build();
     }
 
-    public boolean sync(LocalDateTime now) {
-        OrderTrackingStatus resolved = resolveStatus(now);
-        if (resolved == status) {
-            return false;
-        }
-        this.status = resolved;
-        return true;
+    public void acceptAndStartCooking(LocalDateTime startedAt, int cookingMinutes) {
+        requireStatus(OrderTrackingStatus.RECEIVED);
+        this.status = OrderTrackingStatus.COOKING;
+        this.progressStartedAt = startedAt;
+        this.cookingStartedAt = startedAt;
+        this.estimatedPickupTime = startedAt.plusMinutes(Math.max(cookingMinutes, 1));
+        this.autoCompletedAt = this.estimatedPickupTime.plusMinutes(30);
+    }
+
+    public void markReadyForPickup(LocalDateTime readyAt) {
+        requireStatus(OrderTrackingStatus.COOKING);
+        this.status = OrderTrackingStatus.READY_FOR_PICKUP;
+        this.estimatedPickupTime = readyAt;
+        this.autoCompletedAt = readyAt.plusMinutes(30);
+    }
+
+    public void completePickup() {
+        requireStatus(OrderTrackingStatus.READY_FOR_PICKUP);
+        this.status = OrderTrackingStatus.PICKED_UP;
+    }
+
+    public void reject() {
+        requireStatus(OrderTrackingStatus.RECEIVED);
+        this.status = OrderTrackingStatus.REJECTED;
     }
 
     public boolean needsNotification() {
@@ -100,16 +117,11 @@ public class OrderTracking extends BaseTimeEntity {
         this.lastNotifiedStatus = status;
     }
 
-    private OrderTrackingStatus resolveStatus(LocalDateTime now) {
-        if (!now.isBefore(autoCompletedAt)) {
-            return OrderTrackingStatus.PICKED_UP;
+    private void requireStatus(OrderTrackingStatus expected) {
+        if (status != expected) {
+            throw new IllegalStateException(
+                    "주문 상태를 " + expected + "에서만 변경할 수 있습니다. 현재 상태: " + status
+            );
         }
-        if (!now.isBefore(estimatedPickupTime)) {
-            return OrderTrackingStatus.READY_FOR_PICKUP;
-        }
-        if (!now.isBefore(cookingStartedAt)) {
-            return OrderTrackingStatus.COOKING;
-        }
-        return OrderTrackingStatus.RECEIVED;
     }
 }

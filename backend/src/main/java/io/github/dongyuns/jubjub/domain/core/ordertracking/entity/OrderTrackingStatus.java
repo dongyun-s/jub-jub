@@ -4,5 +4,6 @@ public enum OrderTrackingStatus {
     RECEIVED,
     COOKING,
     READY_FOR_PICKUP,
-    PICKED_UP
+    PICKED_UP,
+    REJECTED
 }

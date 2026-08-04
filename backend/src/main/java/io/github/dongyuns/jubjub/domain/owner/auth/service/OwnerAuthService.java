@@ -8,7 +8,10 @@ import io.github.dongyuns.jubjub.domain.core.account.repository.VerificationLogR
 import io.github.dongyuns.jubjub.domain.core.member.entity.MemberProfile;
 import io.github.dongyuns.jubjub.domain.core.member.repository.MemberProfileRepository;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
+import io.github.dongyuns.jubjub.domain.core.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.core.store.repository.StoreRepository;
+import io.github.dongyuns.jubjub.domain.shared.external.tmap.AddressGeocoder;
+import io.github.dongyuns.jubjub.domain.shared.external.tmap.GeocodingResult;
 import io.github.dongyuns.jubjub.domain.owner.auth.dto.OwnerSignupRequest;
 import io.github.dongyuns.jubjub.domain.owner.auth.dto.OwnerRegisterRequest;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,7 @@ public class OwnerAuthService {
     private final StoreRepository storeRepository;
     private final VerificationLogRepository verificationLogRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AddressGeocoder addressGeocoder;
 
     @Transactional
     public void signup(OwnerSignupRequest request) {
@@ -95,14 +99,13 @@ public class OwnerAuthService {
         MemberProfile savedProfile = memberProfileRepository.save(profile);
 
         // 7. Store 생성
-        Store store = Store.builder()
-                .ownerProfileId(savedProfile.getId())
-                .name(request.storeName())
-                .phoneNumber(normalizePhone(request.storePhone()))
-                .address(request.address())
-                .build();
-
-        storeRepository.save(store);
+        storeRepository.save(createStore(
+                savedProfile.getId(),
+                request.storeName(),
+                request.storePhone(),
+                request.address(),
+                request.categoryId()
+        ));
     }
 
     /**
@@ -122,15 +125,16 @@ public class OwnerAuthService {
         MemberProfile profile = memberProfileRepository.findByAccount(account)
                 .orElseThrow(() -> new IllegalArgumentException("프로필 정보를 찾을 수 없습니다."));
 
-        // Store 생성
-        Store store = Store.builder()
-                .ownerProfileId(profile.getId())
-                .name(request.storeName())
-                .phoneNumber(normalizePhone(request.storePhone()))
-                .address(request.address())
-                .build();
+        validateStoreNotRegistered(profile.getId());
 
-        storeRepository.save(store);
+        // Store 생성
+        storeRepository.save(createStore(
+                profile.getId(),
+                request.storeName(),
+                request.storePhone(),
+                request.address(),
+                request.categoryId()
+        ));
 
         // Account.role을 OWNER로 변경
         account.updateRole(AccountRole.OWNER);
@@ -155,15 +159,16 @@ public class OwnerAuthService {
         MemberProfile profile = memberProfileRepository.findByAccount(account)
                 .orElseThrow(() -> new IllegalArgumentException("프로필 정보를 찾을 수 없습니다."));
 
-        // 3. Store 생성
-        Store store = Store.builder()
-                .ownerProfileId(profile.getId())
-                .name(request.storeName())
-                .phoneNumber(normalizePhone(request.storePhone()))
-                .address(request.address())
-                .build();
+        validateStoreNotRegistered(profile.getId());
 
-        storeRepository.save(store);
+        // 3. Store 생성
+        storeRepository.save(createStore(
+                profile.getId(),
+                request.storeName(),
+                request.storePhone(),
+                request.address(),
+                request.categoryId()
+        ));
 
         // 4. Account.role을 OWNER로 변경
         account.updateRole(AccountRole.OWNER);
@@ -179,5 +184,39 @@ public class OwnerAuthService {
         }
 
         return phone.replaceAll("[^0-9]", "");
+    }
+
+    private void validateStoreNotRegistered(Long ownerProfileId) {
+        if (storeRepository.existsByOwnerProfileId(ownerProfileId)) {
+            throw new IllegalArgumentException("이미 등록된 사장님 매장이 있습니다.");
+        }
+    }
+
+    private Store createStore(
+            Long ownerProfileId,
+            String storeName,
+            String storePhone,
+            String address,
+            Integer categoryId
+    ) {
+        StoreCategory category = requireCategory(categoryId);
+        GeocodingResult coordinates = addressGeocoder.geocode(address);
+
+        return Store.builder()
+                .ownerProfileId(ownerProfileId)
+                .name(storeName)
+                .phoneNumber(normalizePhone(storePhone))
+                .address(address.trim())
+                .categoryId(category.getId())
+                .latitude(coordinates.latitude())
+                .longitude(coordinates.longitude())
+                .build();
+    }
+
+    private StoreCategory requireCategory(Integer categoryId) {
+        if (categoryId == null) {
+            throw new IllegalArgumentException("매장 카테고리는 필수입니다.");
+        }
+        return StoreCategory.fromId(categoryId);
     }
 }

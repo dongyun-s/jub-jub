@@ -63,6 +63,9 @@ public class OrderService {
                 .orElseThrow(() -> new BusinessException("MEMBER_PROFILE_NOT_FOUND", "회원 프로필을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         Store store = storeRepository.findById(request.storeId())
                 .orElseThrow(() -> new BusinessException("STORE_NOT_FOUND", "매장을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        if (!"OPEN".equals(store.getStatus())) {
+            throw new BusinessException("STORE_NOT_OPEN", "현재 영업 중인 매장만 주문할 수 있습니다.", HttpStatus.CONFLICT);
+        }
         List<Cart> carts = validateCartAmount(memberProfile, store, request.totalAmount());
 
         List<Long> memberCouponIds = normalizeCouponIds(request.memberCouponIds());
