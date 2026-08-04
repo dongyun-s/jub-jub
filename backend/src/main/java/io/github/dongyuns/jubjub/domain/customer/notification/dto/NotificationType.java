@@ -1,0 +1,7 @@
+package io.github.dongyuns.jubjub.domain.customer.notification.dto;
+
+public enum NotificationType {
+    ORDER_TRACKING,
+    REVIEW_REQUEST,
+    COUPON_ISSUED
+}
