@@ -1,9 +1,23 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { OwnerHeader } from '../../components/OwnerHeader'
 import { Icon } from '../../components/Icon'
+import { useOwnerOrders } from '../../context/OwnerOrdersProvider'
 import { useOwnerSales } from '../../context/OwnerSalesProvider'
+import { useOwnerReviews } from '../../hooks/useOwnerReviews'
 import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
+import {
+  buildWeeklySalesPaths,
+  formatTrendPct,
+  formatWon,
+  reviewRelativeLabel,
+} from '../../lib/dashboardStats'
+import { MOCK_DASHBOARD } from '../../lib/mocks/ownerMockData'
+import { getActiveOwnerStoreProfile } from '../../lib/ownerSession'
+import { formatPrice } from '../../lib/format'
 import styles from './DashboardPage.module.css'
+
+const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'] as const
 
 export function DashboardPage() {
   const {
@@ -14,12 +28,73 @@ export function DashboardPage() {
     formatResumeAtLabel,
   } = useOwnerSales()
   const { store, mockMode } = useOwnerStoreDetail()
+  const { orders, newOrders, activeOrders, completedOrders, useMock } = useOwnerOrders()
+  const { reviews } = useOwnerReviews()
+  const ownerProfile = getActiveOwnerStoreProfile()
+
+  const [weekTab, setWeekTab] = useState<'this' | 'last'>('this')
+
+  const storeLabel = ownerProfile?.storeName || store?.name
+
+  const metrics = useMemo(() => {
+    const inProgress = newOrders.length + activeOrders.length
+    const liveSales = orders.reduce((sum, o) => sum + (o.total || o.amount || 0), 0)
+    const liveOrderCount = orders.length
+
+    if (useMock) {
+      // 예시: 베이스 mock + 현재 보드 주문 반영
+      const boardSales = liveSales
+      const todaySales = Math.max(MOCK_DASHBOARD.todaySales, boardSales)
+      const orderCount = Math.max(MOCK_DASHBOARD.orderCount, liveOrderCount + completedOrders.length)
+      return {
+        todaySales,
+        salesTrendPct: MOCK_DASHBOARD.salesTrendPct,
+        orderCount,
+        orderTrendPct: MOCK_DASHBOARD.orderTrendPct,
+        inProgress,
+      }
+    }
+
+    return {
+      todaySales: liveSales,
+      salesTrendPct: 0,
+      orderCount: liveOrderCount,
+      orderTrendPct: 0,
+      inProgress,
+    }
+  }, [useMock, orders, newOrders.length, activeOrders.length, completedOrders.length])
+
+  const weeklyValues =
+    weekTab === 'this' ? MOCK_DASHBOARD.weeklyThisWeek : MOCK_DASHBOARD.weeklyLastWeek
+  const chartPaths = useMemo(() => buildWeeklySalesPaths(weeklyValues), [weeklyValues])
+
+  const bestMenus = MOCK_DASHBOARD.bestMenus
+
+  const avgRating = useMemo(() => {
+    if (!reviews.length) return null
+    const sum = reviews.reduce((s, r) => s + (r.overallRating || 0), 0)
+    return Math.round((sum / reviews.length) * 10) / 10
+  }, [reviews])
+
+  const recentReviews = useMemo(() => {
+    return [...reviews]
+      .sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return tb - ta
+      })
+      .slice(0, 2)
+  }, [reviews])
 
   return (
     <>
       <OwnerHeader
         title="대시보드"
-        subtitle={mockMode ? `${store?.name ?? ''} · 예시 데이터` : store?.name}
+        subtitle={
+          mockMode
+            ? `${storeLabel ?? ''} · 예시 데이터`
+            : storeLabel
+        }
       />
       <main className={styles.main}>
         {salesPaused ? (
@@ -50,7 +125,20 @@ export function DashboardPage() {
               영업 재개하기
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className={styles.openBanner}>
+            <div className={styles.openLeft}>
+              <span className={styles.openDot} aria-hidden />
+              <div>
+                <h4 className={styles.openTitle}>영업 중</h4>
+                <p className={styles.openText}>주문을 받고 있습니다. 필요하면 일시 중지할 수 있습니다.</p>
+              </div>
+            </div>
+            <Link to="/sales" className={styles.pauseLink}>
+              영업 일시정지
+            </Link>
+          </div>
+        )}
 
         <section className={styles.metricsGrid}>
           <div className={styles.metricCard}>
@@ -61,14 +149,18 @@ export function DashboardPage() {
               </div>
             </div>
             <div>
-              <h2 className={styles.metricValue}>₩ 2,450,000</h2>
-              <div className={styles.trendRow}>
-                <span className={styles.trendUpPink}>
-                  <Icon name="trending_up" />
-                  12.5%
-                </span>
-                <span className={styles.trendHint}>전일 대비 증가</span>
-              </div>
+              <h2 className={styles.metricValue}>{formatWon(metrics.todaySales)}</h2>
+              {metrics.salesTrendPct !== 0 ? (
+                <div className={styles.trendRow}>
+                  <span className={styles.trendUpPink}>
+                    <Icon name="trending_up" />
+                    {formatTrendPct(metrics.salesTrendPct)}
+                  </span>
+                  <span className={styles.trendHint}>전일 대비 증가</span>
+                </div>
+              ) : (
+                <p className={styles.trendHint}>오늘 주문 합계 기준</p>
+              )}
             </div>
             <div className={styles.blurOrb} aria-hidden />
           </div>
@@ -81,29 +173,36 @@ export function DashboardPage() {
             </div>
             <div>
               <h2 className={styles.metricValue}>
-                142 <span className={styles.metricSub}>건</span>
+                {metrics.orderCount.toLocaleString('ko-KR')}{' '}
+                <span className={styles.metricSub}>건</span>
               </h2>
-              <div className={styles.trendRow}>
-                <span className={styles.trendUpViolet}>
-                  <Icon name="trending_up" />
-                  8.2%
-                </span>
-                <span className={styles.trendHint}>전일 동시간 대비</span>
-              </div>
+              {metrics.orderTrendPct !== 0 ? (
+                <div className={styles.trendRow}>
+                  <span className={styles.trendUpViolet}>
+                    <Icon name="trending_up" />
+                    {formatTrendPct(metrics.orderTrendPct)}
+                  </span>
+                  <span className={styles.trendHint}>전일 동시간 대비</span>
+                </div>
+              ) : (
+                <p className={styles.trendHint}>오늘 접수·진행·완료 합계</p>
+              )}
             </div>
           </div>
           <div className={`${styles.metricCard} ${styles.metricCardAccent}`}>
             <div className={styles.metricTop}>
-              <span className={styles.metricLabel}>실시간 배달</span>
+              <span className={styles.metricLabel}>실시간 픽업</span>
               <div className={`${styles.metricIconWrap} ${styles.metricIconWrapPulse}`}>
-                <Icon name="delivery_dining" />
+                <Icon name="shopping_bag" />
               </div>
             </div>
             <div>
               <h2 className={styles.metricValue}>
-                18 <span className={styles.metricSub}>진행중</span>
+                {metrics.inProgress} <span className={styles.metricSub}>진행중</span>
               </h2>
-              <p className={styles.trendHint}>+5명의 라이더 매칭 대기</p>
+              <p className={styles.trendHint}>
+                신규 {newOrders.length} · 조리/픽업대기 {activeOrders.length}
+              </p>
             </div>
           </div>
         </section>
@@ -116,10 +215,18 @@ export function DashboardPage() {
                 <p className={styles.chartDesc}>최근 7일간의 수익 변화 추이</p>
               </div>
               <div className={styles.chartTabs}>
-                <button type="button" className={styles.tabActive}>
+                <button
+                  type="button"
+                  className={weekTab === 'this' ? styles.tabActive : styles.tabIdle}
+                  onClick={() => setWeekTab('this')}
+                >
                   이번주
                 </button>
-                <button type="button" className={styles.tabIdle}>
+                <button
+                  type="button"
+                  className={weekTab === 'last' ? styles.tabActive : styles.tabIdle}
+                  onClick={() => setWeekTab('last')}
+                >
                   지난주
                 </button>
               </div>
@@ -134,31 +241,29 @@ export function DashboardPage() {
                 </div>
                 <div className={styles.svgWrap}>
                   <svg className={styles.svg} viewBox="0 0 1000 200" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="line-grad" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#FF4D8D" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="#FF4D8D" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d="M0,150 C100,140 150,180 250,120 C350,60 450,140 550,80 C650,20 750,100 850,40 L1000,60"
-                    fill="none"
-                    stroke="#FF4D8D"
-                    strokeLinecap="round"
-                    strokeWidth="4"
-                  />
-                  <path
-                    d="M0,150 C100,140 150,180 250,120 C350,60 450,140 550,80 C650,20 750,100 850,40 L1000,60 V200 H0 Z"
-                    fill="url(#line-grad)"
-                  />
-                </svg>
+                    <defs>
+                      <linearGradient id="line-grad" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="#FF4D8D" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#FF4D8D" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d={chartPaths.line}
+                      fill="none"
+                      stroke="#FF4D8D"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="4"
+                    />
+                    <path d={chartPaths.area} fill="url(#line-grad)" />
+                  </svg>
+                </div>
+                <div className={styles.dayLabels}>
+                  {DAY_LABELS.map((d) => (
+                    <span key={d}>{d}요일</span>
+                  ))}
+                </div>
               </div>
-              <div className={styles.dayLabels}>
-                {['월', '화', '수', '목', '금', '토', '일'].map((d) => (
-                  <span key={d}>{d}요일</span>
-                ))}
-              </div>
-            </div>
             </div>
           </div>
         </section>
@@ -170,11 +275,7 @@ export function DashboardPage() {
               베스트 메뉴 순위
             </h3>
             <div className={styles.rankList}>
-              {[
-                { rank: '01', name: '불꽃 숙성 삼겹살', orders: 428, price: '₩ 18,500' },
-                { rank: '02', name: '시그니처 비빔밥', orders: 312, price: '₩ 12,000' },
-                { rank: '03', name: '명장 얼큰 라면', orders: 285, price: '₩ 9,500' },
-              ].map((m) => (
+              {bestMenus.map((m) => (
                 <div key={m.rank} className={styles.rankRow}>
                   <div className={styles.rankNum}>{m.rank}</div>
                   <div className={styles.rankThumb} />
@@ -182,10 +283,13 @@ export function DashboardPage() {
                     <h4 className={styles.rankName}>{m.name}</h4>
                     <p className={styles.rankMeta}>주간 주문 {m.orders}건</p>
                   </div>
-                  <div className={styles.rankPrice}>{m.price}</div>
+                  <div className={styles.rankPrice}>{formatPrice(m.price)}</div>
                 </div>
               ))}
             </div>
+            <Link to="/menu" className={styles.linkReviews}>
+              메뉴 관리 보기
+            </Link>
           </div>
           <div className={styles.reviewsPanel}>
             <div className={styles.reviewsHead}>
@@ -195,24 +299,23 @@ export function DashboardPage() {
               </h3>
               <div className={styles.ratingPill}>
                 <Icon name="star" filled style={{ fontSize: '0.875rem', color: 'var(--owner-primary)' }} />
-                <span className={styles.ratingNum}>4.8</span>
+                <span className={styles.ratingNum}>{avgRating != null ? avgRating.toFixed(1) : '—'}</span>
               </div>
             </div>
             <div className={styles.reviewCards}>
-              <div className={styles.glassCard}>
-                <div className={styles.reviewCardTop}>
-                  <span className={styles.reviewUser}>lucy_kim01</span>
-                  <span className={styles.reviewTime}>10분 전</span>
-                </div>
-                <p className={styles.reviewBody}>배달도 빠르고 삼겹살이 정말 맛있어요! 추천합니다.</p>
-              </div>
-              <div className={styles.reviewCardMuted}>
-                <div className={styles.reviewCardTop}>
-                  <span className={styles.reviewUser}>gourmet_lee</span>
-                  <span className={styles.reviewTime}>45분 전</span>
-                </div>
-                <p className={styles.reviewBody}>비빔밥 양이 정말 많아요. 재료도 신선했습니다.</p>
-              </div>
+              {recentReviews.length === 0 ? (
+                <p className={styles.trendHint}>아직 리뷰가 없습니다.</p>
+              ) : (
+                recentReviews.map((r, i) => (
+                  <div key={r.reviewId} className={i === 0 ? styles.glassCard : styles.reviewCardMuted}>
+                    <div className={styles.reviewCardTop}>
+                      <span className={styles.reviewUser}>손님 #{r.memberProfileId}</span>
+                      <span className={styles.reviewTime}>{reviewRelativeLabel(r.createdAt)}</span>
+                    </div>
+                    <p className={styles.reviewBody}>{r.content || '내용 없음'}</p>
+                  </div>
+                ))
+              )}
             </div>
             <Link to="/reviews" className={styles.linkReviews}>
               전체 리뷰 보기
@@ -221,9 +324,9 @@ export function DashboardPage() {
         </section>
       </main>
 
-      <button type="button" className={styles.fab} title="신규 주문 등록">
-        <Icon name="add_box" className={styles.fabIcon} />
-      </button>
+      <Link to="/orders" className={styles.fab} title="실시간 주문">
+        <Icon name="receipt_long" className={styles.fabIcon} />
+      </Link>
     </>
   )
 }

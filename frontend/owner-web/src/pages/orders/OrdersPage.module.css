@@ -35,6 +35,29 @@
   color: var(--owner-primary-container);
 }
 
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.resetDemoBtn {
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 35%, transparent);
+  background: transparent;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--owner-on-surface-variant);
+}
+
+.resetDemoBtn:hover {
+  background: var(--owner-surface-high);
+}
+
 .headerActions {
   display: flex;
   align-items: center;
@@ -203,6 +226,80 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--owner-on-surface-variant);
+}
+
+.statusStepper {
+  margin: 0;
+  padding: 0.65rem 0.5rem;
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.25rem;
+  border-radius: 0.75rem;
+  background: var(--owner-surface-lowest);
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 14%, transparent);
+}
+
+.statusStep {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+  min-width: 0;
+}
+
+.statusStep:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 0.4rem;
+  left: calc(50% + 0.55rem);
+  width: calc(100% - 1.1rem);
+  height: 2px;
+  background: color-mix(in srgb, var(--owner-outline-variant) 35%, transparent);
+}
+
+.statusStepDone:not(:last-child)::after,
+.statusStepCurrent:not(:last-child)::after {
+  background: color-mix(in srgb, var(--owner-primary-container) 70%, transparent);
+}
+
+.statusStepDot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--owner-outline-variant) 45%, transparent);
+  border: 2px solid var(--owner-surface-lowest);
+  z-index: 1;
+}
+
+.statusStepDone .statusStepDot {
+  background: var(--owner-primary-container);
+}
+
+.statusStepCurrent .statusStepDot {
+  background: var(--owner-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--owner-primary) 28%, transparent);
+}
+
+.statusStepLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--owner-on-surface-variant);
+  text-align: center;
+}
+
+.statusStepDone .statusStepLabel,
+.statusStepCurrent .statusStepLabel {
+  color: var(--owner-on-surface);
+}
+
+.statusFlowHint {
+  margin: 0;
+  font-size: 0.75rem;
   color: var(--owner-on-surface-variant);
 }
 

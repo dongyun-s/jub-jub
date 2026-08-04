@@ -69,6 +69,64 @@
   background: #fb923c;
 }
 
+.openBanner {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, #22c55e 28%, transparent);
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+  padding: 1rem;
+}
+
+.openLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.openDot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 9999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #22c55e 25%, transparent);
+  flex-shrink: 0;
+}
+
+.openTitle {
+  margin: 0;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.openText {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: color-mix(in srgb, #16a34a 75%, var(--owner-on-surface-variant));
+}
+
+.pauseLink {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 40%, transparent);
+  background: var(--owner-surface-low);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+  text-decoration: none;
+}
+
+.pauseLink:hover {
+  background: var(--owner-surface-high);
+}
+
 .metricsGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -538,6 +596,7 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   cursor: pointer;
   transition: transform 0.15s;
+  text-decoration: none;
 }
 
 .fab:hover {
