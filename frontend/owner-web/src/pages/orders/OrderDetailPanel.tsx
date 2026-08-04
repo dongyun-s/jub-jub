@@ -29,11 +29,54 @@ type OrderDetailPanelProps = {
 const COOK_DONE_GUARD_MS = 2_000
 
 function statusLabel(order: MockOwnerOrder): string {
-  if (order.status === 'new') return '신규'
+  if (order.status === 'new') return '신규 · 수락 대기'
   if (order.status === 'ready') return '픽업 대기'
   if (order.status === 'progress') return '조리 중'
   if (order.status === 'completed') return '픽업 완료'
   return order.label
+}
+
+const STATUS_STEPS = [
+  { key: 'accepted', label: '수락' },
+  { key: 'cooking', label: '조리중' },
+  { key: 'ready', label: '픽업준비' },
+  { key: 'done', label: '완료' },
+] as const
+
+function OrderStatusStepper({ status }: { status: MockOwnerOrder['status'] }) {
+  /** -1: 수락 전, 0: 수락됨(조리중 단계의 이전), 1: 조리중, 2: 픽업준비, 3: 완료 */
+  const reached =
+    status === 'new' ? -1 : status === 'progress' ? 1 : status === 'ready' ? 2 : 3
+
+  return (
+    <ol className={styles.statusStepper} aria-label="주문 상태">
+      {STATUS_STEPS.map((step, i) => {
+        const isDone = reached > i || (reached === i && status !== 'new')
+        const isCurrent =
+          (status === 'new' && i === 0) ||
+          (status === 'progress' && i === 1) ||
+          (status === 'ready' && i === 2) ||
+          (status === 'completed' && i === 3)
+        // 수락 단계는 조리중 이상이면 완료 처리
+        const acceptDone = i === 0 && reached >= 1
+        return (
+          <li
+            key={step.key}
+            className={[
+              styles.statusStep,
+              acceptDone || (isDone && !isCurrent) ? styles.statusStepDone : '',
+              isCurrent ? styles.statusStepCurrent : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <span className={styles.statusStepDot} />
+            <span className={styles.statusStepLabel}>{step.label}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
 }
 
 export function OrderDetailPanel({
@@ -125,6 +168,12 @@ export function OrderDetailPanel({
       </div>
 
       <div className={styles.detailScroll}>
+        <section className={styles.detailSection}>
+          <h3 className={styles.detailSectionTitle}>주문 상태</h3>
+          <OrderStatusStepper status={order.status} />
+          <p className={styles.statusFlowHint}>수락 → 조리중 → 픽업준비 → 완료</p>
+        </section>
+
         <section className={styles.detailSection}>
           <h3 className={styles.detailSectionTitle}>픽업 시간</h3>
           {locked ? (
@@ -223,10 +272,10 @@ export function OrderDetailPanel({
           <>
             <button type="button" className={styles.btnAcceptLarge} onClick={() => onStartCooking(order.orderId)}>
               <Icon name="skillet" />
-              조리 시작
+              주문 수락 · 조리 시작
             </button>
             <button type="button" className={styles.btnReject} onClick={() => onReject(order.orderId)}>
-              거절
+              주문 거절
             </button>
           </>
         ) : null}

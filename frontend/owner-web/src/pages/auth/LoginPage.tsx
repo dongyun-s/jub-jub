@@ -1,10 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/Icon'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { ApiError } from '../../api/authClient'
 import { login } from '../../api/auth'
 import { setSessionEmail, setTokens } from '../../lib/authStorage'
+import { isOwnerAuthSkipped, useOwnerMockData } from '../../lib/ownerConfig'
+import {
+  activateOwnerStoreForEmail,
+  hasMockOwnerCredential,
+  verifyMockOwnerCredential,
+} from '../../lib/ownerSession'
 import styles from './AuthPage.module.css'
 
 type LocationState = { from?: string }
@@ -13,6 +19,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const from = useMemo(() => (location.state as LocationState | null)?.from, [location.state])
+  const mockMode = useOwnerMockData()
+  const authSkipped = isOwnerAuthSkipped()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,14 +32,36 @@ export function LoginPage() {
     navigate(from ?? '/dashboard', { replace: true })
   }
 
+  // auth 연동 전: 로그인 화면 진입 시 바로 POS로
+  useEffect(() => {
+    if (authSkipped) {
+      navigate(from ?? '/dashboard', { replace: true })
+    }
+  }, [authSkipped, from, navigate])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
+    const trimmedEmail = email.trim()
     try {
-      const res = await login(email.trim(), password)
+      // 예시 모드에서 로컬 가입한 계정은 API 없이 로그인
+      if (mockMode && hasMockOwnerCredential(trimmedEmail)) {
+        if (!verifyMockOwnerCredential(trimmedEmail, password)) {
+          setError('이메일 또는 비밀번호가 올바르지 않습니다.')
+          return
+        }
+        setTokens('mock-owner-access', 'mock-owner-refresh')
+        setSessionEmail(trimmedEmail)
+        activateOwnerStoreForEmail(trimmedEmail)
+        goAfterLogin()
+        return
+      }
+
+      const res = await login(trimmedEmail, password)
       setTokens(res.accessToken, res.refreshToken)
-      setSessionEmail(res.email?.trim() || email.trim())
+      setSessionEmail(res.email?.trim() || trimmedEmail)
+      activateOwnerStoreForEmail(res.email?.trim() || trimmedEmail)
       goAfterLogin()
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : '로그인에 실패했습니다.'
@@ -128,4 +158,3 @@ export function LoginPage() {
     </div>
   )
 }
-

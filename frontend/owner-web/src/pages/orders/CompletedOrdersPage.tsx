@@ -15,7 +15,7 @@ const noop = () => {}
 export function CompletedOrdersPage() {
   const { storeId, store, mockMode } = useOwnerStoreDetail()
   const { baseMinutes } = useOwnerCookingTime(storeId, store?.cookingTimeMinutes)
-  const { completedOrders, useMock } = useOwnerOrders()
+  const { completedOrders } = useOwnerOrders()
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const selectedOrder = useMemo(
@@ -61,13 +61,7 @@ export function CompletedOrdersPage() {
           </Link>
         </div>
 
-        {!useMock ? (
-          <EmptyState
-            icon="cloud_off"
-            title="주문 API 미연동"
-            description="VITE_OWNER_USE_MOCK=true 로 예시를 확인할 수 있습니다."
-          />
-        ) : completedOrders.length === 0 ? (
+        {completedOrders.length === 0 ? (
           <EmptyState
             icon="task_alt"
             title="완료된 주문이 없습니다"

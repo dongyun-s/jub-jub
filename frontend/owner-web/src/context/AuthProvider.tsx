@@ -1,24 +1,29 @@
 import { createContext, useContext, useMemo } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { clearTokens } from '../lib/authStorage'
+import { isOwnerAuthSkipped } from '../lib/ownerConfig'
+import { clearActiveOwnerStore } from '../lib/ownerSession'
 import { getOwnerAccessToken } from '../api/authClient'
 
 type AuthContextValue = {
   isLoggedIn: boolean
+  /** auth 연동 전: 로그인 없이 진입 중 */
+  authSkipped: boolean
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Api 요청에서 쓰는 토큰 소스(getOwnerAccessToken)와 동일하게 판정
-  const isLoggedIn = Boolean(getOwnerAccessToken())
+  const authSkipped = isOwnerAuthSkipped()
+  const isLoggedIn = authSkipped || Boolean(getOwnerAccessToken())
 
   const logout = () => {
     clearTokens()
+    clearActiveOwnerStore()
   }
 
-  const value = useMemo(() => ({ isLoggedIn, logout }), [isLoggedIn])
+  const value = useMemo(() => ({ isLoggedIn, authSkipped, logout }), [isLoggedIn, authSkipped])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -30,19 +35,22 @@ export function useAuth() {
 }
 
 /**
- * owner-web의 기능 페이지를 토큰 기반으로 보호합니다.
- * - 미로그인: `/auth/login`으로 이동
+ * owner-web 기능 페이지 보호
+ * - VITE_OWNER_SKIP_AUTH 기본(스킵): 토큰 없이 통과
+ * - false: 미로그인 시 /auth/login
  */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, logout } = useAuth()
+  const { isLoggedIn, authSkipped, logout } = useAuth()
   const location = useLocation()
 
+  if (authSkipped) {
+    return <>{children}</>
+  }
+
   if (!isLoggedIn) {
-    // (선택) 토큰이 깨졌을 가능성이 있으면 localStorage 정리
     logout()
     return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />
   }
 
   return <>{children}</>
 }
-

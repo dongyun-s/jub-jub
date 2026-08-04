@@ -6,13 +6,21 @@ import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal
 import { useAuth } from '../../context/AuthProvider'
 import { useOwnerStoreCategory } from '../../hooks/useOwnerStoreCategory'
 import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
+import { getActiveOwnerStoreProfile } from '../../lib/ownerSession'
 import { STORE_CATEGORIES } from '../../lib/storeCategories'
 import styles from './StoreSettingsPage.module.css'
+
+function formatBizNumber(raw: string): string {
+  const d = raw.replace(/\D/g, '')
+  if (d.length !== 10) return raw
+  return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`
+}
 
 export function StoreSettingsPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const { store, storeId, mockMode } = useOwnerStoreDetail()
+  const ownerProfile = getActiveOwnerStoreProfile()
   const { categoryId, categoryLabel, setCategoryId } = useOwnerStoreCategory(
     storeId,
     store?.categoryId,
@@ -24,11 +32,15 @@ export function StoreSettingsPage() {
     setSavedOpen(true)
   }
 
+  const displayName = ownerProfile?.storeName || store?.name
+  const displayAddress = ownerProfile?.storeAddress || store?.address
+  const displayPhone = ownerProfile?.storePhone || store?.phoneNumber
+
   return (
     <>
       <OwnerHeader
         title="매장 정보"
-        subtitle={mockMode ? `${store?.name ?? ''} · 예시 데이터` : store?.name}
+        subtitle={mockMode ? `${displayName ?? ''} · 예시 데이터` : displayName}
       />
       <main className={styles.main}>
         <div className={styles.inner}>
@@ -39,18 +51,35 @@ export function StoreSettingsPage() {
             </h2>
             <dl className={styles.infoList}>
               <div className={styles.infoRow}>
+                <dt>매장 PK</dt>
+                <dd>{storeId}</dd>
+              </div>
+              <div className={styles.infoRow}>
                 <dt>매장명</dt>
-                <dd>{store?.name ?? '—'}</dd>
+                <dd>{displayName ?? '—'}</dd>
+              </div>
+              <div className={styles.infoRow}>
+                <dt>사업자번호</dt>
+                <dd>{ownerProfile?.businessNumber ? formatBizNumber(ownerProfile.businessNumber) : '—'}</dd>
               </div>
               <div className={styles.infoRow}>
                 <dt>주소</dt>
-                <dd>{store?.address ?? '—'}</dd>
+                <dd>{displayAddress ?? '—'}</dd>
               </div>
               <div className={styles.infoRow}>
-                <dt>연락처</dt>
-                <dd>{store?.phoneNumber ?? '—'}</dd>
+                <dt>가게 전화</dt>
+                <dd>{displayPhone ?? '—'}</dd>
               </div>
+              {ownerProfile?.email ? (
+                <div className={styles.infoRow}>
+                  <dt>사장님 계정</dt>
+                  <dd>{ownerProfile.email}</dd>
+                </div>
+              ) : null}
             </dl>
+            <p className={styles.hint}>
+              사장님 계정과 매장은 1:1입니다. 사업자·주소·전화는 가입 시 이 브라우저에 저장된 값입니다.
+            </p>
           </section>
 
           <section className={styles.card}>

@@ -5,15 +5,33 @@ import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal
 import { Icon } from '../../components/Icon'
 import { ApiError } from '../../api/authClient'
 import { signup, verifyConfirm, verifySend, type VerificationType } from '../../api/auth'
+import { formatBusinessNumber, verifyBusinessNumber } from '../../api/business'
+import { openDaumPostcode } from '../../lib/daumPostcode'
+import { useOwnerMockData } from '../../lib/ownerConfig'
+import { saveMockOwnerCredential, saveOwnerStoreProfile } from '../../lib/ownerSession'
 import styles from './AuthPage.module.css'
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '')
+}
 
 export function SignUpPage() {
   const navigate = useNavigate()
+  const mockMode = useOwnerMockData()
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [nickname, setNickname] = useState('')
+  const [businessNumber, setBusinessNumber] = useState('')
+  const [bizVerified, setBizVerified] = useState(false)
+  const [bizStatusLabel, setBizStatusLabel] = useState<string | null>(null)
+  const [bizChecking, setBizChecking] = useState(false)
+  const [storeName, setStoreName] = useState('')
+  const [zonecode, setZonecode] = useState('')
+  const [storeAddress, setStoreAddress] = useState('')
+  const [storeAddressDetail, setStoreAddressDetail] = useState('')
+  const [storePhone, setStorePhone] = useState('')
   const [verifyCode, setVerifyCode] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -108,12 +126,48 @@ export function SignUpPage() {
     }
   }
 
+  const handleBizVerify = async () => {
+    setError(null)
+    setInfo(null)
+    setBizChecking(true)
+    try {
+      const result = await verifyBusinessNumber(businessNumber)
+      setBizVerified(result.ok)
+      setBizStatusLabel(result.ok ? result.message : null)
+      if (result.ok) {
+        setBusinessNumber(formatBusinessNumber(result.businessNumber))
+        setInfo(result.message)
+      } else {
+        setError(result.message)
+      }
+    } catch (err) {
+      setBizVerified(false)
+      setBizStatusLabel(null)
+      setError(err instanceof Error ? err.message : '사업자번호 확인에 실패했습니다.')
+    } finally {
+      setBizChecking(false)
+    }
+  }
+
+  const handleAddressSearch = async () => {
+    setError(null)
+    try {
+      const result = await openDaumPostcode()
+      setZonecode(result.zonecode)
+      setStoreAddress(result.address)
+      setStoreAddressDetail('')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '주소 검색에 실패했습니다.'
+      if (!msg.includes('취소')) setError(msg)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setInfo(null)
 
-    if (!verified) {
+    if (!mockMode && !verified) {
       setError(verifyChannel === 'EMAIL' ? '이메일 인증을 완료해 주세요.' : '휴대폰(SMS) 인증을 완료해 주세요.')
       return
     }
@@ -121,15 +175,48 @@ export function SignUpPage() {
       setError('비밀번호가 일치하지 않습니다.')
       return
     }
+    const bizDigits = digitsOnly(businessNumber)
+    if (bizDigits.length < 10) {
+      setError('사업자번호를 확인해 주세요. (숫자 10자리)')
+      return
+    }
+    if (!bizVerified) {
+      setError('사업자번호 확인을 완료해 주세요.')
+      return
+    }
+    if (!storeAddress.trim()) {
+      setError('업장 주소를 검색해 선택해 주세요.')
+      return
+    }
+    if (!storePhone.trim()) {
+      setError('가게 전화번호를 입력해 주세요.')
+      return
+    }
+
+    const fullAddress = [zonecode ? `(${zonecode})` : '', storeAddress.trim(), storeAddressDetail.trim()]
+      .filter(Boolean)
+      .join(' ')
 
     setLoading(true)
     try {
-      await signup({
+      if (!mockMode) {
+        await signup({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          phone: phone.trim(),
+          nickname: (nickname.trim() || name.trim()).trim(),
+        })
+      } else {
+        saveMockOwnerCredential(email.trim(), password)
+      }
+
+      saveOwnerStoreProfile({
         email: email.trim(),
-        password,
-        name: name.trim(),
-        phone: phone.trim(),
-        nickname: (nickname.trim() || name.trim()).trim(),
+        businessNumber: bizDigits,
+        storeAddress: fullAddress,
+        storePhone: storePhone.trim(),
+        storeName: storeName.trim() || name.trim(),
       })
 
       navigate('/auth/login', { replace: true })
@@ -167,27 +254,33 @@ export function SignUpPage() {
         </div>
 
         <h1 className={styles.title}>계정을 만들어 주세요</h1>
-        <p className={styles.subtitle}>인증을 완료한 뒤 가입할 수 있습니다.</p>
+        <p className={styles.subtitle}>
+          {mockMode
+            ? '예시 모드: 매장 정보와 계정을 이 브라우저에 저장합니다.'
+            : '인증을 완료한 뒤 가입할 수 있습니다. 매장 정보는 사장님 앱에 로컬 저장됩니다.'}
+        </p>
 
         {info ? <div className={styles.mutedBox}>{info}</div> : null}
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.channelRow}>
-            <button
-              type="button"
-              className={[styles.channelBtn, verifyChannel === 'SMS' ? styles.channelBtnActive : ''].join(' ')}
-              onClick={() => onChangeChannel('SMS')}
-            >
-              SMS 인증
-            </button>
-            <button
-              type="button"
-              className={[styles.channelBtn, verifyChannel === 'EMAIL' ? styles.channelBtnActive : ''].join(' ')}
-              onClick={() => onChangeChannel('EMAIL')}
-            >
-              이메일 인증
-            </button>
-          </div>
+          {!mockMode ? (
+            <div className={styles.channelRow}>
+              <button
+                type="button"
+                className={[styles.channelBtn, verifyChannel === 'SMS' ? styles.channelBtnActive : ''].join(' ')}
+                onClick={() => onChangeChannel('SMS')}
+              >
+                SMS 인증
+              </button>
+              <button
+                type="button"
+                className={[styles.channelBtn, verifyChannel === 'EMAIL' ? styles.channelBtnActive : ''].join(' ')}
+                onClick={() => onChangeChannel('EMAIL')}
+              >
+                이메일 인증
+              </button>
+            </div>
+          ) : null}
 
           <div className={styles.twoCol}>
             <div className={styles.row}>
@@ -249,6 +342,103 @@ export function SignUpPage() {
           </div>
 
           <div className={styles.mutedBox}>
+            <p style={{ margin: 0, fontWeight: 800, color: 'var(--owner-on-surface)' }}>매장 정보</p>
+            <p style={{ margin: '0.4rem 0 0' }}>사장님 계정과 매장은 1:1로 연결됩니다.</p>
+          </div>
+
+          <div className={styles.row}>
+            <label className="owner-input-label" htmlFor="storeName">
+              가게명
+            </label>
+            <input
+              id="storeName"
+              className="owner-input-field"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              placeholder="가게 이름 (선택)"
+            />
+          </div>
+
+          <div className={styles.row}>
+            <label className="owner-input-label" htmlFor="businessNumber">
+              사업자번호
+            </label>
+            <div className={styles.fieldWithBtn}>
+              <input
+                id="businessNumber"
+                className="owner-input-field"
+                value={businessNumber}
+                onChange={(e) => {
+                  setBusinessNumber(e.target.value)
+                  setBizVerified(false)
+                  setBizStatusLabel(null)
+                }}
+                placeholder="000-00-00000"
+                inputMode="numeric"
+                required
+              />
+              <button
+                type="button"
+                className={styles.sideBtn}
+                disabled={bizChecking || loading}
+                onClick={() => void handleBizVerify()}
+              >
+                {bizChecking ? '확인 중…' : bizVerified ? '확인됨' : '번호 확인'}
+              </button>
+            </div>
+            {bizVerified && bizStatusLabel ? <p className={styles.okNote}>{bizStatusLabel}</p> : null}
+          </div>
+
+          <div className={styles.row}>
+            <label className="owner-input-label" htmlFor="storeAddress">
+              업장 주소
+            </label>
+            <div className={styles.fieldWithBtn}>
+              <input
+                id="storeAddress"
+                className="owner-input-field"
+                value={storeAddress ? (zonecode ? `[${zonecode}] ${storeAddress}` : storeAddress) : ''}
+                readOnly
+                placeholder="주소 검색으로 선택해 주세요"
+                required
+              />
+              <button type="button" className={styles.sideBtn} disabled={loading} onClick={() => void handleAddressSearch()}>
+                주소 검색
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.row}>
+            <label className="owner-input-label" htmlFor="storeAddressDetail">
+              상세 주소
+            </label>
+            <input
+              id="storeAddressDetail"
+              className="owner-input-field"
+              value={storeAddressDetail}
+              onChange={(e) => setStoreAddressDetail(e.target.value)}
+              placeholder="동·호수 등 (선택)"
+              disabled={!storeAddress}
+            />
+          </div>
+
+          <div className={styles.row}>
+            <label className="owner-input-label" htmlFor="storePhone">
+              가게 전화번호
+            </label>
+            <input
+              id="storePhone"
+              type="tel"
+              className="owner-input-field"
+              value={storePhone}
+              onChange={(e) => setStorePhone(e.target.value)}
+              placeholder="매장 대표 번호"
+              required
+            />
+          </div>
+
+          {!mockMode ? (
+          <div className={styles.mutedBox}>
             <p style={{ margin: 0, fontWeight: 800, color: 'var(--owner-on-surface)' }}>
               {verifyChannel === 'EMAIL' ? '이메일 인증' : '휴대폰(SMS) 인증'}
             </p>
@@ -276,7 +466,7 @@ export function SignUpPage() {
                   placeholder="6자리"
                   maxLength={6}
                   inputMode="numeric"
-                  required
+                  required={!mockMode}
                 />
                 <button type="button" className="owner-btn-primary" disabled={loading} onClick={handleVerifyCode}>
                   확인
@@ -286,6 +476,7 @@ export function SignUpPage() {
 
             {verified ? <p className={styles.smallNote}>인증 완료</p> : null}
           </div>
+          ) : null}
 
           <div className={styles.twoCol}>
             <div className={styles.row}>

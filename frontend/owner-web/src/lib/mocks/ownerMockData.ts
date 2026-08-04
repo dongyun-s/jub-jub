@@ -26,8 +26,12 @@ export type MockOwnerOrder = {
   paymentMethod: string
   /** 기본 조리시간 대비 가감(분). 픽업 예상 = 매장 기본 + 이 값 */
   pickupAdjustMinutes?: number
-  /** 조리 시작 시각(ms). 이후 픽업 시간 변경 불가 */
+  /** 조리 시작(수락) 시각(ms). 이후 픽업 시간 변경 불가 */
   acceptedAtMs?: number
+  /** 조리 완료 → 픽업 대기 전환 시각 */
+  readyAtMs?: number
+  /** 픽업 완료 시각 */
+  completedAtMs?: number
 }
 
 export function getMockStoreDetail(storeId: number): StoreDetailDto {
@@ -246,10 +250,35 @@ export function getMockStoreReviews(storeId: number): ReviewDto[] {
   ]
 }
 
-export const MOCK_DASHBOARD = {
+export type MockBestMenu = {
+  rank: string
+  name: string
+  orders: number
+  price: number
+}
+
+export type MockDashboardData = {
+  todaySales: number
+  salesTrendPct: number
+  orderCount: number
+  orderTrendPct: number
+  /** 주간 매출 (월~일), 원 단위 */
+  weeklyThisWeek: number[]
+  weeklyLastWeek: number[]
+  bestMenus: MockBestMenu[]
+}
+
+export const MOCK_DASHBOARD: MockDashboardData = {
   todaySales: 2450000,
   salesTrendPct: 12.5,
   orderCount: 142,
   orderTrendPct: 8.2,
-  pickupInProgress: 18,
+  weeklyThisWeek: [1_820_000, 2_050_000, 1_640_000, 2_280_000, 2_610_000, 3_120_000, 2_450_000],
+  weeklyLastWeek: [1_650_000, 1_880_000, 1_720_000, 2_010_000, 2_240_000, 2_780_000, 2_180_000],
+  bestMenus: [
+    { rank: '01', name: '시그니처 불고기 비빔밥', orders: 428, price: 14000 },
+    { rank: '02', name: '숙성 묵은지 김치찌개', orders: 312, price: 12000 },
+    { rank: '03', name: '갈릭 허니 가라아게', orders: 285, price: 9500 },
+  ],
 }
+
