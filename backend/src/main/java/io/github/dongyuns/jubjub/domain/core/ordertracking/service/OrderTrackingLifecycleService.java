@@ -7,9 +7,7 @@ import io.github.dongyuns.jubjub.domain.core.member.repository.MemberProfileRepo
 import io.github.dongyuns.jubjub.domain.core.order.entity.Order;
 import io.github.dongyuns.jubjub.domain.core.order.entity.OrderStatus;
 import jakarta.persistence.EntityManager;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -41,7 +39,6 @@ public class OrderTrackingLifecycleService {
     @Scheduled(fixedDelayString = "${order-tracking.sync-delay-ms:60000}")
     public void synchronizePaidOrders() {
         List<Order> paidOrders = findPaidOrders();
-        LocalDateTime now = LocalDateTime.now();
 
         for (Order order : paidOrders) {
             OrderTracking tracking = ensureTracking(order);
@@ -49,9 +46,13 @@ public class OrderTrackingLifecycleService {
                 continue;
             }
 
-            tracking.sync(now);
             sendNotificationIfNeeded(order, tracking);
         }
+    }
+
+    @Transactional
+    public void notifyStatusChange(Order order, OrderTracking tracking) {
+        sendNotificationIfNeeded(order, tracking);
     }
 
     private void sendNotificationIfNeeded(Order order, OrderTracking tracking) {
@@ -74,9 +75,10 @@ public class OrderTrackingLifecycleService {
     private String buildMessage(Order order, OrderTracking tracking) {
         String statusMessage = switch (tracking.getStatus()) {
             case RECEIVED -> "주문이 접수되었습니다.";
-            case COOKING -> "주문이 조리중입니다.";
+            case COOKING -> "매장에서 주문을 수락하고 조리를 시작했습니다.";
             case READY_FOR_PICKUP -> "픽업 준비가 완료되었습니다.";
             case PICKED_UP -> "주문이 픽업 완료되었습니다.";
+            case REJECTED -> "매장에서 주문을 거절했습니다.";
         };
 
         StringBuilder builder = new StringBuilder("[줍줍] ")

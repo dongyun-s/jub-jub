@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.common.response.ApiResponse;
 import io.github.dongyuns.jubjub.domain.owner.auth.dto.OwnerRegisterRequest;
 import io.github.dongyuns.jubjub.domain.owner.auth.dto.OwnerSignupRequest;
 import io.github.dongyuns.jubjub.domain.owner.auth.service.OwnerAuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +29,7 @@ public class OwnerAuthController {
      */
     @PostMapping("/signup")
     public ApiResponse<String> signup(
-            @RequestBody OwnerSignupRequest request
+            @Valid @RequestBody OwnerSignupRequest request
     ) {
 
         ownerAuthService.signup(request);
@@ -43,7 +44,7 @@ public class OwnerAuthController {
     @PostMapping("/register")
     public ApiResponse<String> register(
             Authentication authentication,
-            @RequestBody OwnerRegisterRequest request
+            @Valid @RequestBody OwnerRegisterRequest request
     ) {
 
         ownerAuthService.register(

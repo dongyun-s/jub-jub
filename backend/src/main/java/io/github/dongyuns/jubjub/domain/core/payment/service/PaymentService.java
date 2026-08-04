@@ -135,23 +135,39 @@ public class PaymentService {
             return RefundResponse.from(existingRefund);
         }
 
+        return refundPaidPayment(payment, request.amount(), request.reason());
+    }
+
+    @Transactional
+    public RefundResponse refundPaidOrder(Long orderId, String reason) {
+        Payment payment = paymentRepository.findByOrderIdAndStatusForUpdate(orderId, PaymentStatus.PAID)
+                .orElseThrow(() -> new BusinessException(
+                        "PAYMENT_NOT_REFUNDABLE",
+                        "환불 가능한 결제 완료 내역을 찾을 수 없습니다.",
+                        HttpStatus.CONFLICT
+                ));
+
+        return refundPaidPayment(payment, payment.getPaidAmount(), reason);
+    }
+
+    private RefundResponse refundPaidPayment(Payment payment, Integer amount, String reason) {
         if (payment.getStatus() != PaymentStatus.PAID) {
             throw new BusinessException("PAYMENT_NOT_REFUNDABLE", "PAID 상태 결제만 환불할 수 있습니다.", HttpStatus.CONFLICT);
         }
 
-        validateRefundAmount(payment.getPaidAmount(), request.amount());
+        validateRefundAmount(payment.getPaidAmount(), amount);
 
         // 실제 환불은 PortOne에 먼저 요청하고, 성공 응답을 받은 뒤 내부 상태를 맞춘다.
         PortOneRefundResult refundResult = portOneClient.refund(
                 payment.getMerchantUid(),
-                new PortOneRefundCommand(request.amount(), request.reason())
+                new PortOneRefundCommand(amount, reason)
         );
 
         PaymentCancellation refund = PaymentCancellation.refunded(
                 payment,
                 refundResult.cancellationId(),
                 refundResult.refundAmount(),
-                request.reason(),
+                reason,
                 refundResult.rawDataJson(),
                 LocalDateTime.now(),
                 refundResult.refundedAt()
