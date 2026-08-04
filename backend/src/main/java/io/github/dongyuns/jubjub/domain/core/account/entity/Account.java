@@ -17,14 +17,24 @@ public class Account {
     @Column(nullable = false)
     private String password;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'USER'")
+    private AccountRole role = AccountRole.USER;
+
     @Builder
-    public Account(String email, String password) {
+    public Account(String email, String password, AccountRole role) {
         this.email = email;
         this.password = password;
+        this.role = role == null ? AccountRole.USER : role;
     }
     // 비밀번호 변경(재설정)을 위한 메서드
     public void updatePassword(String newPassword) {
         this.password = newPassword;
+    }
+
+    // 역할 변경 메서드 (USER → OWNER)
+    public void updateRole(AccountRole newRole) {
+        this.role = newRole;
     }
 
     // 탈퇴 여부 플래그
