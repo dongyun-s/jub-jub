@@ -10,6 +10,8 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
 
     List<Media> findByOwnerTypeAndOwnerId(String ownerType, Long ownerId);
 
+    List<Media> findByOwnerTypeAndOwnerIdIn(String ownerType, List<Long> ownerIds);
+
     Optional<Media> findFirstByOwnerTypeAndOwnerId(String ownerType, Long ownerId);
 
     void deleteByOwnerTypeAndOwnerId(String ownerType, Long ownerId);
