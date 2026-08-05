@@ -22,4 +22,5 @@ public class ReviewResponse {
     private Boolean aiGeneratedHelped;
     private LocalDateTime createdAt;
     private List<String> imagePaths;
+    private OwnerReplyResponse ownerReply;
 }

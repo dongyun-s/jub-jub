@@ -41,6 +41,7 @@ interface ReviewUi {
   content: string
   photos: string[]
   keywords: string[]
+  ownerReply: ReviewDto['ownerReply']
 }
 
 function formatReviewDate(iso?: string): string {
@@ -80,6 +81,7 @@ function mapDtoToUi(d: ReviewDto, storeName: string): ReviewUi {
     content: d.content,
     photos: urls,
     keywords: kw,
+    ownerReply: d.ownerReply,
   }
 }
 
@@ -255,6 +257,15 @@ function MyReviewsPage({
                         {review.photos.map((photo, idx) => (
                           <img key={idx} src={photo} alt={`리뷰 사진 ${idx + 1}`} className={styles.cardPhoto} />
                         ))}
+                      </div>
+                    )}
+                    {review.ownerReply && (
+                      <div className={styles.ownerReply}>
+                        <div className={styles.ownerReplyHeader}>
+                          <span className={`material-symbols-outlined ${styles.ownerReplyIcon}`}>subdirectory_arrow_right</span>
+                          <strong>사장님 답글</strong>
+                        </div>
+                        <p className={styles.ownerReplyContent}>{review.ownerReply.content}</p>
                       </div>
                     )}
                     {review.keywords.length > 0 && (

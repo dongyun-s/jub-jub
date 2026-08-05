@@ -4,9 +4,12 @@ import io.github.dongyuns.jubjub.domain.customer.review.dto.AiReviewGenerateRequ
 import io.github.dongyuns.jubjub.domain.customer.review.dto.AiReviewGenerateResponse;
 import io.github.dongyuns.jubjub.domain.customer.review.dto.ReviewCreateRequest;
 import io.github.dongyuns.jubjub.domain.customer.review.dto.ReviewDeleteRequest;
+import io.github.dongyuns.jubjub.domain.customer.review.dto.OwnerReplyResponse;
 import io.github.dongyuns.jubjub.domain.customer.review.dto.ReviewResponse;
 import io.github.dongyuns.jubjub.domain.customer.review.dto.ReviewUpdateRequest;
 import io.github.dongyuns.jubjub.domain.core.review.entity.Review;
+import io.github.dongyuns.jubjub.domain.core.review.entity.ReviewReply;
+import io.github.dongyuns.jubjub.domain.core.review.repository.ReviewReplyRepository;
 import io.github.dongyuns.jubjub.domain.core.review.repository.ReviewRepository;
 import io.github.dongyuns.jubjub.domain.core.notification.service.ReviewNotificationService;
 import io.github.dongyuns.jubjub.domain.core.media.entity.Media;
@@ -24,6 +27,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -33,6 +38,7 @@ public class ReviewService {
     private static final int MAX_REVIEW_IMAGE_COUNT = 5;
 
     private final ReviewRepository reviewRepository;
+    private final ReviewReplyRepository reviewReplyRepository;
     private final MediaRepository mediaRepository;
     private final OrderRepository orderRepository;
     private final ReviewNotificationService reviewNotificationService;
@@ -90,23 +96,17 @@ public class ReviewService {
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getStoreReviews(Long storeId) {
-        return reviewRepository.findByStoreId(storeId).stream()
-                .map(this::buildReviewResponse)
-                .toList();
+        return buildReviewResponses(reviewRepository.findByStoreId(storeId));
     }
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getStoreReviewsByTasteRating(Long storeId, Integer tasteRating) {
-        return reviewRepository.findByStoreIdAndTasteRating(storeId, tasteRating).stream()
-                .map(this::buildReviewResponse)
-                .toList();
+        return buildReviewResponses(reviewRepository.findByStoreIdAndTasteRating(storeId, tasteRating));
     }
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getMyReviews(Long memberProfileId) {
-        return reviewRepository.findByMemberProfileId(memberProfileId).stream()
-                .map(this::buildReviewResponse)
-                .toList();
+        return buildReviewResponses(reviewRepository.findByMemberProfileId(memberProfileId));
     }
 
     @Transactional
@@ -143,6 +143,7 @@ public class ReviewService {
 
         validateReviewOwner(request.getMemberProfileId(), review.getMemberProfileId());
 
+        reviewReplyRepository.deleteByReviewReviewId(reviewId);
         mediaRepository.deleteByOwnerTypeAndOwnerId("REVIEW", review.getReviewId());
         reviewRepository.delete(review);
     }
@@ -313,6 +314,46 @@ public class ReviewService {
                 .map(Media::getImagePath)
                 .toList();
 
+        ReviewReply ownerReply = reviewReplyRepository.findByReviewReviewId(review.getReviewId()).orElse(null);
+        return buildReviewResponse(review, imagePaths, ownerReply);
+    }
+
+    private List<ReviewResponse> buildReviewResponses(List<Review> reviews) {
+        if (reviews.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> reviewIds = reviews.stream().map(Review::getReviewId).toList();
+        Map<Long, List<String>> imagePathsByReviewId = mediaRepository
+                .findByOwnerTypeAndOwnerIdIn("REVIEW", reviewIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        Media::getOwnerId,
+                        Collectors.mapping(Media::getImagePath, Collectors.toList())
+                ));
+        Map<Long, ReviewReply> repliesByReviewId = reviewReplyRepository
+                .findByReviewReviewIdIn(reviewIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        reply -> reply.getReview().getReviewId(),
+                        Function.identity()
+                ));
+
+        return reviews.stream()
+                .map(review -> buildReviewResponse(
+                        review,
+                        imagePathsByReviewId.getOrDefault(review.getReviewId(), List.of()),
+                        repliesByReviewId.get(review.getReviewId())
+                ))
+                .toList();
+    }
+
+    private ReviewResponse buildReviewResponse(
+            Review review,
+            List<String> imagePaths,
+            ReviewReply ownerReply
+    ) {
+
         return ReviewResponse.builder()
                 .reviewId(review.getReviewId())
                 .orderId(review.getOrderId())
@@ -326,7 +367,20 @@ public class ReviewService {
                 .aiGeneratedHelped(review.getAiGeneratedHelped())
                 .createdAt(review.getCreatedAt())
                 .imagePaths(imagePaths)
+                .ownerReply(toOwnerReplyResponse(ownerReply))
                 .build();
+    }
+
+    private OwnerReplyResponse toOwnerReplyResponse(ReviewReply reply) {
+        if (reply == null) {
+            return null;
+        }
+        return new OwnerReplyResponse(
+                reply.getId(),
+                reply.getContent(),
+                reply.getCreatedAt(),
+                reply.getUpdatedAt()
+        );
     }
 
     private String extractOutputText(Map<String, Object> response) {

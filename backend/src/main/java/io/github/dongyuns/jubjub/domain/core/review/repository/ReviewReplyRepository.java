@@ -11,4 +11,6 @@ public interface ReviewReplyRepository extends JpaRepository<ReviewReply, Long> 
     Optional<ReviewReply> findByReviewReviewId(Long reviewId);
 
     List<ReviewReply> findByReviewReviewIdIn(Collection<Long> reviewIds);
+
+    void deleteByReviewReviewId(Long reviewId);
 }

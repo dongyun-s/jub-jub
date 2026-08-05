@@ -692,6 +692,15 @@ function StoreDetailPage({
                             })}
                             </div>
                           )}
+                          {rev.ownerReply && (
+                            <div className={styles.reviewOwnerReply}>
+                              <div className={styles.reviewOwnerReplyHeader}>
+                                <span className="material-symbols-outlined">subdirectory_arrow_right</span>
+                                <strong>사장님 답글</strong>
+                              </div>
+                              <p className={styles.reviewOwnerReplyText}>{rev.ownerReply.content}</p>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
