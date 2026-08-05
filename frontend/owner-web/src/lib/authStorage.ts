@@ -10,6 +10,7 @@ const REFRESH = 'jubjub_refresh_token'
 /** /auth/me 에서 필요한 보조정보 캐싱(호환용) */
 const SESSION_EMAIL = 'jubjub_session_email'
 const CACHED_MEMBER_PROFILE_ID = 'jubjub_cached_member_profile_id'
+const SESSION_ROLE = 'jubjub_session_role'
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null
@@ -33,6 +34,7 @@ export function clearTokens(): void {
   window.localStorage.removeItem(REFRESH)
   window.localStorage.removeItem(SESSION_EMAIL)
   window.localStorage.removeItem(CACHED_MEMBER_PROFILE_ID)
+  window.localStorage.removeItem(SESSION_ROLE)
 }
 
 export function setSessionEmail(email: string): void {
@@ -58,5 +60,15 @@ export function getCachedMemberProfileId(): number | null {
   if (!raw) return null
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null
+}
+
+export function setSessionRole(role: string): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(SESSION_ROLE, role.trim())
+}
+
+export function getSessionRole(): string | null {
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(SESSION_ROLE)
 }
 

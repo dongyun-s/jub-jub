@@ -29,6 +29,7 @@ import {
   estimateFinalPaymentAmount,
 } from '../../lib/orderPricing'
 import { fetchStoreDetail } from '../../api/store'
+import { fetchStoreGeo, invalidateStoreListCache } from '../../lib/storeGeo'
 import styles from './CartPage.module.css'
 
 interface AppliedCoupon {
@@ -196,11 +197,41 @@ function CartPage({
 
     void (async () => {
       try {
+        // 0) 결제 전 — GPS·매장 좌표(사장님 주소→TMAP) 선검증 (결제 후 409 방지)
+        let userCoords
+        try {
+          userCoords = await resolveUserCoords(null)
+        } catch (geoErr) {
+          setIsProcessing(false)
+          if (geoErr instanceof GeolocationError) {
+            showCartAlert({
+              title: '위치(GPS) 권한 필요',
+              message: `${geoErr.message}\n\n픽업 거리 적립을 위해 결제 전에 현재 위치가 필요합니다.`,
+              variant: geoErr.reason === 'UNAVAILABLE' ? 'error' : 'info',
+            })
+            return
+          }
+          throw geoErr
+        }
+
+        invalidateStoreListCache()
+        const storeGeo = await fetchStoreGeo(cartStoreId)
+        if (!storeGeo) {
+          setIsProcessing(false)
+          showCartAlert({
+            title: '매장 위치 없음',
+            message:
+              '이 매장의 위치(좌표)가 아직 등록되지 않았습니다.\n사장님이 매장 주소를 등록·보정하면 주문이 가능합니다.',
+            variant: 'error',
+          })
+          return
+        }
+
         const PortOne = await import(
           /* @vite-ignore */ 'https://cdn.portone.io/v2/browser-sdk.esm.js'
         )
 
-        let storeLabel = pickupStoreName?.trim() || ''
+        let storeLabel = pickupStoreName?.trim() || storeGeo.name || ''
         if (!storeLabel && cartStoreId != null) {
           try {
             const detail = await fetchStoreDetail(cartStoreId)
@@ -279,9 +310,7 @@ function CartPage({
           return
         }
 
-        // 4) 결제 확정 — 사용자 위치로 픽업 거리 저장 (백엔드 필수)
-        const userCoords = await resolveUserCoords(null)
-
+        // 4) 결제 확정 — 선확보한 사용자 위치 + 매장 좌표로 픽업 거리 저장
         const confirmed = await confirmPayment({
           merchantUid: prepared.merchantUid,
           transactionId: txId,
@@ -351,6 +380,23 @@ function CartPage({
             title: '위치(GPS) 권한 필요',
             message: e.message,
             variant: e.reason === 'UNAVAILABLE' ? 'error' : 'info',
+          })
+          return
+        }
+        if (e instanceof ApiError && e.code === 'STORE_COORDINATE_MISSING') {
+          showCartAlert({
+            title: '매장 위치 없음',
+            message:
+              '사장님 매장에 좌표가 없습니다. 매장 주소가 등록·보정된 뒤 다시 결제해 주세요.',
+            variant: 'error',
+          })
+          return
+        }
+        if (e instanceof ApiError && e.code === 'ORDER_COORDINATE_MISSING') {
+          showCartAlert({
+            title: '주문 위치 없음',
+            message: '결제 확정에 현재 위치가 필요합니다. GPS를 켠 뒤 다시 시도해 주세요.',
+            variant: 'error',
           })
           return
         }

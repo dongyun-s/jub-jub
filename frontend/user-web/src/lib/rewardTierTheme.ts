@@ -196,3 +196,29 @@ export function getTierLabelEn(
   if (key === 'legend') return 'LEGEND'
   return 'TIER'
 }
+
+/**
+ * 등급별 상시 할인율 (%) — 백엔드 RewardTier.discountRate 와 동일
+ * BRONZE 0 · SILVER 1 · GOLD 3 · PLATINUM 5 · DIAMOND 7 · LEGEND 10
+ */
+export function getTierDiscountRate(
+  tier: string | null | undefined,
+  tierName: string | null | undefined,
+): number {
+  switch (resolveTierKey(tier, tierName)) {
+    case 'silver':
+      return 1
+    case 'gold':
+      return 3
+    case 'platinum':
+      return 5
+    case 'diamond':
+      return 7
+    case 'legend':
+      return 10
+    case 'bronze':
+    case 'default':
+    default:
+      return 0
+  }
+}

@@ -233,6 +233,54 @@
   color: #16a34a;
 }
 
+.categoryHint {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--owner-on-surface-variant);
+}
+
+.chipGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in srgb, var(--owner-outline-variant) 22%, transparent);
+  background: var(--owner-surface-highest);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--owner-on-surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.chip:hover {
+  border-color: color-mix(in srgb, var(--owner-primary-container) 40%, transparent);
+}
+
+.chipSelected {
+  border-color: var(--owner-primary-container);
+  background: color-mix(in srgb, var(--owner-primary-container) 12%, var(--owner-surface-highest));
+  color: var(--owner-primary-container);
+}
+
+.chipEtc.chipSelected {
+  border-color: var(--owner-on-surface-variant);
+  background: var(--owner-surface-high);
+  color: var(--owner-on-surface);
+}
+
+.chipCheck {
+  font-size: 0.95rem !important;
+}
+
 @media (max-width: 420px) {
   .twoCol {
     grid-template-columns: 1fr;

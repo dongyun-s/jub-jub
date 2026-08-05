@@ -1,0 +1,87 @@
+.lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.section {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--owner-outline-variant) 35%, transparent);
+}
+
+.sectionTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--owner-on-surface);
+}
+
+.sectionDesc {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--owner-on-surface-variant);
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--owner-on-surface-variant);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 50%, transparent);
+  border-radius: 0.5rem;
+  background: var(--owner-surface, #fff);
+  font-size: 0.9rem;
+}
+
+.error {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.dangerBtn {
+  margin-top: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: #dc2626;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dangerBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.secondaryBtn {
+  padding: 0.55rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 50%, transparent);
+  border-radius: 0.5rem;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--owner-on-surface);
+}
+
+.doneBtn {
+  margin-top: 1rem;
+  width: 100%;
+}

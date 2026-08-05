@@ -45,7 +45,7 @@ export function NewOrderAlertHost() {
   }, [incomingOrder, newOrders])
 
   const handleStartFromModal = (id: number) => {
-    handleStartCooking(id)
+    void handleStartCooking(id)
     dismiss()
     stopFlashPageTitle()
     handleActivate({ orderId: id })
@@ -61,8 +61,9 @@ export function NewOrderAlertHost() {
 
   const confirmReject = () => {
     if (rejectTargetId == null) return
-    rejectOrder(rejectTargetId)
+    const id = rejectTargetId
     setRejectTargetId(null)
+    void rejectOrder(id, '재료 소진 등으로 주문을 받을 수 없습니다.')
     dismiss()
     stopFlashPageTitle()
   }

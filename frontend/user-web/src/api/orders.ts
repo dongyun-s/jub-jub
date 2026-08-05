@@ -52,12 +52,12 @@ export function getMyOrders() {
   return apiFetch<MyOrderItem[]>('/orders/me', { method: 'GET' })
 }
 
-/** 주문내역·리뷰 대상 — 결제 완료(또는 픽업 완료)만 노출 */
+/** 주문내역·리뷰 대상 — 결제 완료·픽업 완료·거절(환불) 노출 */
 export function isPaidOrderForHistory(
   o: Pick<MyOrderItem, 'orderStatus' | 'paymentStatus' | 'paidAt'>,
 ): boolean {
-  if (o.paymentStatus === 'PAID') return true
-  if (o.orderStatus === 'PAID' || o.orderStatus === 'COMPLETED') return true
+  if (o.paymentStatus === 'PAID' || o.paymentStatus === 'REFUNDED') return true
+  if (o.orderStatus === 'PAID' || o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED') return true
   if (o.paidAt != null && String(o.paidAt).trim() !== '') return true
   return false
 }
@@ -67,7 +67,8 @@ export function isActivePickupOrder(
   o: Pick<MyOrderItem, 'orderStatus' | 'paymentStatus' | 'paidAt'>,
 ): boolean {
   if (!isPaidOrderForHistory(o)) return false
-  if (o.orderStatus === 'COMPLETED') return false
+  if (o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED') return false
+  if (o.paymentStatus === 'REFUNDED') return false
   return true
 }
 

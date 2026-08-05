@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { getOwnerStoreId } from '../lib/ownerConfig'
+import { fetchOwnerStore, updateOwnerStoreStatus } from '../api/owner/store'
+import { getOwnerStoreId, useOwnerMockData } from '../lib/ownerConfig'
 import {
   formatPauseRemaining,
   formatPauseRemainingMinutes,
@@ -23,25 +24,43 @@ type OwnerSalesContextValue = {
   pauseUntilMs: number | null
   isScheduledPause: boolean
   isIndefinitePause: boolean
-  /** 일시 중지 남은 분 (1초마다 갱신) */
   remainingMinutes: number | null
-  /** "42분 남음" */
   remainingMinutesLabel: string | null
   resumeSales: () => void
   pauseForMinutes: (minutes: number) => void
   pauseIndefinitely: () => void
-  /** false: 재개, true: 무기한 중지 */
   setSalesPaused: (paused: boolean) => void
   formatRemainingLabel: () => string | null
   formatResumeAtLabel: () => string | null
+  storeName: string | null
 }
 
 const OwnerSalesContext = createContext<OwnerSalesContextValue | null>(null)
 
 export function OwnerSalesProvider({ children }: { children: ReactNode }) {
   const storeId = getOwnerStoreId()
+  const useMock = useOwnerMockData()
   const [pauseState, setPauseState] = useState<SalesPauseState>(() => readSalesPause(storeId))
   const [now, setNow] = useState(() => Date.now())
+  const [storeName, setStoreName] = useState<string | null>(null)
+
+  const syncFromApi = useCallback(async () => {
+    if (useMock) return
+    try {
+      const store = await fetchOwnerStore()
+      setStoreName(store.name)
+      const paused = store.status === 'PAUSED' || store.status === 'CLOSED'
+      const next = { paused, untilMs: null as number | null }
+      setPauseState(next)
+      writeSalesPause(store.storeId || storeId, next)
+    } catch {
+      /* 로컬 상태 유지 */
+    }
+  }, [useMock, storeId])
+
+  useEffect(() => {
+    void syncFromApi()
+  }, [syncFromApi])
 
   const applyState = useCallback(
     (next: SalesPauseState) => {
@@ -56,21 +75,37 @@ export function OwnerSalesProvider({ children }: { children: ReactNode }) {
     [storeId],
   )
 
+  const pushStatus = useCallback(
+    async (status: 'OPEN' | 'PAUSED' | 'CLOSED') => {
+      if (useMock) return
+      try {
+        await updateOwnerStoreStatus({ status })
+        await syncFromApi()
+      } catch {
+        /* 로컬만 반영된 상태일 수 있음 */
+      }
+    },
+    [useMock, syncFromApi],
+  )
+
   const resumeSales = useCallback(() => {
     applyState({ paused: false, untilMs: null })
-  }, [applyState])
+    void pushStatus('OPEN')
+  }, [applyState, pushStatus])
 
   const pauseForMinutes = useCallback(
     (minutes: number) => {
       const mins = Math.max(5, Math.min(24 * 60, Math.round(minutes)))
       applyState({ paused: true, untilMs: Date.now() + mins * 60_000 })
+      void pushStatus('PAUSED')
     },
-    [applyState],
+    [applyState, pushStatus],
   )
 
   const pauseIndefinitely = useCallback(() => {
     applyState({ paused: true, untilMs: null })
-  }, [applyState])
+    void pushStatus('CLOSED')
+  }, [applyState, pushStatus])
 
   const setSalesPaused = useCallback(
     (paused: boolean) => {
@@ -88,11 +123,12 @@ export function OwnerSalesProvider({ children }: { children: ReactNode }) {
         if (!prev.paused || prev.untilMs == null || prev.untilMs > Date.now()) return prev
         const next = { paused: false, untilMs: null }
         writeSalesPause(storeId, next)
+        if (!useMock) void updateOwnerStoreStatus({ status: 'OPEN' })
         return next
       })
     }, 1000)
     return () => window.clearInterval(id)
-  }, [pauseState.paused, pauseState.untilMs, storeId])
+  }, [pauseState.paused, pauseState.untilMs, storeId, useMock])
 
   const salesPaused = pauseState.paused
   const pauseUntilMs = pauseState.paused ? pauseState.untilMs : null
@@ -133,6 +169,7 @@ export function OwnerSalesProvider({ children }: { children: ReactNode }) {
       setSalesPaused,
       formatRemainingLabel,
       formatResumeAtLabel,
+      storeName,
     }),
     [
       salesPaused,
@@ -147,6 +184,7 @@ export function OwnerSalesProvider({ children }: { children: ReactNode }) {
       setSalesPaused,
       formatRemainingLabel,
       formatResumeAtLabel,
+      storeName,
     ],
   )
 

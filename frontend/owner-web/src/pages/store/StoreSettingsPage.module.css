@@ -119,6 +119,39 @@
   color: var(--owner-on-surface-variant);
 }
 
+.addressEdit {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.addressBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  cursor: pointer;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--owner-primary-container) 40%, transparent);
+  background: color-mix(in srgb, var(--owner-primary-container) 10%, var(--owner-surface-highest));
+  color: var(--owner-primary-container);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.addressBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.errorHint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--owner-error, #b91c1c);
+}
+
 .logoutRow {
   margin-top: 1rem;
   display: flex;

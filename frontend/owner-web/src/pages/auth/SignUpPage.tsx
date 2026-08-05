@@ -4,11 +4,16 @@ import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { Icon } from '../../components/Icon'
 import { ApiError } from '../../api/authClient'
-import { signup, verifyConfirm, verifySend, type VerificationType } from '../../api/auth'
+import { ownerSignup, verifyConfirm, verifySend } from '../../api/auth'
 import { formatBusinessNumber, verifyBusinessNumber } from '../../api/business'
 import { openDaumPostcode } from '../../lib/daumPostcode'
 import { useOwnerMockData } from '../../lib/ownerConfig'
 import { saveMockOwnerCredential, saveOwnerStoreProfile } from '../../lib/ownerSession'
+import {
+  persistStoreCategorySelection,
+  STORE_CATEGORIES,
+  type StoreCategoryId,
+} from '../../lib/storeCategories'
 import styles from './AuthPage.module.css'
 
 function digitsOnly(value: string): string {
@@ -28,6 +33,7 @@ export function SignUpPage() {
   const [bizStatusLabel, setBizStatusLabel] = useState<string | null>(null)
   const [bizChecking, setBizChecking] = useState(false)
   const [storeName, setStoreName] = useState('')
+  const [categoryId, setCategoryId] = useState<StoreCategoryId>(1)
   const [zonecode, setZonecode] = useState('')
   const [storeAddress, setStoreAddress] = useState('')
   const [storeAddressDetail, setStoreAddressDetail] = useState('')
@@ -38,8 +44,8 @@ export function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
 
-  const [verifyChannel, setVerifyChannel] = useState<VerificationType>('SMS')
-  const targetForSend = useMemo(() => (verifyChannel === 'EMAIL' ? email.trim() : phone.trim()), [verifyChannel, email, phone])
+  /** 실 API: BE 신규 가입은 이메일 인증 logId만 인정 */
+  const targetForSend = useMemo(() => email.trim(), [email])
 
   const [logId, setLogId] = useState<number | null>(null)
   const [verified, setVerified] = useState(false)
@@ -51,21 +57,14 @@ export function SignUpPage() {
 
   const sendConfirmMessage = useMemo(() => {
     if (!targetForSend) return ''
-    return verifyChannel === 'EMAIL'
-      ? `${targetForSend}로 인증 메일을 보낼까요?\n메일함·스팸함을 확인해 주세요.`
-      : `${targetForSend}로 인증 문자를 보낼까요?`
-  }, [targetForSend, verifyChannel])
+    return `${targetForSend}로 인증 메일을 보낼까요?\n메일함·스팸함을 확인해 주세요.`
+  }, [targetForSend])
 
   const requestSendCode = () => {
     setError(null)
     setInfo(null)
-    if (verifyChannel === 'EMAIL') {
-      if (!email.trim()) {
-        setError('이메일을 입력해 주세요.')
-        return
-      }
-    } else if (!phone.trim()) {
-      setError('휴대폰 번호를 입력해 주세요.')
+    if (!email.trim()) {
+      setError('이메일을 입력해 주세요.')
       return
     }
     setSendConfirmOpen(true)
@@ -76,14 +75,10 @@ export function SignUpPage() {
     setError(null)
     setInfo(null)
     try {
-      const res = await verifySend(verifyChannel, targetForSend)
+      const res = await verifySend('EMAIL', targetForSend)
       setLogId(res.logId)
       setVerified(false)
-      setInfo(
-        verifyChannel === 'EMAIL'
-          ? `입력하신 이메일로 인증번호를 보냈습니다. 메일함·스팸함을 확인해 주세요. (만료: ${res.expiresAt})`
-          : `문자(SMS)로 인증번호를 보냈습니다. (만료: ${res.expiresAt})`,
-      )
+      setInfo(`입력하신 이메일로 인증번호를 보냈습니다. 메일함·스팸함을 확인해 주세요. (만료: ${res.expiresAt})`)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : '인증번호 발송에 실패했습니다.'
       setError(msg)
@@ -108,15 +103,9 @@ export function SignUpPage() {
       const res = await verifyConfirm(logId, verifyCode.trim())
       if (res.isVerified) {
         setVerified(true)
-        setInfo(
-          verifyChannel === 'EMAIL'
-            ? '이메일 인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.'
-            : '휴대폰 인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.',
-        )
+        setInfo('이메일 인증이 완료되었습니다. 아래 정보를 확인한 뒤 가입을 완료하세요.')
       } else {
-        setError(
-          verifyChannel === 'EMAIL' ? '이메일로 받은 인증번호가 올바르지 않습니다.' : '문자로 받은 인증번호가 올바르지 않습니다.',
-        )
+        setError('이메일로 받은 인증번호가 올바르지 않습니다.')
       }
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : '인증 확인에 실패했습니다.'
@@ -168,7 +157,7 @@ export function SignUpPage() {
     setInfo(null)
 
     if (!mockMode && !verified) {
-      setError(verifyChannel === 'EMAIL' ? '이메일 인증을 완료해 주세요.' : '휴대폰(SMS) 인증을 완료해 주세요.')
+      setError('이메일 인증을 완료해 주세요. (사장님 가입은 이메일 인증이 필요합니다)')
       return
     }
     if (password !== passwordConfirm) {
@@ -192,6 +181,16 @@ export function SignUpPage() {
       setError('가게 전화번호를 입력해 주세요.')
       return
     }
+    if (!STORE_CATEGORIES.some((c) => c.id === categoryId)) {
+      setError('상점 카테고리를 선택해 주세요.')
+      return
+    }
+
+    const resolvedStoreName = storeName.trim() || name.trim()
+    if (!resolvedStoreName) {
+      setError('가게명을 입력해 주세요.')
+      return
+    }
 
     const fullAddress = [zonecode ? `(${zonecode})` : '', storeAddress.trim(), storeAddressDetail.trim()]
       .filter(Boolean)
@@ -200,24 +199,30 @@ export function SignUpPage() {
     setLoading(true)
     try {
       if (!mockMode) {
-        await signup({
+        await ownerSignup({
           email: email.trim(),
           password,
-          name: name.trim(),
-          phone: phone.trim(),
-          nickname: (nickname.trim() || name.trim()).trim(),
+          ownerName: name.trim(),
+          ownerPhone: phone.trim(),
+          storeName: resolvedStoreName,
+          storePhone: storePhone.trim(),
+          businessRegistrationNumber: bizDigits,
+          address: fullAddress,
+          categoryId,
+          logId,
         })
       } else {
         saveMockOwnerCredential(email.trim(), password)
       }
 
-      saveOwnerStoreProfile({
+      const profile = saveOwnerStoreProfile({
         email: email.trim(),
         businessNumber: bizDigits,
         storeAddress: fullAddress,
         storePhone: storePhone.trim(),
-        storeName: storeName.trim() || name.trim(),
+        storeName: resolvedStoreName,
       })
+      persistStoreCategorySelection(profile.storeId, categoryId)
 
       navigate('/auth/login', { replace: true })
     } catch (err) {
@@ -226,15 +231,6 @@ export function SignUpPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const onChangeChannel = (next: VerificationType) => {
-    setVerifyChannel(next)
-    setLogId(null)
-    setVerified(false)
-    setVerifyCode('')
-    setError(null)
-    setInfo(null)
   }
 
   return (
@@ -257,28 +253,15 @@ export function SignUpPage() {
         <p className={styles.subtitle}>
           {mockMode
             ? '예시 모드: 매장 정보와 계정을 이 브라우저에 저장합니다.'
-            : '인증을 완료한 뒤 가입할 수 있습니다. 매장 정보는 사장님 앱에 로컬 저장됩니다.'}
+            : '이메일 인증 후 가입합니다. 계정·매장은 서버에 생성됩니다.'}
         </p>
 
         {info ? <div className={styles.mutedBox}>{info}</div> : null}
 
         <form className={styles.form} onSubmit={handleSubmit}>
           {!mockMode ? (
-            <div className={styles.channelRow}>
-              <button
-                type="button"
-                className={[styles.channelBtn, verifyChannel === 'SMS' ? styles.channelBtnActive : ''].join(' ')}
-                onClick={() => onChangeChannel('SMS')}
-              >
-                SMS 인증
-              </button>
-              <button
-                type="button"
-                className={[styles.channelBtn, verifyChannel === 'EMAIL' ? styles.channelBtnActive : ''].join(' ')}
-                onClick={() => onChangeChannel('EMAIL')}
-              >
-                이메일 인증
-              </button>
+            <div className={styles.mutedBox} style={{ marginBottom: 0 }}>
+              사장님 가입은 <strong>이메일 인증</strong>이 필요합니다.
             </div>
           ) : null}
 
@@ -355,8 +338,34 @@ export function SignUpPage() {
               className="owner-input-field"
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
-              placeholder="가게 이름 (선택)"
+              placeholder="가게 이름"
+              required={!mockMode}
             />
+          </div>
+
+          <div className={styles.row}>
+            <span className="owner-input-label" id="store-category-label">
+              상점 카테고리
+            </span>
+            <p className={styles.categoryHint}>고객 앱 필터에 사용됩니다. 위도·경도는 서버에서 주소로 변환합니다.</p>
+            <div className={styles.chipGrid} role="listbox" aria-labelledby="store-category-label">
+              {STORE_CATEGORIES.map(({ id, label }) => {
+                const selected = categoryId === id
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    className={[styles.chip, selected ? styles.chipSelected : ''].filter(Boolean).join(' ')}
+                    onClick={() => setCategoryId(id)}
+                  >
+                    {label}
+                    {selected ? <Icon name="check" className={styles.chipCheck} /> : null}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <div className={styles.row}>
@@ -439,12 +448,8 @@ export function SignUpPage() {
 
           {!mockMode ? (
           <div className={styles.mutedBox}>
-            <p style={{ margin: 0, fontWeight: 800, color: 'var(--owner-on-surface)' }}>
-              {verifyChannel === 'EMAIL' ? '이메일 인증' : '휴대폰(SMS) 인증'}
-            </p>
-            <p style={{ margin: '0.4rem 0 0' }}>
-              {verifyChannel === 'EMAIL' ? '입력한 이메일로 인증번호를 보냅니다.' : '입력한 번호로 인증번호를 보냅니다.'}
-            </p>
+            <p style={{ margin: 0, fontWeight: 800, color: 'var(--owner-on-surface)' }}>이메일 인증</p>
+            <p style={{ margin: '0.4rem 0 0' }}>입력한 이메일로 인증번호를 보냅니다.</p>
 
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="owner-btn-primary" disabled={loading} onClick={requestSendCode}>
@@ -532,7 +537,7 @@ export function SignUpPage() {
 
       <ConfirmModal
         open={sendConfirmOpen}
-        title={verifyChannel === 'EMAIL' ? '인증 메일 발송' : '인증 문자 발송'}
+        title="인증 메일 발송"
         message={sendConfirmMessage}
         cancelLabel="취소"
         confirmLabel="발송"

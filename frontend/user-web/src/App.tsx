@@ -29,6 +29,7 @@ import {
   NotificationsPage,
   RankingPage,
 } from './pages'
+import { SimpleAlertModal } from './components'
 import { clearTokens, getAccessToken } from './lib/authStorage'
 import { pruneUnpaidLocalOrders } from './lib/orderResolve'
 import { useActivePickup } from './hooks/useActivePickup'
@@ -72,12 +73,33 @@ function App() {
     activeOrder,
     destination: pickupDestination,
     hasActivePickup,
+    hasWaitingAccept,
+    rejectNotice,
+    dismissRejectNotice,
     loading: pickupContextLoading,
     refresh: refreshActivePickup,
   } = useActivePickup(focusOrderId)
 
-  /** 실제 결제 완료·픽업 전 주문만 (개발 URL ?activeOrder=1 로 배너 강제 표시하지 않음) */
+  /** 사장님 수락 이후만 주문현황·픽업 경로 배너 */
   const hasActiveOrder = hasActivePickup
+
+  const handleRejectNoticeClose = useCallback(() => {
+    dismissRejectNotice()
+    setFocusOrderId(null)
+    void refreshActivePickup()
+    setCurrentPage('orders')
+  }, [dismissRejectNotice, refreshActivePickup])
+
+  /** 수락 전에는 주문현황에 머물지 않음 (거절 모달 표시 중에는 유지) */
+  useEffect(() => {
+    if (currentPage !== 'orderStatus') return
+    if (pickupContextLoading) return
+    if (rejectNotice) return
+    if (hasWaitingAccept) {
+      setFocusOrderId(null)
+      setCurrentPage('orders')
+    }
+  }, [currentPage, hasWaitingAccept, pickupContextLoading, rejectNotice])
 
   /** 리뷰 작성/수정 진입 — 뒤로가기 시 직전 화면으로 복귀 */
   const openReviewWrite = useCallback(
@@ -93,7 +115,10 @@ function App() {
     const fallback: Page = reviewWriteTarget?.reviewId ? 'myReviews' : 'orders'
     let returnTo = lastPage ?? fallback
     if (returnTo === 'reviewWrite') returnTo = fallback
+    // 픽업 현황에서 작성한 경우 완료된 주문현황에 남지 않도록 주문내역/내리뷰로
+    if (returnTo === 'orderStatus') returnTo = reviewWriteTarget?.reviewId ? 'myReviews' : 'orders'
     setReviewWriteTarget(null)
+    setFocusOrderId(null)
     setCurrentPage(returnTo)
   }, [lastPage, reviewWriteTarget?.reviewId])
 
@@ -295,7 +320,8 @@ function App() {
               setCartItems([])
               setCartStoreId(null)
               setCartStoreName(null)
-              setCurrentPage('orderStatus')
+              // 수락 전에는 주문내역(대기) · 수락 후 현황/경로 노출
+              setCurrentPage('orders')
             }}
             onCouponClick={() => {
               setCouponHighlightExpiring(false)
@@ -362,6 +388,7 @@ function App() {
             onNotificationsClick={goTo('notifications')}
             onReviewWriteClick={openReviewWrite}
             hasActiveOrder={hasActiveOrder}
+            hasWaitingAccept={hasWaitingAccept}
             activeOrder={activeOrder}
             pickupDestination={pickupDestination}
             cartCount={cartCount}
@@ -382,7 +409,10 @@ function App() {
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
             onReviewWriteClick={openReviewWrite}
-            onPickupComplete={() => void refreshActivePickup()}
+            onPickupComplete={() => {
+              setFocusOrderId(null)
+              void refreshActivePickup()
+            }}
             activeOrder={activeOrder}
             pickupDestination={pickupDestination}
             pickupContextLoading={pickupContextLoading}
@@ -513,7 +543,22 @@ function App() {
     }
   }
 
-  return renderPage()
+  return (
+    <>
+      {renderPage()}
+      <SimpleAlertModal
+        open={rejectNotice != null}
+        title="주문이 거절되었어요"
+        message={
+          rejectNotice?.reason ??
+          '매장 사정으로 주문을 받을 수 없습니다. 결제는 환불 처리됩니다.'
+        }
+        confirmLabel="주문내역 보기"
+        variant="error"
+        onClose={handleRejectNoticeClose}
+      />
+    </>
+  )
 }
 
 export default App

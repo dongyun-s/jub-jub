@@ -168,6 +168,18 @@
   white-space: nowrap;
 }
 
+.rejectedPill {
+  align-self: flex-start;
+  margin-top: 0.2rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #b91c1c;
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+}
+
 .rowSide {
   display: flex;
   flex-direction: column;

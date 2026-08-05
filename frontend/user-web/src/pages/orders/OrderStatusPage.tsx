@@ -2,31 +2,21 @@
  * OrderStatusPage.tsx
  * 주문 현황 페이지 (결제 후 또는 주문내역/홈 배너에서 진입)
  * - 픽업 매장 지도, 주문접수→조리중→픽업준비→픽업완료 단계 표시
- * - 픽업 완료 시 POST /api/v1/orders/{orderId}/complete → 리워드(orderCount) 반영
+ * - 픽업 완료는 사장님 POS에서 처리 · 고객은 상태만 확인
  */
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import Layout from '../../components/Layout'
 import BottomNav from '../../components/BottomNav'
-import PickupRewardModal from '../../components/PickupRewardModal/PickupRewardModal'
 import type { ReviewWritePayload } from '../../api/reviews'
 import type { PickupDestination } from '../../hooks/useActivePickup'
 import type { OrderContextRow } from '../../lib/orderResolve'
-import { completeOrderPickup } from '../../api/orders'
 import {
   fetchOrderTracking,
   mapTrackingToOrderStep,
   type OrderStep,
 } from '../../api/orderTracking'
-import { ApiError } from '../../api/authClient'
-import { getActivePaidOrderFromLocal } from '../../lib/orderResolve'
 import { getAccessToken } from '../../lib/authStorage'
-import { fetchRewardMe, notifyRewardsUpdated } from '../../api/rewards'
-import {
-  buildPickupRewardBreakdown,
-  pollRewardAfterPickup,
-  type PickupRewardBreakdown,
-} from '../../lib/pickupReward'
 import { useDistanceToCoords } from '../../hooks/useDistanceToCoords'
 import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
 import { MapTmapCanvas } from '../map/MapPage'
@@ -84,6 +74,22 @@ function markLocalOrderPickupCompleted(orderId: number) {
         : o,
     )
     window.localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(next))
+    window.dispatchEvent(new Event('jubjub:orders-updated'))
+  } catch {
+    /* ignore */
+  }
+}
+
+function markLocalOrderRejected(orderId: number) {
+  try {
+    const prev = readLocalOrders()
+    const next = prev.map((o) =>
+      o.orderId === orderId
+        ? { ...o, pickupCompleted: true, orderStatus: 'REFUNDED' }
+        : o,
+    )
+    window.localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(next))
+    window.dispatchEvent(new Event('jubjub:orders-updated'))
   } catch {
     /* ignore */
   }
@@ -126,22 +132,48 @@ function OrderStatusPage({
   const [orderStep, setOrderStep] = useState<OrderStep>('received')
   const [estimatedPickupTime, setEstimatedPickupTime] = useState<string | null>(null)
   const [trackingLoading, setTrackingLoading] = useState(false)
-  const [rewardModalOpen, setRewardModalOpen] = useState(false)
-  const [rewardModalLoading, setRewardModalLoading] = useState(false)
-  const [pickupRewards, setPickupRewards] = useState<PickupRewardBreakdown | null>(null)
-  const [pickupSubmitting, setPickupSubmitting] = useState(false)
-  const [pickupError, setPickupError] = useState<string | null>(null)
+  const [trackingStoreLat, setTrackingStoreLat] = useState<number | null>(null)
+  const [trackingStoreLng, setTrackingStoreLng] = useState<number | null>(null)
+  const [trackingStoreAddress, setTrackingStoreAddress] = useState<string | null>(null)
+  const completedNotifiedRef = useRef<number | null>(null)
 
   useEffect(() => {
+    if (activeOrder?.orderStatus === 'REFUNDED') {
+      setOrderStep('rejected')
+      return
+    }
     if (activeOrder?.pickupCompleted || activeOrder?.orderStatus === 'COMPLETED') {
       setOrderStep('completed')
     }
   }, [activeOrder])
 
   useEffect(() => {
+    if (!activeOrder?.orderId) return
+    if (orderStep === 'completed') {
+      if (completedNotifiedRef.current === activeOrder.orderId) return
+      completedNotifiedRef.current = activeOrder.orderId
+      markLocalOrderPickupCompleted(activeOrder.orderId)
+      onPickupComplete?.()
+      return
+    }
+    if (orderStep === 'rejected') {
+      if (completedNotifiedRef.current === activeOrder.orderId) return
+      completedNotifiedRef.current = activeOrder.orderId
+      markLocalOrderRejected(activeOrder.orderId)
+      onPickupComplete?.()
+    }
+  }, [orderStep, activeOrder?.orderId, onPickupComplete])
+
+  useEffect(() => {
     const orderId = activeOrder?.orderId
     if (!orderId || !getAccessToken()) return
-    if (activeOrder?.pickupCompleted || activeOrder?.orderStatus === 'COMPLETED') return
+    if (
+      activeOrder?.pickupCompleted ||
+      activeOrder?.orderStatus === 'COMPLETED' ||
+      activeOrder?.orderStatus === 'REFUNDED'
+    ) {
+      return
+    }
 
     let cancelled = false
     let trackingDone = false
@@ -153,12 +185,21 @@ function OrderStatusPage({
         const data = await fetchOrderTracking(orderId)
         if (cancelled) return
         setEstimatedPickupTime(data.estimatedPickupTime)
+        if (data.storeLatitude != null && data.storeLongitude != null) {
+          setTrackingStoreLat(data.storeLatitude)
+          setTrackingStoreLng(data.storeLongitude)
+        }
+        if (data.storeAddress?.trim()) setTrackingStoreAddress(data.storeAddress.trim())
         const step = mapTrackingToOrderStep(data.trackingStatus, data.paymentOrderStatus)
         setOrderStep(step)
-        if (step === 'completed') trackingDone = true
+        if (step === 'completed' || step === 'rejected') trackingDone = true
       } catch {
         if (!cancelled && activeOrder?.orderStatus === 'COMPLETED') {
           setOrderStep('completed')
+          trackingDone = true
+        }
+        if (!cancelled && activeOrder?.orderStatus === 'REFUNDED') {
+          setOrderStep('rejected')
           trackingDone = true
         }
       } finally {
@@ -183,11 +224,14 @@ function OrderStatusPage({
       menuName: activeOrder.menuSummary?.trim() || '주문',
       storeId: activeOrder.storeId,
       storeName: activeOrder.storeName,
-      storeAddress: pickupDestination?.address?.trim() || '주소 정보 없음',
+      storeAddress:
+        trackingStoreAddress?.trim() ||
+        pickupDestination?.address?.trim() ||
+        '주소 정보 없음',
       distance: '',
       estimatedTime: '',
     }
-  }, [activeOrder, pickupDestination, estimatedPickupTime])
+  }, [activeOrder, pickupDestination, estimatedPickupTime, trackingStoreAddress])
 
   const reviewPayload = useMemo((): ReviewWritePayload => {
     if (activeOrder) {
@@ -206,8 +250,8 @@ function OrderStatusPage({
 
   const currentStepIndex = steps.findIndex((s) => s.key === orderStep)
 
-  const storeMapLat = pickupDestination?.lat
-  const storeMapLng = pickupDestination?.lng
+  const storeMapLat = trackingStoreLat ?? pickupDestination?.lat
+  const storeMapLng = trackingStoreLng ?? pickupDestination?.lng
 
   const storeMapMarkers = useMemo((): MapTmapMarker[] => {
     if (storeMapLat == null || storeMapLng == null) return []
@@ -231,82 +275,6 @@ function OrderStatusPage({
     error: storeDistanceError,
     retry: retryStoreDistance,
   } = useDistanceToCoords(storeCoords)
-
-  const completePickup = () => {
-    const order = activeOrder ?? getActivePaidOrderFromLocal()
-    if (!order?.orderId) {
-      setPickupError('픽업할 주문을 찾을 수 없습니다. 결제 완료 후 다시 시도해 주세요.')
-      return
-    }
-
-    setPickupSubmitting(true)
-    setPickupError(null)
-
-    const rewardBeforePromise = getAccessToken()
-      ? fetchRewardMe().catch(() => null)
-      : Promise.resolve(null)
-
-    void rewardBeforePromise
-      .then((rewardBefore) => completeOrderPickup(order.orderId).then(() => rewardBefore))
-      .then(async (rewardBefore) => {
-        markLocalOrderPickupCompleted(order.orderId)
-        setOrderStep('completed')
-        setPickupRewards(null)
-        setRewardModalLoading(true)
-        setRewardModalOpen(true)
-
-        if (rewardBefore) {
-          const rewardAfter = await pollRewardAfterPickup(rewardBefore)
-          setPickupRewards(buildPickupRewardBreakdown(rewardBefore, rewardAfter))
-        } else {
-          const after = await fetchRewardMe()
-          setPickupRewards({
-            walkedMeters: 0,
-            orderCountGain: 0,
-            totalOrderCount: after.orderCount,
-            totalWalkingDistanceM: after.totalWalkingDistance,
-            tierName: after.tierName,
-            tierUpgraded: false,
-          })
-        }
-
-        setRewardModalLoading(false)
-        notifyRewardsUpdated()
-        onPickupComplete?.()
-      })
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 403) {
-          setPickupError(
-            '접근이 거부되었습니다(403). 로그아웃 후 다시 로그인해 주세요.',
-          )
-          return
-        }
-        if (e instanceof ApiError && e.status === 401) {
-          setPickupError('로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.')
-          return
-        }
-        setPickupError(
-          e instanceof ApiError ? e.message : '픽업 완료 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.',
-        )
-      })
-      .finally(() => setPickupSubmitting(false))
-  }
-
-  const dismissRewardModal = (navigateAway: boolean) => {
-    setRewardModalOpen(false)
-    setRewardModalLoading(false)
-    setPickupRewards(null)
-    if (navigateAway && orderStep === 'completed') {
-      onOrdersClick?.() ?? onBack()
-    }
-  }
-
-  const handleRewardClose = () => dismissRewardModal(true)
-
-  const handleReviewFromModal = () => {
-    dismissRewardModal(false)
-    onReviewWriteClick?.(reviewPayload)
-  }
 
   const getStepStatus = (index: number) => {
     if (index < currentStepIndex) return 'completed'
@@ -354,7 +322,7 @@ function OrderStatusPage({
                   fontSize: '0.875rem',
                 }}
               >
-                매장 좌표가 없습니다.
+                매장 좌표가 없습니다. 사장님이 주소를 등록하면 지도에 표시됩니다.
               </div>
             )}
             <div className={styles.distanceCard}>
@@ -386,7 +354,9 @@ function OrderStatusPage({
             <div className={styles.orderRow}>
               <p className={styles.orderNumber}>주문 번호: {display.orderNumber}</p>
               <span className={styles.pickupBadge}>
-                {orderStep === 'completed' ? '픽업 완료' : `픽업 ${display.pickupTime} 예정`}
+                {orderStep === 'completed'
+                  ? '픽업 완료'
+                  : `픽업 ${display.pickupTime} 예정`}
               </span>
             </div>
             <h2 className={styles.orderTitle}>{display.menuName}</h2>
@@ -465,24 +435,34 @@ function OrderStatusPage({
               </div>
             )}
             {orderStep === 'ready' && (
-              <div className={styles.pickupDoneWrap}>
-                <button
-                  type="button"
-                  className={styles.pickupDoneButton}
-                  onClick={completePickup}
-                  disabled={pickupSubmitting || pickupContextLoading || !activeOrder}
-                >
-                  <span className="material-symbols-outlined">verified</span>
-                  {pickupSubmitting ? '처리 중…' : '매장에서 픽업을 완료했어요'}
-                </button>
-                <p className={styles.pickupDoneHint}>
-                  버튼을 누르면 픽업 횟수가 반영되고 리워드를 받을 수 있어요.
+              <div className={styles.cookingWaitBox}>
+                <div className={styles.cookingWaitIcon}>
+                  <span className={`material-symbols-outlined ${styles.cookingWaitIconSpan}`}>inventory_2</span>
+                </div>
+                <p className={styles.cookingWaitTitle}>픽업 준비됐어요</p>
+                <p className={styles.cookingWaitDesc}>
+                  {estimatedPickupTime
+                    ? `픽업 예정 ${formatPickupTime(estimatedPickupTime)} · 매장에서 수령해 주세요.`
+                    : '매장에서 메뉴를 수령해 주세요. 픽업이 끝나면 상태가 완료로 바뀌어요.'}
                 </p>
-                {pickupError && (
-                  <p className={styles.pickupDoneHint} style={{ color: 'rgb(220 38 38)' }}>
-                    {pickupError}
-                  </p>
-                )}
+              </div>
+            )}
+            {orderStep === 'completed' && (
+              <div className={styles.cookingWaitBox}>
+                <div className={styles.cookingWaitIcon}>
+                  <span className={`material-symbols-outlined ${styles.cookingWaitIconSpan}`}>celebration</span>
+                </div>
+                <p className={styles.cookingWaitTitle}>픽업 완료</p>
+                <p className={styles.cookingWaitDesc}>주문이 모두 완료되었어요. 이용해 주셔서 감사합니다.</p>
+                {onReviewWriteClick && activeOrder ? (
+                  <button
+                    type="button"
+                    className={styles.reviewLinkBtn}
+                    onClick={() => onReviewWriteClick(reviewPayload)}
+                  >
+                    리뷰 작성하기
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
@@ -519,15 +499,6 @@ function OrderStatusPage({
             if (page === 'map') onMapClick?.()
             if (page === 'mypage') onMypageClick?.()
           }}
-        />
-
-        <PickupRewardModal
-          open={rewardModalOpen}
-          onClose={handleRewardClose}
-          storeName={display.storeName}
-          loading={rewardModalLoading}
-          rewards={pickupRewards}
-          onWriteReview={onReviewWriteClick ? handleReviewFromModal : undefined}
         />
       </div>
     </Layout>

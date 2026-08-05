@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { OwnerHeader } from '../../components/OwnerHeader'
 import { Icon } from '../../components/Icon'
+import { ApiError } from '../../api/authClient'
+import { fetchOwnerDashboard, type OwnerDashboardDto } from '../../api/owner/dashboard'
 import { useOwnerOrders } from '../../context/OwnerOrdersProvider'
 import { useOwnerSales } from '../../context/OwnerSalesProvider'
-import { useOwnerReviews } from '../../hooks/useOwnerReviews'
-import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
+import { useOwnerMockData } from '../../lib/ownerConfig'
 import {
   buildWeeklySalesPaths,
   formatTrendPct,
@@ -19,84 +20,139 @@ import styles from './DashboardPage.module.css'
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'] as const
 
+function weeklyAmountsFromApi(weekly: OwnerDashboardDto['weeklySales'] | undefined): number[] {
+  const byDow = [0, 0, 0, 0, 0, 0, 0]
+  for (const row of weekly ?? []) {
+    const d = new Date(row.date)
+    if (Number.isNaN(d.getTime())) continue
+    const js = d.getDay()
+    const idx = js === 0 ? 6 : js - 1
+    byDow[idx] = row.salesAmount
+  }
+  return byDow
+}
+
+type RankMenu = { rank: number | string; name: string; orders: number; price: number }
+
 export function DashboardPage() {
+  const useMock = useOwnerMockData()
   const {
     salesPaused,
     resumeSales,
     isScheduledPause,
     remainingMinutesLabel,
     formatResumeAtLabel,
+    storeName: salesStoreName,
   } = useOwnerSales()
-  const { store, mockMode } = useOwnerStoreDetail()
-  const { orders, newOrders, activeOrders, completedOrders, useMock } = useOwnerOrders()
-  const { reviews } = useOwnerReviews()
+  const { newOrders, activeOrders, useMock: ordersMock } = useOwnerOrders()
   const ownerProfile = getActiveOwnerStoreProfile()
 
   const [weekTab, setWeekTab] = useState<'this' | 'last'>('this')
+  const [dash, setDash] = useState<OwnerDashboardDto | null>(null)
+  const [dashLoading, setDashLoading] = useState(!useMock)
+  const [dashError, setDashError] = useState<string | null>(null)
 
-  const storeLabel = ownerProfile?.storeName || store?.name
+  useEffect(() => {
+    if (useMock) {
+      setDash(null)
+      setDashLoading(false)
+      setDashError(null)
+      return
+    }
+    let cancelled = false
+    setDashLoading(true)
+    ;(async () => {
+      try {
+        const data = await fetchOwnerDashboard()
+        if (!cancelled) {
+          setDash(data)
+          setDashError(null)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setDash(null)
+          const msg = e instanceof ApiError ? e.message : e instanceof Error ? e.message : '대시보드를 불러오지 못했습니다.'
+          setDashError(msg)
+        }
+      } finally {
+        if (!cancelled) setDashLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [useMock])
+
+  const storeLabel = salesStoreName || dash?.storeName || ownerProfile?.storeName
+  const liveOrdersInProgress = newOrders.length + activeOrders.length
 
   const metrics = useMemo(() => {
-    const inProgress = newOrders.length + activeOrders.length
-    const liveSales = orders.reduce((sum, o) => sum + (o.total || o.amount || 0), 0)
-    const liveOrderCount = orders.length
-
     if (useMock) {
-      // 예시: 베이스 mock + 현재 보드 주문 반영
-      const boardSales = liveSales
-      const todaySales = Math.max(MOCK_DASHBOARD.todaySales, boardSales)
-      const orderCount = Math.max(MOCK_DASHBOARD.orderCount, liveOrderCount + completedOrders.length)
       return {
-        todaySales,
+        todaySales: MOCK_DASHBOARD.todaySales,
         salesTrendPct: MOCK_DASHBOARD.salesTrendPct,
-        orderCount,
-        orderTrendPct: MOCK_DASHBOARD.orderTrendPct,
-        inProgress,
+        orderCount: MOCK_DASHBOARD.orderCount,
+        inProgress: liveOrdersInProgress,
       }
     }
-
-    return {
-      todaySales: liveSales,
-      salesTrendPct: 0,
-      orderCount: liveOrderCount,
-      orderTrendPct: 0,
-      inProgress,
+    if (dash) {
+      return {
+        todaySales: dash.todaySales,
+        salesTrendPct: 0,
+        orderCount: dash.todayOrderCount,
+        inProgress: Math.max(dash.activeOrderCount, liveOrdersInProgress),
+      }
     }
-  }, [useMock, orders, newOrders.length, activeOrders.length, completedOrders.length])
+    return {
+      todaySales: 0,
+      salesTrendPct: 0,
+      orderCount: 0,
+      inProgress: liveOrdersInProgress,
+    }
+  }, [useMock, dash, liveOrdersInProgress])
 
-  const weeklyValues =
-    weekTab === 'this' ? MOCK_DASHBOARD.weeklyThisWeek : MOCK_DASHBOARD.weeklyLastWeek
+  const weeklyValues = useMemo(() => {
+    if (useMock) {
+      return weekTab === 'this' ? MOCK_DASHBOARD.weeklyThisWeek : MOCK_DASHBOARD.weeklyLastWeek
+    }
+    if (dash) return weeklyAmountsFromApi(dash.weeklySales)
+    return [0, 0, 0, 0, 0, 0, 0]
+  }, [useMock, dash, weekTab])
+
   const chartPaths = useMemo(() => buildWeeklySalesPaths(weeklyValues), [weeklyValues])
+  const weeklyHasData = weeklyValues.some((v) => v > 0)
 
-  const bestMenus = MOCK_DASHBOARD.bestMenus
+  const bestMenus = useMemo((): RankMenu[] => {
+    if (useMock) return MOCK_DASHBOARD.bestMenus
+    if (!dash) return []
+    return dash.bestMenus.slice(0, 5).map((m, i) => ({
+      rank: i + 1,
+      name: m.menuName,
+      orders: m.orderQuantity,
+      price: m.salesAmount,
+    }))
+  }, [useMock, dash])
 
-  const avgRating = useMemo(() => {
-    if (!reviews.length) return null
-    const sum = reviews.reduce((s, r) => s + (r.overallRating || 0), 0)
-    return Math.round((sum / reviews.length) * 10) / 10
-  }, [reviews])
-
+  const avgRating = useMock ? null : (dash?.averageRating ?? null)
   const recentReviews = useMemo(() => {
-    return [...reviews]
-      .sort((a, b) => {
-        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
-        return tb - ta
-      })
-      .slice(0, 2)
-  }, [reviews])
+    if (useMock) return []
+    return dash?.recentReviews?.slice(0, 2) ?? []
+  }, [useMock, dash])
 
   return (
     <>
       <OwnerHeader
         title="대시보드"
-        subtitle={
-          mockMode
-            ? `${storeLabel ?? ''} · 예시 데이터`
-            : storeLabel
-        }
+        subtitle={useMock || ordersMock ? `${storeLabel ?? ''} · 예시 데이터` : storeLabel}
       />
       <main className={styles.main}>
+        {dashError ? (
+          <p className={styles.errorBanner} role="alert">
+            대시보드 API: {dashError}
+          </p>
+        ) : null}
+        {dashLoading ? <p className={styles.trendHint}>대시보드 불러오는 중…</p> : null}
+
         {salesPaused ? (
           <div className={styles.warningBanner}>
             <div className={styles.warningLeft}>
@@ -159,7 +215,7 @@ export function DashboardPage() {
                   <span className={styles.trendHint}>전일 대비 증가</span>
                 </div>
               ) : (
-                <p className={styles.trendHint}>오늘 주문 합계 기준</p>
+                <p className={styles.trendHint}>{useMock ? '예시 매출' : '오늘 매출'}</p>
               )}
             </div>
             <div className={styles.blurOrb} aria-hidden />
@@ -176,17 +232,7 @@ export function DashboardPage() {
                 {metrics.orderCount.toLocaleString('ko-KR')}{' '}
                 <span className={styles.metricSub}>건</span>
               </h2>
-              {metrics.orderTrendPct !== 0 ? (
-                <div className={styles.trendRow}>
-                  <span className={styles.trendUpViolet}>
-                    <Icon name="trending_up" />
-                    {formatTrendPct(metrics.orderTrendPct)}
-                  </span>
-                  <span className={styles.trendHint}>전일 동시간 대비</span>
-                </div>
-              ) : (
-                <p className={styles.trendHint}>오늘 접수·진행·완료 합계</p>
-              )}
+              <p className={styles.trendHint}>오늘 주문</p>
             </div>
           </div>
           <div className={`${styles.metricCard} ${styles.metricCardAccent}`}>
@@ -212,24 +258,28 @@ export function DashboardPage() {
             <div className={styles.chartHead}>
               <div className={styles.chartHeadText}>
                 <h3 className={styles.chartTitle}>주간 매출 트렌드</h3>
-                <p className={styles.chartDesc}>최근 7일간의 수익 변화 추이</p>
+                <p className={styles.chartDesc}>
+                  {!useMock && !weeklyHasData && !dashLoading ? '이번 주 매출 데이터가 아직 없습니다.' : '최근 매출 변화'}
+                </p>
               </div>
-              <div className={styles.chartTabs}>
-                <button
-                  type="button"
-                  className={weekTab === 'this' ? styles.tabActive : styles.tabIdle}
-                  onClick={() => setWeekTab('this')}
-                >
-                  이번주
-                </button>
-                <button
-                  type="button"
-                  className={weekTab === 'last' ? styles.tabActive : styles.tabIdle}
-                  onClick={() => setWeekTab('last')}
-                >
-                  지난주
-                </button>
-              </div>
+              {useMock ? (
+                <div className={styles.chartTabs}>
+                  <button
+                    type="button"
+                    className={weekTab === 'this' ? styles.tabActive : styles.tabIdle}
+                    onClick={() => setWeekTab('this')}
+                  >
+                    이번주
+                  </button>
+                  <button
+                    type="button"
+                    className={weekTab === 'last' ? styles.tabActive : styles.tabIdle}
+                    onClick={() => setWeekTab('last')}
+                  >
+                    지난주
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div className={styles.chartPlot}>
               <div className={styles.chartBody}>
@@ -275,17 +325,23 @@ export function DashboardPage() {
               베스트 메뉴 순위
             </h3>
             <div className={styles.rankList}>
-              {bestMenus.map((m) => (
-                <div key={m.rank} className={styles.rankRow}>
-                  <div className={styles.rankNum}>{m.rank}</div>
-                  <div className={styles.rankThumb} />
-                  <div className={styles.rankInfo}>
-                    <h4 className={styles.rankName}>{m.name}</h4>
-                    <p className={styles.rankMeta}>주간 주문 {m.orders}건</p>
+              {bestMenus.length === 0 ? (
+                <p className={styles.trendHint}>
+                  {dashLoading ? '불러오는 중…' : '아직 베스트 메뉴 데이터가 없습니다.'}
+                </p>
+              ) : (
+                bestMenus.map((m) => (
+                  <div key={`${m.rank}-${m.name}`} className={styles.rankRow}>
+                    <div className={styles.rankNum}>{m.rank}</div>
+                    <div className={styles.rankThumb} />
+                    <div className={styles.rankInfo}>
+                      <h4 className={styles.rankName}>{m.name}</h4>
+                      <p className={styles.rankMeta}>주문 {m.orders}건</p>
+                    </div>
+                    <div className={styles.rankPrice}>{formatPrice(m.price)}</div>
                   </div>
-                  <div className={styles.rankPrice}>{formatPrice(m.price)}</div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <Link to="/menu" className={styles.linkReviews}>
               메뉴 관리 보기
@@ -299,17 +355,25 @@ export function DashboardPage() {
               </h3>
               <div className={styles.ratingPill}>
                 <Icon name="star" filled style={{ fontSize: '0.875rem', color: 'var(--owner-primary)' }} />
-                <span className={styles.ratingNum}>{avgRating != null ? avgRating.toFixed(1) : '—'}</span>
+                <span className={styles.ratingNum}>
+                  {avgRating != null && avgRating > 0 ? avgRating.toFixed(1) : '—'}
+                </span>
               </div>
             </div>
             <div className={styles.reviewCards}>
               {recentReviews.length === 0 ? (
-                <p className={styles.trendHint}>아직 리뷰가 없습니다.</p>
+                <p className={styles.trendHint}>
+                  {useMock
+                    ? '예시 모드에서는 리뷰 API를 사용하지 않습니다.'
+                    : dashLoading
+                      ? '불러오는 중…'
+                      : '아직 리뷰가 없습니다.'}
+                </p>
               ) : (
                 recentReviews.map((r, i) => (
                   <div key={r.reviewId} className={i === 0 ? styles.glassCard : styles.reviewCardMuted}>
                     <div className={styles.reviewCardTop}>
-                      <span className={styles.reviewUser}>손님 #{r.memberProfileId}</span>
+                      <span className={styles.reviewUser}>★ {r.overallRating}</span>
                       <span className={styles.reviewTime}>{reviewRelativeLabel(r.createdAt)}</span>
                     </div>
                     <p className={styles.reviewBody}>{r.content || '내용 없음'}</p>

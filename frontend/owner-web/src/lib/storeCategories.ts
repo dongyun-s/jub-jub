@@ -26,3 +26,15 @@ export function getStoreCategoryLabel(categoryId: StoreCategorySelection): strin
 export function isValidStoreCategoryId(id: number): boolean {
   return STORE_CATEGORIES.some((c) => c.id === id)
 }
+
+const categoryStorageKey = (storeId: number) => `owner_store_category_${storeId}`
+
+/** 가입·설정에서 선택한 카테고리를 브라우저에 보관 (설정 화면과 동일 키) */
+export function persistStoreCategorySelection(storeId: number, categoryId: StoreCategorySelection): void {
+  if (typeof window === 'undefined' || !Number.isFinite(storeId) || storeId <= 0) return
+  try {
+    window.localStorage.setItem(categoryStorageKey(storeId), categoryId == null ? 'null' : String(categoryId))
+  } catch {
+    /* ignore */
+  }
+}

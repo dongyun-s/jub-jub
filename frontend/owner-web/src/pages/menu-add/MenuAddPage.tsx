@@ -1,31 +1,113 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { OwnerHeader } from '../../components/OwnerHeader'
 import { Icon } from '../../components/Icon'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
+import { useOwnerMenus } from '../../hooks/useOwnerMenus'
+import { ApiError } from '../../api/authClient'
+import { OWNER_MENU_CATEGORIES, type OwnerMenuCategory } from '../../api/owner/menu'
+import { uploadImageFileViaPresigned } from '../../api/uploads'
 import styles from './MenuAddPage.module.css'
 
 export function MenuAddPage() {
-  const [saveAlertOpen, setSaveAlertOpen] = useState(false)
-  const { store, mockMode } = useOwnerStoreDetail()
+  const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { store, mockMode: storeMock } = useOwnerStoreDetail()
+  const { createMenu, mockMode } = useOwnerMenus()
+  const isMock = mockMode || storeMock
+
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [price, setPrice] = useState('')
+  const [category, setCategory] = useState<OwnerMenuCategory>('MAIN')
+  const [isSpicy, setIsSpicy] = useState(false)
+  const [isVegetarian, setIsVegetarian] = useState(false)
+  const [isBest, setIsBest] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [alert, setAlert] = useState<{
+    title: string
+    message: string
+    variant?: 'error' | 'success' | 'info'
+    goList?: boolean
+  } | null>(null)
+
+  const onPickImage = (file: File | null) => {
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview)
+    setImageFile(file)
+    setImagePreview(file ? URL.createObjectURL(file) : null)
+  }
+
+  const handleSave = async () => {
+    const trimmedName = name.trim()
+    const priceNum = Number(price)
+    if (!trimmedName) {
+      setAlert({ title: '입력 확인', message: '메뉴명을 입력해 주세요.', variant: 'error' })
+      return
+    }
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      setAlert({ title: '입력 확인', message: '가격을 올바르게 입력해 주세요.', variant: 'error' })
+      return
+    }
+
+    setSaving(true)
+    try {
+      let imageUrl: string | null = null
+      if (imageFile && !isMock) {
+        imageUrl = await uploadImageFileViaPresigned('MENU', imageFile)
+      } else if (imageFile && isMock) {
+        imageUrl = imagePreview
+      }
+
+      const result = await createMenu({
+        name: trimmedName,
+        description: description.trim(),
+        price: Math.floor(priceNum),
+        category,
+        imageUrl,
+        isSpicy,
+        isVegetarian,
+        isBest,
+      })
+      setAlert({
+        title: '등록 완료',
+        message: result.message || '메뉴가 등록되었습니다.',
+        variant: 'success',
+        goList: true,
+      })
+    } catch (e: unknown) {
+      setAlert({
+        title: '등록 실패',
+        message: e instanceof ApiError ? e.message : '메뉴를 등록하지 못했습니다.',
+        variant: 'error',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <>
       <OwnerHeader
         title="메뉴 추가"
-        subtitle={mockMode ? `${store?.name ?? ''} · 예시 데이터` : store?.name}
+        subtitle={isMock ? `${store?.name ?? ''} · 예시 데이터` : store?.name}
       />
       <main className={styles.main}>
         <div className={styles.inner}>
           <div className={styles.intro}>
             <div className={styles.breadcrumb}>
-              <span>메뉴 관리</span>
+              <Link to="/menu" style={{ color: 'inherit', textDecoration: 'none' }}>
+                메뉴 관리
+              </Link>
               <Icon name="chevron_right" style={{ fontSize: '0.75rem', opacity: 0.6 }} />
               <span className={styles.breadcrumbAccent}>신규 등록</span>
             </div>
             <h1 className={styles.pageTitle}>메뉴 추가</h1>
-            <p className={styles.pageDesc}>고객 앱에 노출될 메뉴 정보를 입력해 주세요.</p>
+            <p className={styles.pageDesc}>
+              Presigned URL로 이미지를 올린 뒤, 메뉴 등록 API에 imageUrl을 함께 보냅니다.
+            </p>
           </div>
 
           <div className={styles.grid}>
@@ -37,25 +119,67 @@ export function MenuAddPage() {
                 </h2>
                 <div className={styles.fieldStack}>
                   <div className={styles.field}>
-                    <label className={styles.label}>메뉴명</label>
-                    <input type="text" placeholder="예: 시그니처 트러플 버거" className={styles.input} />
+                    <label className={styles.label} htmlFor="menu-name">
+                      메뉴명
+                    </label>
+                    <input
+                      id="menu-name"
+                      type="text"
+                      placeholder="예: 치즈버거"
+                      className={styles.input}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={saving}
+                      maxLength={100}
+                    />
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label}>설명</label>
-                    <textarea rows={4} placeholder="재료, 조리법, 맛의 특징을 적어주세요." className={styles.textarea} />
+                    <label className={styles.label} htmlFor="menu-desc">
+                      설명
+                    </label>
+                    <textarea
+                      id="menu-desc"
+                      rows={4}
+                      placeholder="재료, 조리법, 맛의 특징을 적어주세요."
+                      className={styles.textarea}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      disabled={saving}
+                    />
                   </div>
                   <div className={styles.row2}>
                     <div className={styles.field}>
-                      <label className={styles.label}>가격 (원)</label>
-                      <input type="number" placeholder="0" className={styles.input} />
+                      <label className={styles.label} htmlFor="menu-price">
+                        가격 (원)
+                      </label>
+                      <input
+                        id="menu-price"
+                        type="number"
+                        placeholder="0"
+                        className={styles.input}
+                        min={0}
+                        step={100}
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        disabled={saving}
+                      />
                     </div>
                     <div className={styles.field}>
-                      <label className={styles.label}>카테고리</label>
-                      <select className={styles.select}>
-                        <option>메인</option>
-                        <option>사이드</option>
-                        <option>음료</option>
-                        <option>디저트</option>
+                      <label className={styles.label} htmlFor="menu-category">
+                        카테고리
+                      </label>
+                      <select
+                        id="menu-category"
+                        className={styles.select}
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value as OwnerMenuCategory)}
+                        disabled={saving}
+                      >
+                        {OWNER_MENU_CATEGORIES.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label} ({c.value})
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -65,12 +189,36 @@ export function MenuAddPage() {
               <section className={styles.card}>
                 <h2 className={styles.cardTitlePlain}>태그</h2>
                 <div className={styles.tags}>
-                  {['매운맛', '비건', '베스트'].map((t) => (
-                    <label key={t} className={styles.tagLabel}>
-                      <input type="checkbox" className={styles.checkbox} />
-                      <span>{t}</span>
-                    </label>
-                  ))}
+                  <label className={styles.tagLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={isSpicy}
+                      onChange={(e) => setIsSpicy(e.target.checked)}
+                      disabled={saving}
+                    />
+                    <span>매운맛</span>
+                  </label>
+                  <label className={styles.tagLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={isVegetarian}
+                      onChange={(e) => setIsVegetarian(e.target.checked)}
+                      disabled={saving}
+                    />
+                    <span>비건</span>
+                  </label>
+                  <label className={styles.tagLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={isBest}
+                      onChange={(e) => setIsBest(e.target.checked)}
+                      disabled={saving}
+                    />
+                    <span>베스트</span>
+                  </label>
                 </div>
               </section>
             </div>
@@ -78,16 +226,50 @@ export function MenuAddPage() {
             <div className={styles.colSide}>
               <section className={styles.card}>
                 <h2 className={styles.cardTitlePlain}>메뉴 이미지</h2>
-                <button type="button" className={styles.upload}>
-                  <Icon name="add_a_photo" className={styles.uploadIcon} />
-                  <p className={styles.uploadText}>클릭하여 업로드</p>
-                  <p className={styles.uploadHint}>권장 1080×1080, 최대 5MB</p>
-                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  hidden
+                  onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+                />
+                {imagePreview ? (
+                  <div className={styles.previewWrap}>
+                    <img src={imagePreview} alt="메뉴 미리보기" className={styles.previewImg} />
+                    <button
+                      type="button"
+                      className={styles.btnSecondary}
+                      disabled={saving}
+                      onClick={() => {
+                        onPickImage(null)
+                        if (fileInputRef.current) fileInputRef.current.value = ''
+                      }}
+                    >
+                      이미지 제거
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.upload}
+                    disabled={saving}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Icon name="add_a_photo" className={styles.uploadIcon} />
+                    <p className={styles.uploadText}>클릭하여 업로드</p>
+                    <p className={styles.uploadHint}>JPEG/PNG/WebP/GIF · 최대 10MB</p>
+                  </button>
+                )}
               </section>
               <section className={styles.card}>
-                <button type="button" className={styles.btnPrimary} onClick={() => setSaveAlertOpen(true)}>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                >
                   <Icon name="save" />
-                  저장
+                  {saving ? '저장 중…' : '저장'}
                 </button>
                 <Link to="/menu" className={styles.btnSecondary}>
                   <Icon name="close" />
@@ -100,11 +282,15 @@ export function MenuAddPage() {
       </main>
 
       <SimpleAlertModal
-        open={saveAlertOpen}
-        title="안내"
-        message="메뉴 등록 API는 준비 중입니다. 입력 내용은 아직 서버에 저장되지 않습니다."
-        variant="info"
-        onClose={() => setSaveAlertOpen(false)}
+        open={alert != null}
+        title={alert?.title}
+        message={alert?.message ?? ''}
+        variant={alert?.variant ?? 'info'}
+        onClose={() => {
+          const go = alert?.goList
+          setAlert(null)
+          if (go) navigate('/menu')
+        }}
       />
     </>
   )

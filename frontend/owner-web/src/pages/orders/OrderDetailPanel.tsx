@@ -29,6 +29,7 @@ type OrderDetailPanelProps = {
 const COOK_DONE_GUARD_MS = 2_000
 
 function statusLabel(order: MockOwnerOrder): string {
+  if (order.rejected) return '거절 · 환불 처리'
   if (order.status === 'new') return '신규 · 수락 대기'
   if (order.status === 'ready') return '픽업 대기'
   if (order.status === 'progress') return '조리 중'
@@ -171,7 +172,9 @@ export function OrderDetailPanel({
         <section className={styles.detailSection}>
           <h3 className={styles.detailSectionTitle}>주문 상태</h3>
           <OrderStatusStepper status={order.status} />
-          <p className={styles.statusFlowHint}>수락 → 조리중 → 픽업준비 → 완료</p>
+          <p className={styles.statusFlowHint}>
+            {order.rejected ? '거절된 주문입니다. 완료 목록에서 확인할 수 있습니다.' : '수락 → 조리중 → 픽업준비 → 완료'}
+          </p>
         </section>
 
         <section className={styles.detailSection}>

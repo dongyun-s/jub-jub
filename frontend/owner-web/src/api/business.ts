@@ -13,6 +13,8 @@ export type BizVerifyResult = {
   statusLabel: string
   taxType?: string
   message: string
+  /** 국세청 미연결로 체크섬만 통과한 경우 */
+  checksumOnly?: boolean
 }
 
 type NtsStatusItem = {
@@ -57,6 +59,17 @@ function mapStatus(code?: string): { statusCode: BizStatusCode; statusLabel: str
   return { statusCode: 'unknown', statusLabel: '확인 불가', ok: false }
 }
 
+function checksumFallback(businessNumber: string, detail: string): BizVerifyResult {
+  return {
+    ok: true,
+    businessNumber,
+    statusCode: '01',
+    statusLabel: '형식 확인',
+    checksumOnly: true,
+    message: `사업자번호 형식은 올바릅니다. (국세청 API 일시 불가 · ${detail})`,
+  }
+}
+
 /**
  * POST /owner-ext/nts-business/status
  * Vite가 국세청 API로 프록시하며 serviceKey를 붙입니다.
@@ -82,11 +95,16 @@ export async function verifyBusinessNumber(raw: string): Promise<BizVerifyResult
     }
   }
 
-  const res = await fetch('/owner-ext/nts-business/status', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ b_no: [businessNumber] }),
-  })
+  let res: Response
+  try {
+    res = await fetch('/owner-ext/nts-business/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ b_no: [businessNumber] }),
+    })
+  } catch {
+    return checksumFallback(businessNumber, '네트워크 오류')
+  }
 
   if (res.status === 501) {
     return {
@@ -95,8 +113,21 @@ export async function verifyBusinessNumber(raw: string): Promise<BizVerifyResult
       statusCode: 'unknown',
       statusLabel: '키 미설정',
       message:
-        'NTS_BUSINESS_SERVICE_KEY 가 frontend/.env 에 없습니다. 공공데이터포털 인증키를 넣은 뒤 owner-web dev 서버를 재시작하세요.',
+        'NTS_BUSINESS_SERVICE_KEY 가 frontend/.env 에 없습니다. 공공데이터포털 인증키를 넣은 뒤 owner-web을 재시작하세요.',
     }
+  }
+
+  // Vite 프록시가 국세청에 못 붙으면 502/503
+  if (res.status === 502 || res.status === 503) {
+    const text = await res.text().catch(() => '')
+    let detail = '공공데이터포털 연결 실패'
+    try {
+      const j = text ? (JSON.parse(text) as { msg?: string }) : null
+      if (j?.msg) detail = j.msg
+    } catch {
+      /* ignore */
+    }
+    return checksumFallback(businessNumber, detail)
   }
 
   const text = await res.text()
@@ -112,6 +143,7 @@ export async function verifyBusinessNumber(raw: string): Promise<BizVerifyResult
       typeof body === 'object' && body && 'msg' in body
         ? String((body as { msg?: string }).msg)
         : text.slice(0, 200) || `사업자 확인 요청 실패 (${res.status})`
+    // 키/쿼터 오류 등은 형식만 통과시키지 않고 실패로 유지하되, 5xx는 위에서 처리
     return {
       ok: false,
       businessNumber,

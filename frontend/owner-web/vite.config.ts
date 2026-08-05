@@ -90,8 +90,21 @@ export default defineConfig(({ mode }) => {
           rewrite: (p) => {
             const pathOnly = p.replace(/^\/owner-ext\/nts-business/, '/api/nts-businessman/v1')
             if (!ntsKeyQuery) return pathOnly
+            // 이미 인코딩된 키는 그대로, 아니면 encode — 이중 인코딩 방지
             const sep = pathOnly.includes('?') ? '&' : '?'
             return `${pathOnly}${sep}serviceKey=${ntsKeyQuery}`
+          },
+          configure: (proxy) => {
+            proxy.on('error', (err, _req, res) => {
+              const r = res as { writeHead?: (code: number, h: Record<string, string>) => void; end?: (b: string) => void; headersSent?: boolean }
+              if (!r?.writeHead || r.headersSent) return
+              r.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' })
+              r.end(
+                JSON.stringify({
+                  msg: `국세청(공공데이터) API에 연결하지 못했습니다. (${err.message || 'network error'}) 네트워크·방화벽을 확인하거나, 형식 검증만으로 가입을 진행할 수 있습니다.`,
+                }),
+              )
+            })
           },
         },
         '/api': backendProxy(proxyTarget),

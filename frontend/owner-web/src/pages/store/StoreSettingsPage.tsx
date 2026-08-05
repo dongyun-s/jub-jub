@@ -1,13 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { OwnerHeader } from '../../components/OwnerHeader'
 import { Icon } from '../../components/Icon'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
+import { ApiError } from '../../api/authClient'
+import { patchOwnerStore } from '../../api/owner/store'
 import { useAuth } from '../../context/AuthProvider'
-import { useOwnerStoreCategory } from '../../hooks/useOwnerStoreCategory'
 import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
-import { getActiveOwnerStoreProfile } from '../../lib/ownerSession'
-import { STORE_CATEGORIES } from '../../lib/storeCategories'
+import { openDaumPostcode } from '../../lib/daumPostcode'
+import { getActiveOwnerStoreProfile, saveOwnerStoreProfile } from '../../lib/ownerSession'
+import {
+  getStoreCategoryLabel,
+  isValidStoreCategoryId,
+  persistStoreCategorySelection,
+  STORE_CATEGORIES,
+  type StoreCategoryId,
+} from '../../lib/storeCategories'
 import styles from './StoreSettingsPage.module.css'
 
 function formatBizNumber(raw: string): string {
@@ -19,22 +27,82 @@ function formatBizNumber(raw: string): string {
 export function StoreSettingsPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
-  const { store, storeId, mockMode } = useOwnerStoreDetail()
+  const { store, storeId, mockMode, loading } = useOwnerStoreDetail()
   const ownerProfile = getActiveOwnerStoreProfile()
-  const { categoryId, categoryLabel, setCategoryId } = useOwnerStoreCategory(
-    storeId,
-    store?.categoryId,
-  )
-  const [savedOpen, setSavedOpen] = useState(false)
 
-  const selectCategory = (id: typeof categoryId) => {
-    setCategoryId(id)
-    setSavedOpen(true)
+  const initialCategory: StoreCategoryId =
+    store?.categoryId != null && isValidStoreCategoryId(store.categoryId)
+      ? (store.categoryId as StoreCategoryId)
+      : 1
+
+  const [categoryId, setCategoryId] = useState<StoreCategoryId>(initialCategory)
+  const [address, setAddress] = useState(ownerProfile?.storeAddress || store?.address || '')
+  const [saving, setSaving] = useState(false)
+  const [savedOpen, setSavedOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (store?.categoryId != null && isValidStoreCategoryId(store.categoryId)) {
+      setCategoryId(store.categoryId as StoreCategoryId)
+    }
+    const nextAddress = ownerProfile?.storeAddress || store?.address || ''
+    if (nextAddress) setAddress(nextAddress)
+  }, [store?.categoryId, store?.address, ownerProfile?.storeAddress])
+
+  const categoryLabel = getStoreCategoryLabel(categoryId)
+  const displayName = ownerProfile?.storeName || store?.name
+  const displayPhone = ownerProfile?.storePhone || store?.phoneNumber
+
+  const saveStoreMeta = async (nextCategoryId: StoreCategoryId, nextAddress: string) => {
+    const trimmed = nextAddress.trim()
+    if (!trimmed) {
+      setError('매장 주소를 입력해 주세요.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    try {
+      if (!mockMode) {
+        await patchOwnerStore({ address: trimmed, categoryId: nextCategoryId })
+      }
+      setCategoryId(nextCategoryId)
+      setAddress(trimmed)
+      persistStoreCategorySelection(storeId, nextCategoryId)
+      if (ownerProfile?.email) {
+        saveOwnerStoreProfile({
+          email: ownerProfile.email,
+          businessNumber: ownerProfile.businessNumber,
+          storeAddress: trimmed,
+          storePhone: ownerProfile.storePhone,
+          storeName: ownerProfile.storeName,
+          storeId,
+        })
+      }
+      setSavedOpen(true)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const displayName = ownerProfile?.storeName || store?.name
-  const displayAddress = ownerProfile?.storeAddress || store?.address
-  const displayPhone = ownerProfile?.storePhone || store?.phoneNumber
+  const selectCategory = (id: StoreCategoryId) => {
+    void saveStoreMeta(id, address)
+  }
+
+  const handleAddressSearch = async () => {
+    setError(null)
+    try {
+      const result = await openDaumPostcode()
+      const next = [result.zonecode ? `(${result.zonecode})` : '', result.address].filter(Boolean).join(' ')
+      setAddress(next)
+      await saveStoreMeta(categoryId, next)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '주소 검색에 실패했습니다.'
+      if (!msg.includes('취소')) setError(msg)
+    }
+  }
 
   return (
     <>
@@ -56,7 +124,7 @@ export function StoreSettingsPage() {
               </div>
               <div className={styles.infoRow}>
                 <dt>매장명</dt>
-                <dd>{displayName ?? '—'}</dd>
+                <dd>{loading ? '…' : (displayName ?? '—')}</dd>
               </div>
               <div className={styles.infoRow}>
                 <dt>사업자번호</dt>
@@ -64,7 +132,7 @@ export function StoreSettingsPage() {
               </div>
               <div className={styles.infoRow}>
                 <dt>주소</dt>
-                <dd>{displayAddress ?? '—'}</dd>
+                <dd>{address || '—'}</dd>
               </div>
               <div className={styles.infoRow}>
                 <dt>가게 전화</dt>
@@ -77,9 +145,16 @@ export function StoreSettingsPage() {
                 </div>
               ) : null}
             </dl>
-            <p className={styles.hint}>
-              사장님 계정과 매장은 1:1입니다. 사업자·주소·전화는 가입 시 이 브라우저에 저장된 값입니다.
-            </p>
+
+            <div className={styles.addressEdit}>
+              <button type="button" className={styles.addressBtn} disabled={saving} onClick={() => void handleAddressSearch()}>
+                <Icon name="search" />
+                주소 변경
+              </button>
+              <p className={styles.hint}>
+                주소·카테고리만 서버에 전송합니다. 좌표는 백엔드(TMAP)가 변환합니다.
+              </p>
+            </div>
           </section>
 
           <section className={styles.card}>
@@ -105,6 +180,7 @@ export function StoreSettingsPage() {
                     type="button"
                     role="option"
                     aria-selected={selected}
+                    disabled={saving}
                     className={[styles.chip, selected ? styles.chipSelected : ''].filter(Boolean).join(' ')}
                     onClick={() => selectCategory(id)}
                   >
@@ -113,24 +189,13 @@ export function StoreSettingsPage() {
                   </button>
                 )
               })}
-              <button
-                type="button"
-                role="option"
-                aria-selected={categoryId == null}
-                className={[styles.chip, styles.chipEtc, categoryId == null ? styles.chipSelected : '']
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => selectCategory(null)}
-              >
-                기타
-                {categoryId == null ? <Icon name="check" className={styles.chipCheck} /> : null}
-              </button>
             </div>
 
+            {error ? <p className={styles.errorHint}>{error}</p> : null}
             <p className={styles.hint}>
               {mockMode
-                ? '예시 모드: 선택값은 이 브라우저에 저장됩니다. API 연동 시 매장 정보와 함께 서버에 반영됩니다.'
-                : '카테고리 변경 API 연동 후 서버에 저장됩니다.'}
+                ? '예시 모드: 선택값은 이 브라우저에 저장됩니다.'
+                : '카테고리를 고르면 현재 주소와 함께 서버에 저장됩니다.'}
             </p>
 
             <div className={styles.logoutRow}>
@@ -154,7 +219,7 @@ export function StoreSettingsPage() {
       <SimpleAlertModal
         open={savedOpen}
         title="저장됨"
-        message={`가게 카테고리가 「${categoryLabel}」(으)로 설정되었습니다.`}
+        message={`가게 정보가 저장되었습니다. (카테고리: ${categoryLabel})`}
         variant="info"
         onClose={() => setSavedOpen(false)}
       />

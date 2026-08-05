@@ -102,6 +102,14 @@
   color: var(--owner-on-surface-variant);
 }
 
+.statRow {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--owner-on-surface-variant);
+}
+
 .bars {
   display: flex;
   flex-direction: column;
@@ -209,6 +217,28 @@
 }
 
 .filterIdle:hover {
+  color: var(--owner-on-surface);
+}
+
+.searchWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 12rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 20%, transparent);
+  background: var(--owner-surface-low);
+  color: var(--owner-on-surface-variant);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.875rem;
   color: var(--owner-on-surface);
 }
 
@@ -366,7 +396,28 @@
 .replyRow {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   padding-top: 0.5rem;
+}
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 35%, transparent);
+  border-radius: 9999px;
+  padding: 0.55rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--owner-on-surface-variant);
+  background: transparent;
+}
+
+.btnGhost:hover {
+  color: var(--owner-primary);
+  border-color: color-mix(in srgb, var(--owner-primary) 40%, transparent);
 }
 
 .btnReply {
@@ -386,6 +437,127 @@
 
 .btnReply:active {
   transform: scale(0.95);
+}
+
+.photoRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.photoThumb {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: var(--owner-surface-low);
+}
+
+.ownerReply {
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--owner-primary-container) 12%, transparent);
+  padding: 0.85rem 1rem;
+}
+
+.ownerReplyLabel {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--owner-primary);
+}
+
+.ownerReplyText {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--owner-on-surface);
+}
+
+.modalPreview {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.5rem;
+  background: var(--owner-surface-low);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--owner-on-surface-variant);
+}
+
+.replyTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 7rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--owner-outline-variant) 45%, transparent);
+  background: var(--owner-surface, #fff);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.charCount {
+  margin: 0.35rem 0 0;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--owner-on-surface-variant);
+}
+
+.modalActions {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.modalActionsRight {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.btnDangerText {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #b91c1c;
+  padding: 0.35rem 0;
+}
+
+.btnDangerText:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.insightModal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.insightSummary {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--owner-on-surface);
+}
+
+.insightList {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--owner-on-surface-variant);
+}
+
+.insightMeta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--owner-on-surface-variant);
 }
 
 .fab {

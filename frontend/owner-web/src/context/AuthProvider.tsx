@@ -7,7 +7,7 @@ import { getOwnerAccessToken } from '../api/authClient'
 
 type AuthContextValue = {
   isLoggedIn: boolean
-  /** auth 연동 전: 로그인 없이 진입 중 */
+  /** true면 토큰 없이 진입 (VITE_OWNER_SKIP_AUTH=true 만) */
   authSkipped: boolean
   logout: () => void
 }
@@ -34,13 +34,9 @@ export function useAuth() {
   return ctx
 }
 
-/**
- * owner-web 기능 페이지 보호
- * - VITE_OWNER_SKIP_AUTH 기본(스킵): 토큰 없이 통과
- * - false: 미로그인 시 /auth/login
- */
+/** 미로그인 시 /auth/login (SKIP_AUTH=true 일 때만 통과) */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, authSkipped, logout } = useAuth()
+  const { isLoggedIn, authSkipped } = useAuth()
   const location = useLocation()
 
   if (authSkipped) {
@@ -48,8 +44,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!isLoggedIn) {
-    logout()
-    return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />
+    const fromPath = location.pathname.startsWith('/auth') ? '/dashboard' : location.pathname
+    return <Navigate to="/auth/login" replace state={{ from: fromPath }} />
   }
 
   return <>{children}</>

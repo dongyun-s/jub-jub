@@ -83,17 +83,29 @@
 
 .profileWrap {
   display: flex;
-  height: var(--owner-header-h);
   align-items: center;
   justify-content: center;
+  padding: 0.75rem 0 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 9999px;
-  border: 2px solid var(--owner-outline-variant);
-  object-fit: cover;
+.logoutBtn {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.logoutBtn:hover {
+  background: var(--owner-surface-high);
+  color: #fff;
 }
 
 .content {
