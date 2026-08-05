@@ -14,6 +14,8 @@ public record OwnerMenuListResponse(
 
         MenuCategory category,
 
+        String imageUrl,
+
         Boolean isSpicy,
 
         Boolean isVegetarian,

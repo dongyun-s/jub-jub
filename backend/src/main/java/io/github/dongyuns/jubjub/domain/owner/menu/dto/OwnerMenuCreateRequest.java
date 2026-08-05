@@ -12,6 +12,8 @@ public record OwnerMenuCreateRequest(
 
         MenuCategory category,
 
+        String imageUrl,
+
         Boolean isSpicy,
 
         Boolean isVegetarian,

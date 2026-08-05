@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -70,6 +71,14 @@ public class OwnerMenuService {
 
         Menu savedMenu = menuRepository.save(menu);
 
+        // 메뉴 이미지 저장
+        if (StringUtils.hasText(request.imageUrl())) {
+            mediaCrudService.createMenuImage(
+                    savedMenu.getId(),
+                    request.imageUrl()
+            );
+        }
+
         return new OwnerMenuResponse(
                 savedMenu.getId(),
                 "메뉴가 등록되었습니다."
@@ -92,6 +101,7 @@ public class OwnerMenuService {
                         menu.getPrice(),
                         menu.getDescription(),
                         menu.getCategory(),
+                        mediaCrudService.getMenuImage(menu.getId()),
                         menu.isSpicy(),
                         menu.isVegetarian(),
                         menu.isBest(),
@@ -121,6 +131,30 @@ public class OwnerMenuService {
                 Boolean.TRUE.equals(request.isBest())
         );
 
+        // 이미지 처리
+        if (StringUtils.hasText(request.imageUrl())) {
+
+            String currentImage =
+                    mediaCrudService.getMenuImage(menuId);
+
+            if (currentImage == null) {
+                mediaCrudService.createMenuImage(
+                        menuId,
+                        request.imageUrl()
+                );
+            } else {
+                mediaCrudService.updateMenuImage(
+                        menuId,
+                        request.imageUrl()
+                );
+            }
+
+        } else {
+
+            mediaCrudService.deleteMenuImage(menuId);
+
+        }
+
         return new OwnerMenuResponse(
                 menu.getId(),
                 "메뉴가 수정되었습니다."
@@ -136,6 +170,9 @@ public class OwnerMenuService {
         Menu menu = getOwnerMenu(menuId);
 
         menu.delete();
+
+        // 메뉴 이미지도 함께 삭제
+        mediaCrudService.deleteMenuImage(menuId);
     }
 
     /**
@@ -156,53 +193,6 @@ public class OwnerMenuService {
                 soldOut
                         ? "메뉴가 품절 처리되었습니다."
                         : "메뉴 판매가 재개되었습니다."
-        );
-    }
-
-    /**
-     * 메뉴 이미지 등록
-     */
-    @Transactional
-    public void uploadMenuImage(
-            Long menuId,
-            String imageUrl
-    ) {
-
-        Menu menu = getOwnerMenu(menuId);
-
-        mediaCrudService.createMenuImage(
-                menu.getId(),
-                imageUrl
-        );
-    }
-
-    /**
-     * 메뉴 이미지 수정
-     */
-    @Transactional
-    public void updateMenuImage(
-            Long menuId,
-            String imageUrl
-    ) {
-
-        Menu menu = getOwnerMenu(menuId);
-
-        mediaCrudService.updateMenuImage(
-                menu.getId(),
-                imageUrl
-        );
-    }
-
-    /**
-     * 메뉴 이미지 삭제
-     */
-    @Transactional
-    public void deleteMenuImage(Long menuId) {
-
-        Menu menu = getOwnerMenu(menuId);
-
-        mediaCrudService.deleteMenuImage(
-                menu.getId()
         );
     }
 }

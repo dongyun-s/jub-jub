@@ -92,48 +92,4 @@ public class OwnerMenuController {
 
         return ApiResponse.success(response);
     }
-
-    /**
-     * 메뉴 이미지 등록
-     */
-    @Operation(summary = "메뉴 이미지 등록", description = "메뉴 이미지를 등록합니다.")
-    @PostMapping("/{menuId}/image")
-    public ApiResponse<String> uploadMenuImage(
-            @PathVariable Long menuId,
-            @RequestParam String imagePath
-    ) {
-
-        ownerMenuService.uploadMenuImage(menuId, imagePath);
-
-        return ApiResponse.success("메뉴 이미지가 등록되었습니다.");
-    }
-
-    /**
-     * 메뉴 이미지 수정
-     */
-    @Operation(summary = "메뉴 이미지 수정", description = "메뉴 이미지를 수정합니다.")
-    @PutMapping("/{menuId}/image")
-    public ApiResponse<String> updateMenuImage(
-            @PathVariable Long menuId,
-            @RequestParam String imagePath
-    ) {
-
-        ownerMenuService.updateMenuImage(menuId, imagePath);
-
-        return ApiResponse.success("메뉴 이미지가 수정되었습니다.");
-    }
-
-    /**
-     * 메뉴 이미지 삭제
-     */
-    @Operation(summary = "메뉴 이미지 삭제", description = "메뉴 이미지를 삭제합니다.")
-    @DeleteMapping("/{menuId}/image")
-    public ApiResponse<String> deleteMenuImage(
-            @PathVariable Long menuId
-    ) {
-
-        ownerMenuService.deleteMenuImage(menuId);
-
-        return ApiResponse.success("메뉴 이미지가 삭제되었습니다.");
-    }
 }

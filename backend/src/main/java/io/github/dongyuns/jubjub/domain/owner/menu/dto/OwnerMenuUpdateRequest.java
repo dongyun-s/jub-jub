@@ -12,6 +12,8 @@ public record OwnerMenuUpdateRequest(
 
         MenuCategory category,
 
+        String imageUrl,
+
         Boolean isSpicy,
 
         Boolean isVegetarian,
