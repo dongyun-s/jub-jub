@@ -215,6 +215,11 @@
   color: var(--color-primary);
 }
 
+.orderStatusRejected {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: rgb(185 28 28);
+}
+
 .orderStatusReviewed {
   background-color: rgb(241 245 249); /* slate-100 */
   color: rgb(100 116 139);           /* slate-500 */

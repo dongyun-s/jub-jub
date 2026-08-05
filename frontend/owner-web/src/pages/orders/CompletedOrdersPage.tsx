@@ -65,7 +65,7 @@ export function CompletedOrdersPage() {
           <EmptyState
             icon="task_alt"
             title="완료된 주문이 없습니다"
-            description="실시간 주문에서 픽업 완료한 주문이 이곳에 쌓입니다."
+            description="픽업 완료·거절된 주문이 이곳에 쌓입니다."
           />
         ) : (
           <div className={styles.boardWithDetail}>
@@ -89,6 +89,7 @@ export function CompletedOrdersPage() {
                         <div className={styles.rowMain}>
                           <span className={`${styles.orderNo} ${styles.monoNum}`}>#{o.orderNo}</span>
                           <span className={styles.summary}>{o.summary}</span>
+                          {o.rejected ? <span className={styles.rejectedPill}>거절</span> : null}
                         </div>
                         <div className={styles.rowSide}>
                           <span className={styles.time}>{o.time}</span>

@@ -25,6 +25,8 @@ export function OrdersPage() {
     newOrders,
     activeOrders,
     orders,
+    useMock,
+    error: ordersError,
     handleStartCooking,
     handlePickupMinutesChange,
     handleCookDone,
@@ -32,6 +34,7 @@ export function OrdersPage() {
     rejectOrder,
     simulateIncomingOrder,
     resetDemoOrders,
+    loadOrderDetail,
   } = useOwnerOrders()
   const { salesPaused, isScheduledPause, remainingMinutesLabel } = useOwnerSales()
 
@@ -49,6 +52,11 @@ export function OrdersPage() {
   )
 
   useEffect(() => {
+    if (selectedId == null || useMock) return
+    void loadOrderDetail(selectedId)
+  }, [selectedId, useMock, loadOrderDetail])
+
+  useEffect(() => {
     const fromNav = (location.state as { selectOrderId?: number } | null)?.selectOrderId
     if (fromNav != null && orders.some((o) => o.orderId === fromNav)) {
       setSelectedId(fromNav)
@@ -64,6 +72,17 @@ export function OrdersPage() {
     else setSelectedId(null)
   }, [orders, newOrders, activeOrders, selectedId])
 
+  const runAction = async (fn: () => Promise<void>, failTitle: string) => {
+    try {
+      await fn()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '요청에 실패했습니다.'
+      setAlertTitle(failTitle)
+      setAlertMessage(msg)
+      setAlertOpen(true)
+    }
+  }
+
   const {
     scrollRef: newOrdersScrollRef,
     isDragging: isNewOrdersDragging,
@@ -74,16 +93,17 @@ export function OrdersPage() {
 
   const confirmReject = () => {
     if (rejectTargetId == null) return
-    rejectOrder(rejectTargetId)
+    const id = rejectTargetId
     setRejectTargetId(null)
-    setAlertTitle('주문 거절')
-    setAlertMessage('주문을 거절했습니다. (로컬 POS · 고객 알림 API는 추후 연동)')
-    setAlertOpen(true)
+    void runAction(
+      () => rejectOrder(id, '재료 소진 등으로 주문을 받을 수 없습니다.'),
+      '주문 거절 실패',
+    )
   }
 
   const showPrintStub = () => {
     setAlertTitle('주문지 출력')
-    setAlertMessage('예시 모드: 주문지 출력은 프린터 API 연동 후 동작합니다.')
+    setAlertMessage(useMock ? '예시 모드: 프린터 API 연동 후 동작합니다.' : '프린터 연동 준비 중입니다.')
     setAlertOpen(true)
   }
 
@@ -95,7 +115,7 @@ export function OrdersPage() {
     <>
       <OwnerHeader
         title="실시간 주문"
-        subtitle={mockMode ? `${storeLabel ?? ''} · 로컬 POS` : storeLabel}
+        subtitle={useMock || mockMode ? `${storeLabel ?? ''} · 로컬 POS` : storeLabel}
         right={
           <Link to="/orders/completed" className={styles.completedLink}>
             <Icon name="task_alt" style={{ fontSize: '1rem' }} />
@@ -105,21 +125,28 @@ export function OrdersPage() {
       />
 
       <main className={styles.main}>
+        {ordersError ? <p style={{ color: '#b91c1c', margin: '0 0 0.75rem' }}>{ordersError}</p> : null}
         <section className={styles.pickupToolbar} aria-label="매장 기본 픽업 시간">
           <PickupTimeStepper
             label="기본 조리·픽업 시간"
-            hint="신규 주문에서 픽업 시간을 정한 뒤 수락·조리 시작하세요."
+            hint={
+              useMock
+                ? '신규 주문에서 픽업 시간을 정한 뒤 수락·조리 시작하세요.'
+                : '수락 시 서버가 매장 조리시간 기준으로 픽업 예정 시각을 계산합니다.'
+            }
             minutes={baseMinutes}
             onChange={setBaseMinutes}
           />
-          <div className={styles.toolbarActions}>
-            <button type="button" className={styles.mockIncomingBtn} onClick={simulateIncomingOrder}>
-              테스트 주문 들어오기
-            </button>
-            <button type="button" className={styles.resetDemoBtn} onClick={resetDemoOrders}>
-              예시 데이터 초기화
-            </button>
-          </div>
+          {useMock ? (
+            <div className={styles.toolbarActions}>
+              <button type="button" className={styles.mockIncomingBtn} onClick={simulateIncomingOrder}>
+                테스트 주문 들어오기
+              </button>
+              <button type="button" className={styles.resetDemoBtn} onClick={resetDemoOrders}>
+                예시 데이터 초기화
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <div className={styles.boardWithDetail}>
@@ -209,7 +236,7 @@ export function OrdersPage() {
                 <span
                   className={[styles.statusDot, salesPaused ? styles.statusDotPaused : ''].filter(Boolean).join(' ')}
                 />
-                <span className={styles.statusText}>로컬 POS</span>
+                <span className={styles.statusText}>{useMock ? '로컬 POS' : '실시간'}</span>
               </div>
               <div className={styles.divider} />
               <span className={styles.statusOpenLabel}>
@@ -235,10 +262,10 @@ export function OrdersPage() {
             order={selectedOrder}
             baseMinutes={baseMinutes}
             onPickupMinutesChange={handlePickupMinutesChange}
-            onStartCooking={handleStartCooking}
+            onStartCooking={(id) => void runAction(() => handleStartCooking(id), '수락 실패')}
             onReject={setRejectTargetId}
-            onCookDone={handleCookDone}
-            onPickupDone={handlePickupDone}
+            onCookDone={(id) => void runAction(() => handleCookDone(id), '조리 완료 실패')}
+            onPickupDone={(id) => void runAction(() => handlePickupDone(id), '픽업 완료 실패')}
             onPrint={showPrintStub}
           />
         </div>
@@ -247,7 +274,7 @@ export function OrdersPage() {
       <ConfirmModal
         open={rejectTargetId != null}
         title="주문 거절"
-        message="이 주문을 거절할까요? 목록에서 제거됩니다."
+        message="이 주문을 거절할까요? 전액 환불·쿠폰 복구가 함께 처리됩니다."
         confirmLabel="거절"
         confirmTone="danger"
         onCancel={() => setRejectTargetId(null)}

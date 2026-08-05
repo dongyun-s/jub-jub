@@ -12,11 +12,12 @@ import AppModal from '../../components/AppModal/AppModal'
 import mc from '../../components/AppModal/modalContent.module.css'
 import { ApiError } from '../../api/authClient'
 import { assertImageFileConstraints, MAX_REVIEW_IMAGES, uploadImageFileViaPresigned } from '../../api/uploads'
-import { createReview, fetchReview, generateAiReview, updateReview } from '../../api/reviews'
+import { createReview, fetchReview, generateAiReview, notifyReviewsUpdated, updateReview } from '../../api/reviews'
 import { useProfile } from '../../hooks/useProfile'
-import { getCachedMemberProfileId, resolveMemberProfileIdForReview } from '../../lib/authStorage'
+import { getCachedMemberProfileId, resolveMemberProfileIdForReview, setCachedMemberProfileId } from '../../lib/authStorage'
 import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imageUrl'
 import { notifyReviewNotificationsUpdated } from '../../hooks/useUnreadReviewNotificationCount'
+import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import styles from './ReviewWritePage.module.css'
 
 interface ReviewWritePageProps {
@@ -102,6 +103,13 @@ function ReviewWritePage({
   
   // AI 모달 관련 상태
   const [showAIModal, setShowAIModal] = useState(false)
+  const [resultAlert, setResultAlert] = useState<{
+    open: boolean
+    title: string
+    message: string
+    variant: 'success' | 'error' | 'info'
+    closeAndSubmit?: boolean
+  }>({ open: false, title: '', message: '', variant: 'info' })
   const [aiRatings, setAiRatings] = useState({
     taste: 0,
     packaging: 0,
@@ -407,27 +415,44 @@ function ReviewWritePage({
 
         if (isEditMode && reviewId) {
           await updateReview(reviewId, body)
-          alert(
-            allImagePaths.length > 0
-              ? `리뷰가 수정되었습니다. 사진 ${allImagePaths.length}장이 반영되었습니다.`
-              : '리뷰가 수정되었습니다.',
-          )
+          notifyReviewsUpdated()
+          setResultAlert({
+            open: true,
+            title: '리뷰 수정 완료',
+            message:
+              allImagePaths.length > 0
+                ? `리뷰가 수정되었습니다. 사진 ${allImagePaths.length}장이 반영되었습니다.`
+                : '리뷰가 수정되었습니다.',
+            variant: 'success',
+            closeAndSubmit: true,
+          })
         } else {
           await createReview({
             orderId,
             storeId,
             ...body,
           })
+          setCachedMemberProfileId(Number(memberProfileId))
           notifyReviewNotificationsUpdated()
-          alert(
-            allImagePaths.length > 0
-              ? `리뷰가 등록되었습니다. 사진 ${allImagePaths.length}장이 함께 저장되었습니다.`
-              : '리뷰가 등록되었습니다.',
-          )
+          notifyReviewsUpdated()
+          setResultAlert({
+            open: true,
+            title: '리뷰 등록 완료',
+            message:
+              allImagePaths.length > 0
+                ? `리뷰가 등록되었습니다. 사진 ${allImagePaths.length}장이 함께 저장되었습니다.`
+                : '리뷰가 등록되었습니다.',
+            variant: 'success',
+            closeAndSubmit: true,
+          })
         }
-        onSubmitted?.()
       } catch (e) {
-        alert(e instanceof ApiError ? e.message : isEditMode ? '리뷰 수정에 실패했습니다.' : '리뷰 등록에 실패했습니다.')
+        setResultAlert({
+          open: true,
+          title: isEditMode ? '수정 실패' : '등록 실패',
+          message: e instanceof ApiError ? e.message : isEditMode ? '리뷰 수정에 실패했습니다.' : '리뷰 등록에 실패했습니다.',
+          variant: 'error',
+        })
       } finally {
         setSubmitLoading(false)
       }
@@ -763,6 +788,19 @@ function ReviewWritePage({
                 </p>
               </div>
         </AppModal>
+
+        <SimpleAlertModal
+          open={resultAlert.open}
+          title={resultAlert.title}
+          message={resultAlert.message}
+          variant={resultAlert.variant}
+          confirmLabel="확인"
+          onClose={() => {
+            const shouldFinish = resultAlert.closeAndSubmit
+            setResultAlert((prev) => ({ ...prev, open: false, closeAndSubmit: false }))
+            if (shouldFinish) onSubmitted?.()
+          }}
+        />
       </div>
     </Layout>
   )

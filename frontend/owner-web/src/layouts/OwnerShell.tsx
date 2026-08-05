@@ -1,7 +1,8 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { NewOrderAlertHost } from '../components/NewOrderAlertHost/NewOrderAlertHost'
 import { OwnerNotificationBanner } from '../components/OwnerNotificationBanner/OwnerNotificationBanner'
+import { useAuth } from '../context/AuthProvider'
 import { OwnerOrdersProvider } from '../context/OwnerOrdersProvider'
 import { OwnerSalesProvider } from '../context/OwnerSalesProvider'
 import styles from './OwnerShell.module.css'
@@ -19,6 +20,13 @@ const nav: { to: string; label: string; icon: string; end?: boolean }[] = [
 
 export function OwnerShell() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/auth/login', { replace: true })
+  }
 
   return (
     <div className={styles.root}>
@@ -51,11 +59,10 @@ export function OwnerShell() {
           ))}
         </nav>
         <div className={styles.profileWrap}>
-          <img
-            alt=""
-            className={styles.avatar}
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3cDY65XqTWcrEPG9vcqJ_DdQXZhruVWyERFa5jJ-Ghpq4GtypYxc8x5FHyWZzlM8ih3E_-yukxyAKZzstAJa86oe8FJ3GG3rcxWSWFjGoHDvo7U8fb6HaplKilYVN5ndjEiOLvST10nd68shXO2e3NkC3PVVHpRQdz9k2C-9IQPf84bLLoHfqPp_-pUumD0bTrUOqV-lzJ8vQg4MXVfTJHM0MYWTdgpQCfe3L3miwEkQ8eKJ2QzzteNY6jnbcgvcoE4T8semcD1p5"
-          />
+          <button type="button" className={styles.logoutBtn} onClick={handleLogout} title="로그아웃">
+            <Icon name="logout" />
+            <span className={styles.navLabel}>로그아웃</span>
+          </button>
         </div>
       </aside>
       <div className={styles.content}>

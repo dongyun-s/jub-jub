@@ -149,6 +149,16 @@ function MyReviewsPage({
     void loadReviews()
   }, [loadReviews])
 
+  useEffect(() => {
+    const onReviewsUpdated = () => void loadReviews()
+    window.addEventListener('jubjub:reviews-updated', onReviewsUpdated)
+    window.addEventListener('focus', onReviewsUpdated)
+    return () => {
+      window.removeEventListener('jubjub:reviews-updated', onReviewsUpdated)
+      window.removeEventListener('focus', onReviewsUpdated)
+    }
+  }, [loadReviews])
+
   const handleEditClick = (review: ReviewUi) => {
     onEditReview?.({
       reviewId: review.id,

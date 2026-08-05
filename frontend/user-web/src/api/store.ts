@@ -39,6 +39,11 @@ export interface StoreDetailDto {
   originInfo: string
   cookingTimeMinutes: number
   minOrderAmount: number
+  /** 사장님 주소→좌표 변환 결과 (응답에 있으면 사용) */
+  latitude?: number | null
+  longitude?: number | null
+  categoryId?: number | null
+  categoryName?: string | null
   menus: MenuDto[]
 }
 
@@ -122,8 +127,33 @@ export async function fetchStores(params?: FetchStoresParams): Promise<StoreList
   }
 }
 
-export function fetchStoreDetail(storeId: number) {
-  return apiV1Fetch<StoreDetailDto>(`/stores/${storeId}`)
+export async function fetchStoreDetail(storeId: number): Promise<StoreDetailDto> {
+  const raw = await apiV1Fetch<Record<string, unknown>>(`/stores/${storeId}`)
+  const p = raw && typeof raw === 'object' ? raw : {}
+  return {
+    storeId: num(p.storeId ?? p.store_id ?? storeId),
+    name: String(p.name ?? '').trim(),
+    address: String(p.address ?? '').trim(),
+    phoneNumber: String(p.phoneNumber ?? p.phone_number ?? '').trim(),
+    originInfo: String(p.originInfo ?? p.origin_info ?? '').trim(),
+    cookingTimeMinutes: num(p.cookingTimeMinutes ?? p.cooking_time_minutes, 15),
+    minOrderAmount: num(p.minOrderAmount ?? p.min_order_amount),
+    latitude:
+      p.latitude != null && p.latitude !== ''
+        ? num(p.latitude)
+        : p.lat != null
+          ? num(p.lat)
+          : null,
+    longitude:
+      p.longitude != null && p.longitude !== ''
+        ? num(p.longitude)
+        : p.lng != null
+          ? num(p.lng)
+          : null,
+    categoryId: p.categoryId != null ? num(p.categoryId ?? p.category_id) : null,
+    categoryName: String(p.categoryName ?? p.category_name ?? '').trim() || null,
+    menus: Array.isArray(p.menus) ? (p.menus as StoreDetailDto['menus']) : [],
+  }
 }
 
 export type StoreSortBy = 'DISTANCE' | 'RATING'

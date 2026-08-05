@@ -1,3 +1,7 @@
+/**
+ * @deprecated Owner 리뷰는 `api/owner/review` 사용.
+ * 손님 스토어 리뷰 조회용으로만 남겨 둠.
+ */
 import { apiFetch, ApiError } from './authClient'
 
 export interface ReviewDto {
@@ -47,6 +51,7 @@ function parseReviewList(body: unknown): ReviewDto[] {
   return []
 }
 
+/** @deprecated `fetchOwnerReviews` (`api/owner/review`) 사용 */
 export async function fetchStoreReviews(storeId: number): Promise<ReviewDto[]> {
   try {
     const raw = await apiFetch<unknown>(`/api/reviews/store/${storeId}`, { method: 'GET' })

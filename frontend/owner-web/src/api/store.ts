@@ -22,6 +22,10 @@ export interface StoreDetailDto {
   menus: MenuDto[]
 }
 
+/**
+ * 고객용 매장 상세 (메뉴 포함).
+ * Owner 전용은 `api/owner/store.fetchOwnerStore` / `api/owner/menu` 사용.
+ */
 export function fetchStoreDetail(storeId: number, options?: { skipAuth?: boolean }) {
   return apiV1Fetch<StoreDetailDto>(`/stores/${storeId}`, {
     method: 'GET',

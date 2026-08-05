@@ -42,7 +42,7 @@ function isLocalOrderPaid(o: OrderContextRow): boolean {
 }
 
 function isPickupPending(o: OrderContextRow): boolean {
-  if (o.pickupCompleted || o.orderStatus === 'COMPLETED') return false
+  if (o.pickupCompleted || o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED') return false
   return isLocalOrderPaid(o)
 }
 
@@ -98,21 +98,31 @@ export function readLocalOrdersPendingApiSync(apiOrderIds: Set<number>): OrderCo
 }
 
 function mapApiOrderToContext(hit: MyOrderItem, localMatch?: OrderContextRow): OrderContextRow {
+  const localDone =
+    Boolean(localMatch?.pickupCompleted) ||
+    localMatch?.orderStatus === 'COMPLETED' ||
+    localMatch?.orderStatus === 'REFUNDED'
+  const apiDone = hit.orderStatus === 'COMPLETED' || hit.orderStatus === 'REFUNDED'
   return {
     orderId: hit.orderId,
     storeId: hit.storeId ?? localMatch?.storeId ?? 0,
     storeName: hit.storeName,
     menuSummary: localMatch?.menuSummary ?? hit.orderNo,
-    orderStatus: hit.orderStatus,
+    orderStatus: apiDone || localDone ? (hit.orderStatus === 'REFUNDED' || localMatch?.orderStatus === 'REFUNDED' ? 'REFUNDED' : 'COMPLETED') : hit.orderStatus,
     paymentStatus: hit.paymentStatus ?? undefined,
-    pickupCompleted: hit.orderStatus === 'COMPLETED',
+    pickupCompleted: apiDone || localDone,
     createdAt: localMatch?.createdAt ?? hit.orderedAt,
     paidAt: hit.paidAt ?? localMatch?.paidAt,
   }
 }
 
 function pickNewestActivePickup(orders: MyOrderItem[]): MyOrderItem | undefined {
-  const pending = orders.filter(isActivePickupOrder)
+  const localDoneIds = new Set(
+    readLocalOrders()
+      .filter((o) => o.pickupCompleted || o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED')
+      .map((o) => o.orderId),
+  )
+  const pending = orders.filter((o) => isActivePickupOrder(o) && !localDoneIds.has(o.orderId))
   if (pending.length === 0) return undefined
   return [...pending].sort((a, b) => {
     const ta = new Date(a.orderedAt).getTime()

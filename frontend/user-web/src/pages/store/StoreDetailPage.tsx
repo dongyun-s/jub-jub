@@ -24,6 +24,8 @@ import {
   type MenuItem,
   type MenuCategory,
 } from '../../lib/storeDetailMenu'
+import { fetchRewardMe } from '../../api/rewards'
+import { getTierDiscountRate } from '../../lib/rewardTierTheme'
 import styles from './StoreDetailPage.module.css'
 
 interface StoreDetailPageProps {
@@ -122,10 +124,35 @@ function StoreDetailPage({
   const [storeReviews, setStoreReviews] = useState<ReviewDto[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState<string | null>(null)
+  /** 내 등급 할인율 (%) — 백엔드 RewardTier 기준 */
+  const [tierDiscountRate, setTierDiscountRate] = useState(0)
 
   const categoryScrollRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!getAccessToken()) {
+      setTierDiscountRate(0)
+      return
+    }
+    let cancelled = false
+    const load = () => {
+      void fetchRewardMe()
+        .then((me) => {
+          if (!cancelled) setTierDiscountRate(getTierDiscountRate(me.tier, me.tierName))
+        })
+        .catch(() => {
+          if (!cancelled) setTierDiscountRate(0)
+        })
+    }
+    load()
+    window.addEventListener('jubjub-rewards-updated', load)
+    return () => {
+      cancelled = true
+      window.removeEventListener('jubjub-rewards-updated', load)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -439,8 +466,8 @@ function StoreDetailPage({
                   <span className={styles.statValue}>{cookTimeLabel}</span>
                 </div>
                 <div className={`${styles.statBox} ${styles.statBoxHighlight}`}>
-                  <span className={`${styles.statLabel} ${styles.statLabelPrimary}`}>포장 할인</span>
-                  <span className={styles.statValueGradient}>10%</span>
+                  <span className={`${styles.statLabel} ${styles.statLabelPrimary}`}>등급 할인</span>
+                  <span className={styles.statValueGradient}>{tierDiscountRate}%</span>
                 </div>
               </div>
             </div>

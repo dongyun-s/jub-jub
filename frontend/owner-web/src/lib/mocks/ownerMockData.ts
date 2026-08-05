@@ -1,5 +1,9 @@
 import type { StoreDetailDto } from '../../api/store'
-import type { ReviewDto } from '../../api/reviews'
+import type {
+  OwnerReviewFilter,
+  OwnerReviewListItemDto,
+  OwnerReviewSummaryDto,
+} from '../../api/owner/review'
 
 export type MockOrderStatus = 'new' | 'progress' | 'ready' | 'completed'
 
@@ -17,6 +21,8 @@ export type MockOwnerOrder = {
   amount: number
   time: string
   status: MockOrderStatus
+  /** 사장님 거절 → 완료 목록에 포함될 때 true */
+  rejected?: boolean
   orderedAtLabel: string
   items: MockOrderLine[]
   customerNote?: string
@@ -95,6 +101,22 @@ export function getMockStoreDetail(storeId: number): StoreDetailDto {
       },
     ],
   }
+}
+
+/** Owner Menu API 목록용 목업 */
+export function getMockOwnerMenus() {
+  return getMockStoreDetail(1).menus.map((m, i) => ({
+    menuId: m.menuId,
+    name: m.name,
+    price: m.price,
+    description: m.description,
+    category: (i % 3 === 0 ? 'MAIN' : i % 3 === 1 ? 'SIDE' : 'DRINK') as 'MAIN' | 'SIDE' | 'DRINK',
+    isSpicy: i === 1 || i === 5,
+    isVegetarian: i === 2,
+    isBest: i === 0 || i === 2,
+    soldOut: m.isSoldOut,
+    imageUrl: null as string | null,
+  }))
 }
 
 export const MOCK_OWNER_ORDERS: MockOwnerOrder[] = [
@@ -209,45 +231,77 @@ export const MOCK_OWNER_ORDERS: MockOwnerOrder[] = [
   },
 ]
 
-export function getMockStoreReviews(storeId: number): ReviewDto[] {
-  return [
-    {
-      reviewId: 1,
-      orderId: 8801,
-      memberProfileId: 12,
-      storeId,
-      overallRating: 5,
-      content: '스테이크 샐러드 정말 맛있었어요! 고기가 부드럽고 야채도 신선했습니다.',
-      createdAt: '2026-05-20T14:30:00',
+const MOCK_OWNER_REVIEWS: OwnerReviewListItemDto[] = [
+  {
+    reviewId: 1,
+    orderId: 8801,
+    reviewerName: '맛집탐험가',
+    overallRating: 5,
+    content: '스테이크 샐러드 정말 맛있었어요! 고기가 부드럽고 야채도 신선했습니다.',
+    createdAt: '2026-05-20T14:30:00',
+    imagePaths: [],
+    answered: true,
+    replyContent: '소중한 리뷰 감사합니다. 다음에도 맛있게 준비할게요!',
+  },
+  {
+    reviewId: 2,
+    orderId: 8798,
+    reviewerName: '빠른픽업',
+    overallRating: 4,
+    content: '픽업이 예상보다 빨라서 좋았어요. 포장도 깔끔했습니다.',
+    createdAt: '2026-05-19T19:12:00',
+    imagePaths: ['https://picsum.photos/seed/jubjub-r2/200/200'],
+    answered: false,
+    replyContent: null,
+  },
+  {
+    reviewId: 3,
+    orderId: 8790,
+    reviewerName: '비빔밥러버',
+    overallRating: 5,
+    content: '비빔밥 양도 넉넉하고 양념이 딱 제 스타일이에요. 또 주문할게요!',
+    createdAt: '2026-05-18T12:05:00',
+    imagePaths: [],
+    answered: false,
+    replyContent: null,
+  },
+  {
+    reviewId: 4,
+    orderId: 8782,
+    reviewerName: '대기싫어',
+    overallRating: 3,
+    content: '맛은 좋은데 대기 시간이 조금 길었어요.',
+    createdAt: '2026-05-17T18:40:00',
+    imagePaths: [],
+    answered: false,
+    replyContent: null,
+  },
+]
+
+export function getMockOwnerReviewSummary(): OwnerReviewSummaryDto {
+  return {
+    averageRating: 4.3,
+    totalReviewCount: MOCK_OWNER_REVIEWS.length,
+    unansweredReviewCount: MOCK_OWNER_REVIEWS.filter((r) => !r.answered).length,
+    photoReviewCount: MOCK_OWNER_REVIEWS.filter((r) => r.imagePaths.length > 0).length,
+    ratingDistribution: {
+      oneStar: 0,
+      twoStar: 0,
+      threeStar: 1,
+      fourStar: 1,
+      fiveStar: 2,
     },
-    {
-      reviewId: 2,
-      orderId: 8798,
-      memberProfileId: 34,
-      storeId,
-      overallRating: 4,
-      content: '픽업이 예상보다 빨라서 좋았어요. 포장도 깔끔했습니다.',
-      createdAt: '2026-05-19T19:12:00',
-    },
-    {
-      reviewId: 3,
-      orderId: 8790,
-      memberProfileId: 7,
-      storeId,
-      overallRating: 5,
-      content: '비빔밥 양도 넉넉하고 양념이 딱 제 스타일이에요. 또 주문할게요!',
-      createdAt: '2026-05-18T12:05:00',
-    },
-    {
-      reviewId: 4,
-      orderId: 8782,
-      memberProfileId: 51,
-      storeId,
-      overallRating: 3,
-      content: '맛은 좋은데 대기 시간이 조금 길었어요.',
-      createdAt: '2026-05-17T18:40:00',
-    },
-  ]
+  }
+}
+
+export function getMockOwnerReviewList(filter: OwnerReviewFilter = 'ALL', keyword = ''): OwnerReviewListItemDto[] {
+  const kw = keyword.trim().toLowerCase()
+  return MOCK_OWNER_REVIEWS.filter((r) => {
+    if (filter === 'UNANSWERED' && r.answered) return false
+    if (filter === 'PHOTO' && r.imagePaths.length === 0) return false
+    if (kw && !r.content.toLowerCase().includes(kw) && !r.reviewerName.toLowerCase().includes(kw)) return false
+    return true
+  })
 }
 
 export type MockBestMenu = {

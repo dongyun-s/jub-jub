@@ -1,26 +1,37 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/Icon'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
-import { ApiError } from '../../api/authClient'
-import { login } from '../../api/auth'
-import { setSessionEmail, setTokens } from '../../lib/authStorage'
-import { isOwnerAuthSkipped, useOwnerMockData } from '../../lib/ownerConfig'
+import { ApiError, getOwnerAccessToken } from '../../api/authClient'
+import { isOwnerRole, login } from '../../api/auth'
+import { setSessionEmail, setSessionRole, setTokens } from '../../lib/authStorage'
+import { useOwnerMockData } from '../../lib/ownerConfig'
 import {
   activateOwnerStoreForEmail,
   hasMockOwnerCredential,
+  saveOwnerStoreProfile,
+  getOwnerStoreProfile,
   verifyMockOwnerCredential,
+  setActiveStoreId,
 } from '../../lib/ownerSession'
 import styles from './AuthPage.module.css'
 
 type LocationState = { from?: string }
 
+function resolvePostLoginPath(from: string | undefined): string {
+  if (!from || from.startsWith('/auth')) return '/dashboard'
+  return from
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const from = useMemo(() => (location.state as LocationState | null)?.from, [location.state])
+  const from = useMemo(
+    () => resolvePostLoginPath((location.state as LocationState | null)?.from),
+    [location.state],
+  )
   const mockMode = useOwnerMockData()
-  const authSkipped = isOwnerAuthSkipped()
+  const alreadyLoggedIn = Boolean(getOwnerAccessToken())
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,15 +40,13 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   const goAfterLogin = () => {
-    navigate(from ?? '/dashboard', { replace: true })
+    navigate(from, { replace: true })
   }
 
-  // auth 연동 전: 로그인 화면 진입 시 바로 POS로
-  useEffect(() => {
-    if (authSkipped) {
-      navigate(from ?? '/dashboard', { replace: true })
-    }
-  }, [authSkipped, from, navigate])
+  // 이미 로그인된 경우: effect navigate 루프 방지 → Navigate 한 번만
+  if (alreadyLoggedIn) {
+    return <Navigate to={from} replace />
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +54,7 @@ export function LoginPage() {
     setLoading(true)
     const trimmedEmail = email.trim()
     try {
-      // 예시 모드에서 로컬 가입한 계정은 API 없이 로그인
+      // 예시 모드에서 로컬 가입한 계정만 API 없이 로그인
       if (mockMode && hasMockOwnerCredential(trimmedEmail)) {
         if (!verifyMockOwnerCredential(trimmedEmail, password)) {
           setError('이메일 또는 비밀번호가 올바르지 않습니다.')
@@ -53,15 +62,39 @@ export function LoginPage() {
         }
         setTokens('mock-owner-access', 'mock-owner-refresh')
         setSessionEmail(trimmedEmail)
+        setSessionRole('OWNER')
         activateOwnerStoreForEmail(trimmedEmail)
         goAfterLogin()
         return
       }
 
       const res = await login(trimmedEmail, password)
+      if (!isOwnerRole(res.role)) {
+        setError('사장님(OWNER) 계정이 아닙니다. 사장님 회원가입 후 로그인해 주세요.')
+        return
+      }
+
+      const sessionEmail = res.email?.trim() || trimmedEmail
       setTokens(res.accessToken, res.refreshToken)
-      setSessionEmail(res.email?.trim() || trimmedEmail)
-      activateOwnerStoreForEmail(res.email?.trim() || trimmedEmail)
+      setSessionEmail(sessionEmail)
+      setSessionRole(String(res.role).trim())
+
+      const storeId = res.storeId != null ? Number(res.storeId) : NaN
+      if (Number.isFinite(storeId) && storeId > 0) {
+        const existing = getOwnerStoreProfile(sessionEmail)
+        saveOwnerStoreProfile({
+          email: sessionEmail,
+          businessNumber: existing?.businessNumber ?? '',
+          storeAddress: existing?.storeAddress ?? '',
+          storePhone: existing?.storePhone ?? '',
+          storeName: existing?.storeName,
+          storeId: Math.floor(storeId),
+        })
+        setActiveStoreId(Math.floor(storeId))
+      } else {
+        activateOwnerStoreForEmail(sessionEmail)
+      }
+
       goAfterLogin()
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : '로그인에 실패했습니다.'

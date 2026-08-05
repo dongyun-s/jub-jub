@@ -89,6 +89,12 @@ export function createReview(body: ReviewCreateBody) {
   })
 }
 
+/** 내 리뷰·주문내역 리뷰 상태 갱신 */
+export function notifyReviewsUpdated() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('jubjub:reviews-updated'))
+}
+
 export async function fetchReview(reviewId: number): Promise<ReviewDto> {
   const raw = await apiFetch<unknown>(`/api/reviews/${reviewId}`, { method: 'GET' })
   const inner =
