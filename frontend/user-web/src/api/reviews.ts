@@ -37,6 +37,14 @@ export interface ReviewDto {
   createdAt?: string
   /** 백엔드 ReviewResponse 필드명 */
   imagePaths?: string[]
+  ownerReply?: OwnerReplyDto | null
+}
+
+export interface OwnerReplyDto {
+  replyId: number
+  content: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface ReviewCreateBody {
@@ -125,6 +133,9 @@ function normalizeReviewDto(raw: unknown): ReviewDto | null {
     ? imagePathsRaw.map((x) => String(x)).filter(Boolean)
     : undefined
 
+  const ownerReplyRaw = p.ownerReply ?? p.owner_reply
+  const ownerReply = normalizeOwnerReply(ownerReplyRaw)
+
   return {
     reviewId,
     orderId,
@@ -146,6 +157,32 @@ function normalizeReviewDto(raw: unknown): ReviewDto | null {
           ? p.created_at
           : undefined,
     imagePaths,
+    ownerReply,
+  }
+}
+
+function normalizeOwnerReply(raw: unknown): OwnerReplyDto | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const reply = raw as Record<string, unknown>
+  const replyId = num(reply.replyId ?? reply.reply_id)
+  const content = String(reply.content ?? '').trim()
+  if (!replyId || !content) return null
+
+  return {
+    replyId,
+    content,
+    createdAt:
+      typeof reply.createdAt === 'string'
+        ? reply.createdAt
+        : typeof reply.created_at === 'string'
+          ? reply.created_at
+          : undefined,
+    updatedAt:
+      typeof reply.updatedAt === 'string'
+        ? reply.updatedAt
+        : typeof reply.updated_at === 'string'
+          ? reply.updated_at
+          : undefined,
   }
 }
 

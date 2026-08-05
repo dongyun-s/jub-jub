@@ -746,6 +746,35 @@
   color: rgb(100 116 139);
 }
 
+.reviewOwnerReply {
+  margin: 0.75rem 0 0 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background-color: rgb(249 250 251);
+  border-left: 3px solid var(--color-primary);
+}
+
+.reviewOwnerReplyHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+}
+
+.reviewOwnerReplyHeader span {
+  font-size: 1rem;
+}
+
+.reviewOwnerReplyText {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(55 65 81);
+  white-space: pre-wrap;
+}
+
 .infoTab {
   padding: 1rem 1rem 5rem;
   background-color: #ffffff;
