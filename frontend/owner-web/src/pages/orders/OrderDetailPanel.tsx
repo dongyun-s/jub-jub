@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal'
 import { Icon } from '../../components/Icon'
 import { PickupTimeStepper } from '../../components/PickupTimeStepper/PickupTimeStepper'
-import { formatPrice } from '../../lib/format'
+import { formatOwnerOrderNo, formatPrice } from '../../lib/format'
 import {
-  formatPickupEtaLabel,
-  formatPickupPreviewLabel,
+  countWaitingOrdersAhead,
+  formatAdjustedPickupPreview,
+  formatNewOrderPickupLabel,
+  formatPickupEtaDisplay,
+  formatWaitingQueueHint,
   isPickupTimeLocked,
   resolvePickupMinutes,
 } from '../../lib/ownerPickupTime'
@@ -15,8 +18,12 @@ import styles from './OrdersPage.module.css'
 type OrderDetailPanelProps = {
   order: MockOwnerOrder | null
   baseMinutes: number
+  /** 신규 큐 — 대기 주문 반영 표시 */
+  newOrders?: MockOwnerOrder[]
+  /** 수락 전 픽업 시간 조절 (주문별) */
+  allowPickupAdjust?: boolean
   onPickupMinutesChange: (id: number, adjustMinutes: number) => void
-  onStartCooking: (id: number) => void
+  onStartCooking: (id: number, cookingMinutes?: number) => void
   onReject: (id: number) => void
   onCookDone: (id: number) => void
   onPickupDone: (id: number) => void
@@ -83,6 +90,8 @@ function OrderStatusStepper({ status }: { status: MockOwnerOrder['status'] }) {
 export function OrderDetailPanel({
   order,
   baseMinutes,
+  newOrders = [],
+  allowPickupAdjust = true,
   onPickupMinutesChange,
   onStartCooking,
   onReject,
@@ -152,18 +161,27 @@ export function OrderDetailPanel({
   const locked = isPickupTimeLocked(order)
   const adjust = order.pickupAdjustMinutes ?? 0
   const pickupMinutes = resolvePickupMinutes(baseMinutes, adjust)
+  const waitingAhead = isNew ? countWaitingOrdersAhead(order.orderId, newOrders) : 0
+  const waitingHint = formatWaitingQueueHint(waitingAhead)
   const adjustHint = locked
     ? '조리 시작 후 변경할 수 없습니다'
     : adjust === 0
       ? '매장 기본과 동일 · 조리 시작 시 확정'
       : `기본 대비 ${adjust > 0 ? '+' : ''}${adjust}분`
+  const pickupPreview =
+    allowPickupAdjust && !locked
+      ? formatAdjustedPickupPreview(pickupMinutes)
+      : formatNewOrderPickupLabel(order.estimatedPickupTime, pickupMinutes)
+  const shortNo = formatOwnerOrderNo(order.orderNo, order.orderId)
 
   return (
     <aside className={paneClass} aria-label={`주문 상세 ${order.orderNo}`}>
       <div className={styles.detailHead}>
         <div>
           <p className={styles.detailEyebrow}>{statusLabel(order)}</p>
-          <h2 className={`${styles.detailOrderNo} ${styles.monoNum}`}>#{order.orderNo}</h2>
+          <h2 className={`${styles.detailOrderNo} ${styles.monoNum}`} title={order.orderNo}>
+            #{shortNo}
+          </h2>
           <p className={styles.detailMeta}>{order.orderedAtLabel}</p>
         </div>
       </div>
@@ -184,22 +202,29 @@ export function OrderDetailPanel({
               <Icon name="schedule" style={{ fontSize: '1.125rem' }} />
               <div className={styles.pickupLockedText}>
                 <span className={styles.activeCardEta}>
-                  {formatPickupEtaLabel(order.acceptedAtMs, pickupMinutes)}
+                  {formatPickupEtaDisplay(order.estimatedPickupTime, order.acceptedAtMs, pickupMinutes)}
                 </span>
-                <span className={styles.pickupLockedHint}>조리 시작 시 확정됨</span>
+                <span className={styles.pickupLockedHint}>수락(조리 시작) 시점 기준으로 갱신됨</span>
               </div>
               <span className={styles.pickupLockedBadge}>확정</span>
             </div>
           ) : (
             <>
-              <p className={styles.detailPickupPreview}>{formatPickupPreviewLabel(pickupMinutes)}</p>
-              <PickupTimeStepper
-                compact
-                label="픽업 시간 설정"
-                hint={adjustHint}
-                minutes={pickupMinutes}
-                onChange={(next) => onPickupMinutesChange(order.orderId, next - baseMinutes)}
-              />
+              <p className={styles.detailPickupPreview}>{pickupPreview}</p>
+              {waitingHint ? <p className={styles.detailQueueHint}>{waitingHint}</p> : null}
+              {allowPickupAdjust ? (
+                <PickupTimeStepper
+                  compact
+                  label="픽업 시간 설정"
+                  hint={adjustHint}
+                  minutes={pickupMinutes}
+                  onChange={(next) => onPickupMinutesChange(order.orderId, next - baseMinutes)}
+                />
+              ) : (
+                <p className={styles.detailPickupFallbackHint}>
+                  FastAPI 예측·매장 기본 조리시간이 반영된 예상입니다. 수락 시 픽업 시각이 다시 계산됩니다.
+                </p>
+              )}
             </>
           )}
         </section>
@@ -273,7 +298,11 @@ export function OrderDetailPanel({
 
         {isNew ? (
           <>
-            <button type="button" className={styles.btnAcceptLarge} onClick={() => onStartCooking(order.orderId)}>
+            <button
+              type="button"
+              className={styles.btnAcceptLarge}
+              onClick={() => onStartCooking(order.orderId, pickupMinutes)}
+            >
               <Icon name="skillet" />
               주문 수락 · 조리 시작
             </button>
@@ -323,7 +352,7 @@ export function OrderDetailPanel({
       <ConfirmModal
         open={pickupConfirmOpen}
         title="픽업 완료 확인"
-        message={`#${order.orderNo} 주문을 픽업 완료 처리할까요?\n고객이 매장에서 수령한 뒤에만 눌러 주세요. 완료 후 실시간 목록에서 빠집니다.`}
+        message={`#${formatOwnerOrderNo(order.orderNo, order.orderId)} 주문을 픽업 완료 처리할까요?\n고객이 매장에서 수령한 뒤에만 눌러 주세요. 완료 후 실시간 목록에서 빠집니다.`}
         confirmLabel="픽업 완료"
         confirmTone="primary"
         onCancel={() => setPickupConfirmOpen(false)}

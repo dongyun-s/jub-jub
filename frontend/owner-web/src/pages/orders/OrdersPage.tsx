@@ -11,6 +11,7 @@ import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
 import { useOwnerCookingTime } from '../../hooks/useOwnerCookingTime'
 import { useHorizontalDragScroll } from '../../hooks/useHorizontalDragScroll'
 import { getActiveOwnerStoreProfile } from '../../lib/ownerSession'
+import { resolvePickupMinutes } from '../../lib/ownerPickupTime'
 import { ActiveOrderCard, NewOrderCard } from './orderCards'
 import { OrderDetailPanel } from './OrderDetailPanel'
 import styles from './OrdersPage.module.css'
@@ -129,11 +130,7 @@ export function OrdersPage() {
         <section className={styles.pickupToolbar} aria-label="매장 기본 픽업 시간">
           <PickupTimeStepper
             label="기본 조리·픽업 시간"
-            hint={
-              useMock
-                ? '신규 주문에서 픽업 시간을 정한 뒤 수락·조리 시작하세요.'
-                : '수락 시 서버가 매장 조리시간 기준으로 픽업 예정 시각을 계산합니다.'
-            }
+            hint="신규 주문에서 픽업 시간을 정한 뒤 수락·조리 시작하세요."
             minutes={baseMinutes}
             onChange={setBaseMinutes}
           />
@@ -183,6 +180,7 @@ export function OrdersPage() {
                       selected={selectedId === o.orderId}
                       onSelect={setSelectedId}
                       shouldIgnoreClick={shouldIgnoreNewOrderClick}
+                      newOrders={newOrders}
                     />
                   ))}
                 </div>
@@ -261,8 +259,16 @@ export function OrdersPage() {
           <OrderDetailPanel
             order={selectedOrder}
             baseMinutes={baseMinutes}
+            newOrders={newOrders}
+            allowPickupAdjust
             onPickupMinutesChange={handlePickupMinutesChange}
-            onStartCooking={(id) => void runAction(() => handleStartCooking(id), '수락 실패')}
+            onStartCooking={(id, cookingMinutes) => {
+              const order = orders.find((o) => o.orderId === id)
+              const mins =
+                cookingMinutes ??
+                resolvePickupMinutes(baseMinutes, order?.pickupAdjustMinutes ?? 0)
+              void runAction(() => handleStartCooking(id, mins), '수락 실패')
+            }}
             onReject={setRejectTargetId}
             onCookDone={(id) => void runAction(() => handleCookDone(id), '조리 완료 실패')}
             onPickupDone={(id) => void runAction(() => handlePickupDone(id), '픽업 완료 실패')}

@@ -20,6 +20,7 @@ export type OwnerOrderSummaryDto = {
   finalAmount: number
   orderedAt?: string
   paidAt?: string
+  estimatedPickupTime?: string | null
 }
 
 export type OwnerOrderOptionDto = {
@@ -64,6 +65,7 @@ export type OwnerOrderActionResult = {
   orderId: number
   orderStatus: string
   trackingStatus: OwnerTrackingStatus
+  estimatedPickupTime?: string | null
 }
 
 export type OwnerOrderListParams = {

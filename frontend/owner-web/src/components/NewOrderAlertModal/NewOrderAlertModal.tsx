@@ -2,8 +2,13 @@ import { useId, useMemo } from 'react'
 import AppModal from '../AppModal/AppModal'
 import { Icon } from '../Icon'
 import { PickupTimeStepper } from '../PickupTimeStepper/PickupTimeStepper'
-import { formatPrice } from '../../lib/format'
-import { formatPickupPreviewLabel, resolvePickupMinutes } from '../../lib/ownerPickupTime'
+import { formatOwnerOrderNo, formatPrice } from '../../lib/format'
+import {
+  countWaitingOrdersAhead,
+  formatAdjustedPickupPreview,
+  formatWaitingQueueHint,
+  resolvePickupMinutes,
+} from '../../lib/ownerPickupTime'
 import type { MockOwnerOrder } from '../../lib/mocks/ownerMockData'
 import mc from '../AppModal/modalContent.module.css'
 import styles from './NewOrderAlertModal.module.css'
@@ -12,8 +17,10 @@ type NewOrderAlertModalProps = {
   open: boolean
   order: MockOwnerOrder | null
   baseMinutes: number
+  newOrders?: MockOwnerOrder[]
+  allowPickupAdjust?: boolean
   onPickupMinutesChange: (id: number, adjustMinutes: number) => void
-  onStartCooking: (id: number) => void
+  onStartCooking: (id: number, cookingMinutes?: number) => void
   onReject: (id: number) => void
   onClose: () => void
   onEnableNotify?: () => void
@@ -24,6 +31,8 @@ export function NewOrderAlertModal({
   open,
   order,
   baseMinutes,
+  newOrders = [],
+  allowPickupAdjust = true,
   onPickupMinutesChange,
   onStartCooking,
   onReject,
@@ -40,6 +49,11 @@ export function NewOrderAlertModal({
     () => (liveOrder ? resolvePickupMinutes(baseMinutes, liveOrder.pickupAdjustMinutes ?? 0) : baseMinutes),
     [liveOrder, baseMinutes],
   )
+
+  const waitingHint = useMemo(() => {
+    if (!liveOrder) return null
+    return formatWaitingQueueHint(countWaitingOrdersAhead(liveOrder.orderId, newOrders))
+  }, [liveOrder, newOrders])
 
   const adjustHint = useMemo(() => {
     if (!liveOrder) return ''
@@ -69,8 +83,8 @@ export function NewOrderAlertModal({
         <h2 id={titleId} className={mc.titleCenter}>
           신규 주문이 들어왔습니다
         </h2>
-        <p id={descId} className={styles.orderNo}>
-          #{liveOrder.orderNo}
+        <p id={descId} className={styles.orderNo} title={liveOrder.orderNo}>
+          #{formatOwnerOrderNo(liveOrder.orderNo, liveOrder.orderId)}
         </p>
         <p className={styles.summary}>{liveOrder.summary}</p>
         <p className={styles.amount}>{formatPrice(liveOrder.total)}</p>
@@ -80,14 +94,21 @@ export function NewOrderAlertModal({
         ) : null}
 
         <div className={styles.pickupBlock}>
-          <p className={styles.pickupLead}>{formatPickupPreviewLabel(pickupMinutes)}</p>
-          <PickupTimeStepper
-            compact
-            label="픽업 시간 설정"
-            hint={adjustHint}
-            minutes={pickupMinutes}
-            onChange={(next) => onPickupMinutesChange(liveOrder.orderId, next - baseMinutes)}
-          />
+          <p className={styles.pickupLead}>{formatAdjustedPickupPreview(pickupMinutes)}</p>
+          {waitingHint ? <p className={styles.queueHint}>{waitingHint}</p> : null}
+          {allowPickupAdjust ? (
+            <PickupTimeStepper
+              compact
+              label="픽업 시간 설정"
+              hint={adjustHint}
+              minutes={pickupMinutes}
+              onChange={(next) => onPickupMinutesChange(liveOrder.orderId, next - baseMinutes)}
+            />
+          ) : (
+            <p className={styles.pickupHint}>
+              수락하면 조리 중으로 바뀌고, 픽업 예정 시각이 수락 시점 기준으로 갱신됩니다.
+            </p>
+          )}
         </div>
 
         {showNotifyHint && onEnableNotify ? (
@@ -103,10 +124,10 @@ export function NewOrderAlertModal({
         <button
           type="button"
           className={styles.btnStart}
-          onClick={() => onStartCooking(liveOrder.orderId)}
+          onClick={() => onStartCooking(liveOrder.orderId, pickupMinutes)}
         >
           <Icon name="skillet" />
-          조리 시작
+          수락 · 조리 시작
         </button>
 
         <div className={styles.actions}>

@@ -61,6 +61,14 @@ export function mapOwnerOrderSummary(dto: OwnerOrderSummaryDto): MockOwnerOrder 
   const summary = qty > 0 ? `${nick} · ${qty}개` : nick
   const amount = Number(dto.finalAmount) || 0
 
+  const paidMs = dto.paidAt ? Date.parse(dto.paidAt) : Number.NaN
+  const orderedMs = dto.orderedAt ? Date.parse(dto.orderedAt) : Number.NaN
+  const anchorMs = Number.isFinite(paidMs)
+    ? paidMs
+    : Number.isFinite(orderedMs)
+      ? orderedMs
+      : undefined
+
   return {
     orderId: dto.orderId,
     orderNo: dto.orderNo || String(dto.orderId),
@@ -76,9 +84,14 @@ export function mapOwnerOrderSummary(dto: OwnerOrderSummaryDto): MockOwnerOrder 
     discount: 0,
     total: amount,
     paymentMethod: rejected ? '거절·환불' : dto.orderStatus || '결제',
-    acceptedAtMs: ui === 'progress' || ui === 'ready' || ui === 'completed' ? Date.now() : undefined,
-    readyAtMs: ui === 'ready' || (ui === 'completed' && !rejected) ? Date.now() : undefined,
-    completedAtMs: ui === 'completed' ? Date.now() : undefined,
+    // Date.now()로 덮지 않음 — 수락 시점 앵커는 paidAt/이전값 유지
+    acceptedAtMs:
+      ui === 'progress' || ui === 'ready' || (ui === 'completed' && !rejected)
+        ? anchorMs
+        : undefined,
+    readyAtMs: ui === 'ready' || (ui === 'completed' && !rejected) ? anchorMs : undefined,
+    completedAtMs: ui === 'completed' ? anchorMs : undefined,
+    estimatedPickupTime: dto.estimatedPickupTime ?? null,
   }
 }
 
@@ -93,6 +106,7 @@ export function mapOwnerOrderDetail(dto: OwnerOrderDetailDto, prev?: MockOwnerOr
     finalAmount: dto.finalAmount,
     orderedAt: dto.orderedAt,
     paidAt: dto.paidAt,
+    estimatedPickupTime: dto.estimatedPickupTime,
     totalQuantity: dto.items?.reduce((s, i) => s + (i.quantity || 0), 0),
   })
 
@@ -132,6 +146,10 @@ export function mapOwnerOrderDetail(dto: OwnerOrderDetailDto, prev?: MockOwnerOr
     discount,
     total: dto.finalAmount ?? base.total,
     amount: dto.finalAmount ?? base.amount,
+    estimatedPickupTime: dto.estimatedPickupTime ?? prev?.estimatedPickupTime ?? base.estimatedPickupTime,
+    acceptedAtMs: base.acceptedAtMs ?? prev?.acceptedAtMs,
+    readyAtMs: base.readyAtMs ?? prev?.readyAtMs,
+    completedAtMs: base.completedAtMs ?? prev?.completedAtMs,
     summary:
       items.length > 0
         ? items

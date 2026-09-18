@@ -3,12 +3,12 @@
  * 메뉴 상세 — GET /api/v1/stores/{storeId} 로 메뉴·옵션 조회 후 장바구니 담기(POST /api/v1/carts)
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Layout from '../../components/Layout'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { fetchStoreDetail } from '../../api/store'
 import type { MenuDto } from '../../api/store'
-import { addCartItem } from '../../api/cart'
+import { addOrMergeCartItem } from '../../api/cart'
 import { ApiError } from '../../api/authClient'
 import { getAccessToken } from '../../lib/authStorage'
 import styles from './MenuDetailPage.module.css'
@@ -22,8 +22,6 @@ interface MenuDetailPageProps {
   onBack: () => void
   /** 장바구니 API 반영 후 App에서 목록 갱신 */
   onAfterAddToCart?: () => void | Promise<void>
-  /** 담기 후 이동할 때 (예: 장바구니 탭) */
-  onGoToCart?: () => void
 }
 
 function menuHeroImage(m: MenuDto | null, menuIndex: number): string {
@@ -42,12 +40,12 @@ function MenuDetailPage({
   menuId,
   onBack,
   onAfterAddToCart,
-  onGoToCart,
 }: MenuDetailPageProps) {
   const [menu, setMenu] = useState<MenuDto | null>(null)
   const [menuIndex, setMenuIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const addingRef = useRef(false)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   const [quantity, setQuantity] = useState(1)
@@ -113,6 +111,7 @@ function MenuDetailPage({
   const formatPrice = (price: number) => price.toLocaleString() + '원'
 
   const handleAddToCart = async () => {
+    if (addingRef.current) return
     if (!menu || menu.isSoldOut) return
     if (!getAccessToken()) {
       setAlertMessage('로그인 후 장바구니에 담을 수 있습니다.')
@@ -125,9 +124,10 @@ function MenuDetailPage({
       return
     }
 
+    addingRef.current = true
     setAdding(true)
     try {
-      await addCartItem({
+      await addOrMergeCartItem({
         storeId,
         menuId: menu.menuId,
         quantity,
@@ -135,7 +135,8 @@ function MenuDetailPage({
         optionIds: Array.from(selectedOptionIds),
       })
       await onAfterAddToCart?.()
-      onGoToCart?.()
+      // 장바구니로 바로 가지 않고 매장 메뉴로 복귀 → 다른 메뉴도 담을 수 있게
+      onBack()
     } catch (e) {
       const msg =
         e instanceof ApiError
@@ -145,6 +146,7 @@ function MenuDetailPage({
             : '장바구니에 담지 못했습니다.'
       setAlertMessage(msg)
     } finally {
+      addingRef.current = false
       setAdding(false)
     }
   }

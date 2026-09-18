@@ -20,6 +20,7 @@ export type OwnerStoreDto = {
   longitude?: number | null
   status: OwnerStoreStatus
   cookingTimeMinutes?: number
+  minOrderAmount?: number
 }
 
 export type OwnerStoreStatusBody = {
@@ -57,5 +58,13 @@ export function updateOwnerStoreStatus(body: OwnerStoreStatusBody) {
   return apiV1Fetch<OwnerStoreDto>(storePath('/status'), {
     method: 'PATCH',
     body: JSON.stringify(body),
+  })
+}
+
+/** PATCH /api/v1/owner/store/min-order */
+export function updateOwnerStoreMinOrder(minOrderAmount: number) {
+  return apiV1Fetch<OwnerStoreDto>(storePath('/min-order'), {
+    method: 'PATCH',
+    body: JSON.stringify({ minOrderAmount: Math.max(0, Math.floor(minOrderAmount)) }),
   })
 }

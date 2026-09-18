@@ -34,6 +34,8 @@ export type MockOwnerOrder = {
   pickupAdjustMinutes?: number
   /** 조리 시작(수락) 시각(ms). 이후 픽업 시간 변경 불가 */
   acceptedAtMs?: number
+  /** 서버 예상 픽업 시각(ISO) — FastAPI/기본 조리시간 반영 */
+  estimatedPickupTime?: string | null
   /** 조리 완료 → 픽업 대기 전환 시각 */
   readyAtMs?: number
   /** 픽업 완료 시각 */

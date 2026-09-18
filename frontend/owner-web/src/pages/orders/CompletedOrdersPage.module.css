@@ -152,11 +152,15 @@
 }
 
 .orderNo {
-  font-size: 1.125rem;
-  font-weight: 900;
-  letter-spacing: 0.03em;
-  line-height: 1.2;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
   color: var(--owner-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7rem;
 }
 
 .summary {

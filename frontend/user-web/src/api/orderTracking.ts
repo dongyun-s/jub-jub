@@ -1,5 +1,6 @@
 /**
  * 주문 추적 API — GET /order-tracking/{orderId}
+ * 출발 추천 — GET /order-tracking/{orderId}/departure-recommendation
  */
 import { apiFetch } from './authClient'
 
@@ -26,11 +27,37 @@ export interface OrderTrackingResponse {
   rejectReason?: string | null
 }
 
+/** GET …/departure-recommendation 성공 응답 */
+export interface DepartureRecommendationResponse {
+  orderId: number
+  estimatedPickupTime: string | null
+  walkingMinutes: number
+  minutesUntilDeparture: number
+  recommendedDepartureAt: string | null
+  expectedArrivalAt: string | null
+  leaveNow: boolean
+}
+
 export type OrderStep = 'received' | 'cooking' | 'ready' | 'completed' | 'rejected'
 
 /** GET /order-tracking/{orderId} */
 export function fetchOrderTracking(orderId: number) {
   return apiFetch<OrderTrackingResponse>(`/order-tracking/${orderId}`, { method: 'GET' })
+}
+
+/**
+ * GET /order-tracking/{orderId}/departure-recommendation?userLat=&userLng=
+ * (/api/v1 접두사 없음)
+ */
+export function fetchDepartureRecommendation(orderId: number, userLat: number, userLng: number) {
+  const q = new URLSearchParams({
+    userLat: String(userLat),
+    userLng: String(userLng),
+  })
+  return apiFetch<DepartureRecommendationResponse>(
+    `/order-tracking/${orderId}/departure-recommendation?${q.toString()}`,
+    { method: 'GET' },
+  )
 }
 
 export function mapTrackingToOrderStep(

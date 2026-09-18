@@ -116,9 +116,21 @@ function PickupRewardModal({
               </div>
             </li>
           )}
-          {!showDistance && !showOrderCount && (
+          {!showDistance && !showOrderCount && rewards && (
             <li className={styles.rewardRowMuted}>
-              <p>보상은 처리됐습니다. 홈·마이페이지에서 잠시 후 다시 확인해 주세요.</p>
+              <p>
+                현재 누적 픽업 <strong>{rewards.totalOrderCount.toLocaleString('ko-KR')}회</strong>
+                {rewards.tierName ? ` · ${rewards.tierName}` : ''}
+              </p>
+              <p style={{ marginTop: '0.5rem' }}>
+                이번 픽업 보상이 서버에 반영되지 않았습니다. 픽업 완료는 됐지만 리워드 적립(횟수·등급)이
+                실패한 상태일 수 있어요.
+              </p>
+            </li>
+          )}
+          {!showDistance && !showOrderCount && !rewards && (
+            <li className={styles.rewardRowMuted}>
+              <p>리워드 정보를 불러오지 못했습니다. 홈·마이페이지에서 다시 확인해 주세요.</p>
             </li>
           )}
         </ul>

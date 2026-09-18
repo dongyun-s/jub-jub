@@ -6,7 +6,7 @@ import { EmptyState } from '../../components/EmptyState/EmptyState'
 import { useOwnerOrders } from '../../context/OwnerOrdersProvider'
 import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
 import { useOwnerCookingTime } from '../../hooks/useOwnerCookingTime'
-import { formatPrice } from '../../lib/format'
+import { formatOwnerOrderNo, formatPrice } from '../../lib/format'
 import { OrderDetailPanel } from './OrderDetailPanel'
 import styles from './CompletedOrdersPage.module.css'
 
@@ -87,7 +87,12 @@ export function CompletedOrdersPage() {
                         onClick={() => setSelectedId(o.orderId)}
                       >
                         <div className={styles.rowMain}>
-                          <span className={`${styles.orderNo} ${styles.monoNum}`}>#{o.orderNo}</span>
+                          <span
+                            className={`${styles.orderNo} ${styles.monoNum}`}
+                            title={o.orderNo}
+                          >
+                            #{formatOwnerOrderNo(o.orderNo, o.orderId)}
+                          </span>
                           <span className={styles.summary}>{o.summary}</span>
                           {o.rejected ? <span className={styles.rejectedPill}>거절</span> : null}
                         </div>
