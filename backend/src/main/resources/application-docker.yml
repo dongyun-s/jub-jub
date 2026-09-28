@@ -4,3 +4,61 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  openai:
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+coolsms:
+  api:
+    key: ${COOLSMS_API_KEY}
+    secret: ${COOLSMS_API_SECRET}
+  sender: ${COOLSMS_SENDER}
+
+tmap:
+  app-key: ${TMAP_APP_KEY}
+  pedestrian-url: ${TMAP_PEDESTRIAN_URL:https://apis.openapi.sk.com/tmap/routes/pedestrian}
+  geocoding-url: ${TMAP_GEOCODING_URL:https://apis.openapi.sk.com/tmap/geo/fullAddrGeo}
+
+portone:
+  api-secret: ${PORTONE_API_SECRET}
+  base-url: ${PORTONE_BASE_URL:https://api.portone.io}
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET:}
+
+app:
+  s3:
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region: ${AWS_REGION:ap-northeast-2}
+    bucket: ${AWS_S3_BUCKET:jubjub-images}
+    public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+    presign-duration: ${AWS_S3_PRESIGN_DURATION:10m}
+    max-file-size-bytes: ${AWS_S3_MAX_FILE_SIZE_BYTES:10485760}
+    allowed-content-types:
+      - image/jpeg
+      - image/png
+      - image/webp
+      - image/gif
+
+ai:
+  service:
+    base-url: ${AI_SERVICE_BASE_URL:http://ai-service:8000}
