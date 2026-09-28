@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.domain.core.account.entity.Account;
 import io.github.dongyuns.jubjub.domain.core.account.repository.AccountRepository;
 import io.github.dongyuns.jubjub.domain.core.cart.repository.CartRepository;
 import io.github.dongyuns.jubjub.domain.core.reward.event.PickupCompletedEvent;
+import io.github.dongyuns.jubjub.domain.core.reward.service.RewardService;
 import io.github.dongyuns.jubjub.domain.core.coupon.service.DiscountCalculatorService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.core.store.repository.StoreRepository;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -29,6 +31,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -41,6 +46,7 @@ class OrderServiceTest {
     @Mock private PaymentRepository paymentRepository;
     @Mock private DiscountCalculatorService discountCalculatorService;
     @Mock private PickupDistanceService pickupDistanceService;
+    @Mock private RewardService rewardService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private OrderService orderService;
@@ -56,6 +62,7 @@ class OrderServiceTest {
                 paymentRepository,
                 discountCalculatorService,
                 pickupDistanceService,
+                rewardService,
                 eventPublisher
         );
     }
@@ -65,18 +72,36 @@ class OrderServiceTest {
         Order order = createPaidOrder();
         when(orderRepository.findById(101L)).thenReturn(Optional.of(order));
         when(pickupDistanceService.calculatePickupDistanceMeters(37.5572, 126.9245, order.getStore())).thenReturn(1730);
+        when(rewardService.givePickupReward(order.getMemberProfile(), 100, 1730, 101L))
+                .thenReturn(new RewardService.PickupRewardResult(7L, true, 1));
 
         orderService.completePickup(101L);
 
         ArgumentCaptor<PickupCompletedEvent> eventCaptor = ArgumentCaptor.forClass(PickupCompletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
+        InOrder calls = inOrder(rewardService, eventPublisher);
+        calls.verify(rewardService).givePickupReward(order.getMemberProfile(), 100, 1730, 101L);
+        calls.verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(PickupCompletedEvent.class));
 
         PickupCompletedEvent event = eventCaptor.getValue();
-        assertThat(event.getEmail()).isEqualTo("user@example.com");
-        assertThat(event.getEarnedXp()).isEqualTo(100);
-        assertThat(event.getWalkedDistance()).isEqualTo(1730);
+        assertThat(event.getMemberProfileId()).isEqualTo(7L);
+        assertThat(event.isTierUpgraded()).isTrue();
+        assertThat(event.getDistanceCouponCount()).isEqualTo(1);
         assertThat(event.getOrderId()).isEqualTo(101L);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    void rewardFailureDoesNotPublishCouponEvent() {
+        Order order = createPaidOrder();
+        when(orderRepository.findById(101L)).thenReturn(Optional.of(order));
+        when(pickupDistanceService.calculatePickupDistanceMeters(37.5572, 126.9245, order.getStore())).thenReturn(1730);
+        when(rewardService.givePickupReward(order.getMemberProfile(), 100, 1730, 101L))
+                .thenThrow(new IllegalStateException("reward failed"));
+
+        assertThatThrownBy(() -> orderService.completePickup(101L))
+                .isInstanceOf(IllegalStateException.class);
+        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any(PickupCompletedEvent.class));
     }
 
     private Order createPaidOrder() {

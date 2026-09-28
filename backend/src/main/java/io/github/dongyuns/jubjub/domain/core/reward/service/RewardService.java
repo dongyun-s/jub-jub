@@ -50,41 +50,14 @@ public class RewardService {
     // ==========================================
     @Transactional
     public void earnReward(MemberProfile profile, RewardSource source, int xp, int distance, Long referenceId) {
-
-        // 1) 보상 추가 전의 (과거) 티어를 기억해 둡니다.
-        RewardTier previousTier = profile.getTier();
-
-        // 2) 프로필 수치 업데이트 (픽업일 경우에만 횟수 증가 및 승급 심사)
-        boolean isPickup = (source == RewardSource.EARN_PICKUP);
-        int earnedDistanceCoupons = profile.addReward(distance, isPickup);
-
-        // 3) 보상 추가 후의 (현재) 티어를 확인합니다.
-        RewardTier currentTier = profile.getTier();
-
-        // 4) 과거 티어보다 현재 티어가 더 높다면? (승급 성공!)
-        if (previousTier.ordinal() < currentTier.ordinal()) {
+        PickupRewardResult result = recordReward(profile, source, xp, distance, referenceId);
+        if (result.tierUpgraded()) {
             // DB 쿠폰 정책에 condition_type="TIER_UPGRADE", amount=1000 을 넣어두셔야 합니다!
             couponIssueService.issueCoupon(profile.getId(), "TIER_UPGRADE", 1000);
-            log.info("🎉 [승급 축하] {} -> {} 승급! 1000원 쿠폰 발급 완료 (User ID: {})",
-                    previousTier.name(), currentTier.name(), profile.getId());
+            log.info("회원 {} 승급 쿠폰 발급 완료", profile.getId());
         }
-
-        // 5) 최신화된 RewardHistory 엔티티 구조에 맞춰 적립 내역 저장
-        RewardHistory history = RewardHistory.builder()
-                .memberProfile(profile)
-                .rewardType(RewardType.EARNED) // 적립 고정
-                .rewardSource(source)
-                .earnedXp(xp)
-                .earnedDistance(distance)
-                .referenceId(referenceId)
-                // description은 엔티티 내부에서 source.getDescription()으로 자동 처리됨
-                .build();
-
-        rewardHistoryRepository.save(history);
-
-        // 6) 🎯 10km 돌파 횟수만큼 거리 보상(DISTANCE) 1000원 쿠폰 발급!
-        if (earnedDistanceCoupons > 0) {
-            for (int i = 0; i < earnedDistanceCoupons; i++) {
+        if (result.distanceCouponCount() > 0) {
+            for (int i = 0; i < result.distanceCouponCount(); i++) {
                 // DB의 condition_type="DISTANCE", amount=1000 인 정책을 찾아 발급합니다.
                 couponIssueService.issueCoupon(profile.getId(), "DISTANCE", 1000);
             }
@@ -95,11 +68,28 @@ public class RewardService {
     // 3. [픽업 전용 적립]
     // ==========================================
     @Transactional
-    public void givePickupReward(String email, int xp, int distance, Long orderId) {
-        MemberProfile profile = memberProfileRepository.findByAccountEmail(email)
-                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+    public PickupRewardResult givePickupReward(MemberProfile profile, int xp, int distance, Long orderId) {
+        if (rewardHistoryRepository.existsByRewardSourceAndReferenceId(RewardSource.EARN_PICKUP, orderId)) {
+            throw new BusinessException("PICKUP_REWARD_ALREADY_GRANTED", "이미 적립된 픽업 주문입니다.", HttpStatus.CONFLICT);
+        }
+        return recordReward(profile, RewardSource.EARN_PICKUP, xp, distance, orderId);
+    }
 
-        earnReward(profile, RewardSource.EARN_PICKUP, xp, distance, orderId);
+    private PickupRewardResult recordReward(MemberProfile profile, RewardSource source, int xp, int distance, Long referenceId) {
+        RewardTier previousTier = profile.getTier();
+        int distanceCouponCount = profile.addReward(distance, source == RewardSource.EARN_PICKUP);
+        rewardHistoryRepository.save(RewardHistory.builder()
+                .memberProfile(profile)
+                .rewardType(RewardType.EARNED)
+                .rewardSource(source)
+                .earnedXp(xp)
+                .earnedDistance(distance)
+                .referenceId(referenceId)
+                .build());
+        return new PickupRewardResult(profile.getId(), previousTier.ordinal() < profile.getTier().ordinal(), distanceCouponCount);
+    }
+
+    public record PickupRewardResult(Long memberProfileId, boolean tierUpgraded, int distanceCouponCount) {
     }
 
     // ==========================================
