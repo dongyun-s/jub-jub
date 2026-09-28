@@ -22,6 +22,7 @@ public class OrderTrackingLifecycleService {
     private final OrderTrackingSmsService orderTrackingSmsService;
     private final OrderTrackingNotificationService orderTrackingNotificationService;
     private final MemberProfileRepository memberProfileRepository;
+    private final PickupTimePredictionService pickupTimePredictionService;
 
     @Transactional
     public OrderTracking ensureTracking(Order order) {
@@ -29,8 +30,11 @@ public class OrderTrackingLifecycleService {
             return null;
         }
 
+        // 최초 생성 때만 예측한다. 이후 조회에서는 저장된 예정 시각을 그대로 사용한다.
         OrderTracking tracking = orderTrackingRepository.findByOrderId(order.getId())
-                .orElseGet(() -> orderTrackingRepository.save(OrderTracking.initialize(order)));
+                .orElseGet(() -> orderTrackingRepository.save(
+                        OrderTracking.initialize(order, pickupTimePredictionService.predictReadyAt(order))
+                ));
         orderTrackingNotificationService.createIfNeeded(order, tracking);
         return tracking;
     }

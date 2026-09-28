@@ -9,8 +9,11 @@ import io.github.dongyuns.jubjub.domain.core.order.repository.OrderRepository;
 import io.github.dongyuns.jubjub.domain.core.order.service.OrderService;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.entity.OrderTracking;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.entity.OrderTrackingStatus;
+import io.github.dongyuns.jubjub.domain.core.ordertracking.entity.PredictionSource;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.repository.OrderTrackingRepository;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.service.OrderTrackingLifecycleService;
+import io.github.dongyuns.jubjub.domain.core.ordertracking.service.PickupTimePredictionService;
+import io.github.dongyuns.jubjub.domain.core.ordertracking.service.PickupTrainingDataService;
 import io.github.dongyuns.jubjub.domain.core.payment.service.PaymentService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.owner.order.dto.OwnerOrderStatusResponse;
@@ -30,6 +33,8 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class OwnerOrderServiceTest {
@@ -38,6 +43,8 @@ class OwnerOrderServiceTest {
     @Mock private OrderRepository orderRepository;
     @Mock private OrderTrackingRepository orderTrackingRepository;
     @Mock private OrderTrackingLifecycleService orderTrackingLifecycleService;
+    @Mock private PickupTimePredictionService pickupTimePredictionService;
+    @Mock private PickupTrainingDataService pickupTrainingDataService;
     @Mock private PaymentService paymentService;
     @Mock private OrderService orderService;
 
@@ -50,6 +57,8 @@ class OwnerOrderServiceTest {
                 orderRepository,
                 orderTrackingRepository,
                 orderTrackingLifecycleService,
+                pickupTimePredictionService,
+                pickupTrainingDataService,
                 paymentService,
                 orderService
         );
@@ -61,11 +70,35 @@ class OwnerOrderServiceTest {
         Order order = paidOrder(100L, store);
         OrderTracking tracking = OrderTracking.initialize(order);
         mockOwnedOrder(store, order, tracking);
+        when(pickupTimePredictionService.predictOnAcceptance(eq(order), any(LocalDateTime.class)))
+                .thenAnswer(invocation -> {
+                    LocalDateTime startedAt = invocation.getArgument(1);
+                    return new PickupTimePredictionService.PredictionResult(
+                            startedAt.plusMinutes(20), 15, 2, 1, 0, 20, PredictionSource.FASTAPI
+                    );
+                });
 
         OwnerOrderStatusResponse response = ownerOrderService.accept("owner@example.com", 100L);
 
         assertThat(response.trackingStatus()).isEqualTo(OrderTrackingStatus.COOKING);
+        assertThat(tracking.getEstimatedPickupTime()).isEqualTo(tracking.getCookingStartedAt().plusMinutes(20));
+        verify(pickupTrainingDataService).startCollection(
+                eq(order), eq(tracking.getCookingStartedAt()), any(PickupTimePredictionService.PredictionResult.class));
         verify(orderTrackingLifecycleService).notifyStatusChange(order, tracking);
+    }
+
+    @Test
+    void recordsActualCookingTimeWhenOrderBecomesReady() {
+        Store store = store(1L, 10L);
+        Order order = paidOrder(100L, store);
+        OrderTracking tracking = OrderTracking.initialize(order);
+        tracking.acceptAndStartCooking(LocalDateTime.now().minusMinutes(12), 15);
+        mockOwnedOrder(store, order, tracking);
+
+        OwnerOrderStatusResponse response = ownerOrderService.markReady("owner@example.com", 100L);
+
+        assertThat(response.trackingStatus()).isEqualTo(OrderTrackingStatus.READY_FOR_PICKUP);
+        verify(pickupTrainingDataService).completeCollection(eq(100L), any(LocalDateTime.class));
     }
 
     @Test

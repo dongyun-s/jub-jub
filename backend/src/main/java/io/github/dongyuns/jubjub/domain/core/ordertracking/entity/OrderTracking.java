@@ -71,8 +71,12 @@ public class OrderTracking extends BaseTimeEntity {
     public static OrderTracking initialize(Order order) {
         LocalDateTime baseTime = order.getPaidAt() != null ? order.getPaidAt() : LocalDateTime.now();
         int cookingMinutes = Math.max(order.getStore().getCookingTimeMinutes(), 1);
-        LocalDateTime pickupTime = baseTime.plusMinutes(cookingMinutes);
+        return initialize(order, baseTime.plusMinutes(cookingMinutes));
+    }
 
+    public static OrderTracking initialize(Order order, LocalDateTime pickupTime) {
+        LocalDateTime baseTime = order.getPaidAt() != null ? order.getPaidAt() : LocalDateTime.now();
+        // 고객 주문 추적 API가 내려주는 예상 시각과 자동 완료 기준을 함께 맞춘다.
         return OrderTracking.builder()
                 .orderId(order.getId())
                 .status(OrderTrackingStatus.RECEIVED)
@@ -84,11 +88,15 @@ public class OrderTracking extends BaseTimeEntity {
     }
 
     public void acceptAndStartCooking(LocalDateTime startedAt, int cookingMinutes) {
+        acceptAndStartCooking(startedAt, startedAt.plusMinutes(Math.max(cookingMinutes, 1)));
+    }
+
+    public void acceptAndStartCooking(LocalDateTime startedAt, LocalDateTime readyAt) {
         requireStatus(OrderTrackingStatus.RECEIVED);
         this.status = OrderTrackingStatus.COOKING;
         this.progressStartedAt = startedAt;
         this.cookingStartedAt = startedAt;
-        this.estimatedPickupTime = startedAt.plusMinutes(Math.max(cookingMinutes, 1));
+        this.estimatedPickupTime = readyAt;
         this.autoCompletedAt = this.estimatedPickupTime.plusMinutes(30);
     }
 
