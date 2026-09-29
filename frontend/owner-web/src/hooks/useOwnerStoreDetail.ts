@@ -14,6 +14,10 @@ export function useOwnerStoreDetail() {
   const [loading, setLoading] = useState(!mockMode)
   const [error, setError] = useState<string | null>(null)
 
+  const applyStore = (next: StoreDetailDto | null) => {
+    setStore(next)
+  }
+
   useEffect(() => {
     if (mockMode) {
       setStoreId(fallbackStoreId)
@@ -40,7 +44,7 @@ export function useOwnerStoreDetail() {
           phoneNumber: mine.phoneNumber,
           originInfo: '',
           cookingTimeMinutes: mine.cookingTimeMinutes ?? 15,
-          minOrderAmount: 0,
+          minOrderAmount: mine.minOrderAmount ?? 0,
           categoryId: mine.categoryId ?? null,
           menus: [],
         })
@@ -51,6 +55,8 @@ export function useOwnerStoreDetail() {
             setStore({
               ...full,
               categoryId: full.categoryId ?? mine.categoryId ?? null,
+              minOrderAmount: full.minOrderAmount ?? mine.minOrderAmount ?? 0,
+              cookingTimeMinutes: full.cookingTimeMinutes ?? mine.cookingTimeMinutes ?? 15,
             })
           }
         } catch {
@@ -70,5 +76,5 @@ export function useOwnerStoreDetail() {
     }
   }, [fallbackStoreId, mockMode])
 
-  return { storeId, store, loading, error, mockMode }
+  return { storeId, store, setStore: applyStore, loading, error, mockMode }
 }

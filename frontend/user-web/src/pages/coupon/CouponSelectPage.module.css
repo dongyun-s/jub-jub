@@ -152,6 +152,8 @@
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+  /* BottomNav(고정)에 마지막 쿠폰이 가리지 않도록 */
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   background-color: rgb(249 250 251);
 }
 

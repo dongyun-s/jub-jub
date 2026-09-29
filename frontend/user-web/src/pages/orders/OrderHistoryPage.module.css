@@ -80,6 +80,12 @@
   background-image: linear-gradient(to right, #ffe4f0, #ffffff); /* from-pink-50 to-white */
 }
 
+.activeOrderList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .activeOrderLabel {
   display: flex;
   align-items: center;
@@ -200,6 +206,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.orderNo {
+  margin: 0 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgb(100 116 139); /* slate-500 */
 }
 
 .orderStatusBadge {

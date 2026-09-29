@@ -40,7 +40,7 @@ const CATEGORY_THEMES: Record<string, CategoryTheme> = {
 
 const DEFAULT_STORE_THEME: CategoryTheme = {
   label: '매장',
-  emoji: '🏪',
+  emoji: '🍽️',
   from: '#ec4899',
   to: '#f6319a',
   glow: 'rgba(246,49,154,.45)',
@@ -89,6 +89,7 @@ function userLocationMarkerHtml(headingDeg?: number): string {
   </div>`
 }
 
+/** 카테고리 이모지 핀 (피자→🍕, 햄버거→🍔 …) */
 function storePinHtml(theme: CategoryTheme, size: 'md' | 'lg', title?: string): string {
   const dim = size === 'lg' ? 48 : 40
   const font = size === 'lg' ? 22 : 18
@@ -97,17 +98,6 @@ function storePinHtml(theme: CategoryTheme, size: 'md' | 'lg', title?: string): 
     <div style="width:${dim}px;height:${dim}px;margin:0 auto;background:linear-gradient(145deg,${theme.from},${theme.to});border-radius:50% 50% 50% 6px;transform:rotate(-45deg);border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;">
       <span style="display:block;transform:rotate(45deg);font-size:${font}px;line-height:1;">${theme.emoji}</span>
     </div>
-  </div>`
-}
-
-function destinationPinHtml(theme: CategoryTheme, title?: string): string {
-  const tip = title ? escapeHtml(title) : '픽업 매장'
-  return `<div style="position:relative;width:58px;height:66px;filter:drop-shadow(0 5px 14px ${theme.glow});" title="${tip}">
-    <div style="position:absolute;left:50%;top:0;width:54px;height:54px;margin-left:-27px;border-radius:50%;background:rgba(246,49,154,.15);border:2px solid rgba(246,49,154,.35);"></div>
-    <div style="position:relative;width:46px;height:46px;margin:6px auto 0;background:linear-gradient(145deg,${theme.from},${theme.to});border-radius:50% 50% 50% 6px;transform:rotate(-45deg);border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;">
-      <span style="display:block;transform:rotate(45deg);font-size:24px;line-height:1;">${theme.emoji}</span>
-    </div>
-    <div style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);padding:2px 8px;border-radius:999px;background:#fff;font-size:10px;font-weight:800;color:${theme.to};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.12);max-width:72px;overflow:hidden;text-overflow:ellipsis;">픽업</div>
   </div>`
 }
 
@@ -126,7 +116,7 @@ function markerKind(mk: MapTmapMarker): MapTmapMarkerKind {
 export function getMarkerIconLayout(mk: MapTmapMarker): MarkerIconLayout {
   const kind = markerKind(mk)
   if (kind === 'user') return { width: 56, height: 56, anchorX: 28, anchorY: 56 }
-  if (kind === 'destination') return { width: 58, height: 66, anchorX: 29, anchorY: 66 }
+  if (kind === 'destination') return { width: 56, height: 62, anchorX: 28, anchorY: 62 }
   return { width: 48, height: 54, anchorX: 24, anchorY: 54 }
 }
 
@@ -151,14 +141,6 @@ export function buildMarkerSvgDataUrl(mk: MapTmapMarker): string | null {
   const layout = getMarkerIconLayout(mk)
   const w = layout.width
   const h = layout.height - 6
-  const emoji = theme.emoji
-  const label =
-    kind === 'destination' ? '픽업' : theme.label.length > 4 ? theme.label.slice(0, 4) : theme.label
-  const badge =
-    kind === 'destination'
-      ? `<rect x="${w / 2 - 22}" y="${h - 2}" width="44" height="14" rx="7" fill="#fff"/>
-         <text x="${w / 2}" y="${h + 8}" text-anchor="middle" font-size="9" font-weight="700" fill="${theme.to}">${escapeHtml(label)}</text>`
-      : ''
   return svgEncode(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}">
       <defs>
@@ -167,10 +149,8 @@ export function buildMarkerSvgDataUrl(mk: MapTmapMarker): string | null {
           <stop offset="100%" stop-color="${theme.to}"/>
         </linearGradient>
       </defs>
-      ${kind === 'destination' ? `<circle cx="${w / 2}" cy="27" r="26" fill="rgba(246,49,154,.12)" stroke="rgba(246,49,154,.3)" stroke-width="2"/>` : ''}
       <path d="M${w / 2} ${h} C${w / 2 + 18} ${h} ${w - 4} ${h - 22} ${w - 4} ${h / 2} C${w - 4} 8 8 8 8 ${h / 2} C8 ${h - 22} ${w / 2 - 18} ${h} ${w / 2} ${h}Z" fill="url(#g)" stroke="#fff" stroke-width="3"/>
-      <text x="${w / 2}" y="${h / 2 + 6}" text-anchor="middle" font-size="18">${emoji}</text>
-      ${badge}
+      <text x="${w / 2}" y="${h / 2 + 6}" text-anchor="middle" font-size="18">${theme.emoji}</text>
     </svg>`,
   )
 }
@@ -182,10 +162,8 @@ export function buildMarkerIconHtml(mk: MapTmapMarker): string | null {
     return userLocationMarkerHtml(mk.headingDeg)
   }
   const theme = resolveCategoryTheme(mk.category)
-  if (kind === 'destination') {
-    return destinationPinHtml(theme, mk.title)
-  }
-  return storePinHtml(theme, 'md', mk.title)
+  // 픽업 목적지도 같은 카테고리 이모지 핀 (뱃지 없이 심플)
+  return storePinHtml(theme, kind === 'destination' ? 'lg' : 'md', mk.title)
 }
 
 type TmapMarkerLike = {
@@ -237,7 +215,7 @@ export function applyTmapMarkerAppearance(
 export function markerConstructorIconOptions(
   mk: MapTmapMarker,
   iconHtml: string,
-): { iconHTML: string; offset?: unknown } & Record<string, unknown> {
+): { iconHTML: string } {
   const layout = getMarkerIconLayout(mk)
   const wrapped = `<div style="width:${layout.width}px;height:${layout.height}px;overflow:visible;pointer-events:none;line-height:0;">${iconHtml}</div>`
   return { iconHTML: wrapped }

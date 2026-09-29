@@ -103,24 +103,34 @@
   text-indent: 0;
 }
 
-.verifiedBadge {
+.categoryBadge {
+  flex-shrink: 0;
   background-image: linear-gradient(to right, var(--color-primary), #ec4899);
   color: #ffffff;
-  font-size: 0.625rem;
-  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 9999px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: -0.01em;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
 }
 
 .profileMeta {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 0.375rem;
   font-size: 0.875rem;
   color: rgb(71 85 105);
+  min-width: 0;
+}
+
+.profileMeta > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .starIcon {
@@ -175,6 +185,42 @@
 .statValue {
   font-weight: 700;
   color: rgb(30 41 59);
+}
+
+.statRatingValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  margin-top: 0.125rem;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgb(15 23 42);
+  line-height: 1.2;
+}
+
+.statStarIcon {
+  color: #f59e0b;
+  font-size: 1.125rem;
+  line-height: 1;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+  filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.35));
+}
+
+.statStarIconMuted {
+  color: rgb(203 213 225);
+  font-size: 1.125rem;
+  line-height: 1;
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+.statValueCompact {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgb(30 41 59);
+  white-space: nowrap;
+  line-height: 1.25;
 }
 
 .statValueGradient {
@@ -472,6 +518,32 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+.menuCardSoldOut {
+  opacity: 0.55;
+  filter: grayscale(0.45);
+  background: linear-gradient(to bottom right, rgb(248 250 252), rgb(241 245 249));
+  border-color: rgb(226 232 240);
+  box-shadow: none;
+}
+
+.menuCardSoldOut:hover {
+  box-shadow: none;
+}
+
+.menuCardSoldOut .menuCardImage {
+  filter: brightness(0.72) saturate(0.5);
+}
+
+.menuCardSoldOutBadge {
+  background: rgb(51 65 85);
+  color: #ffffff;
+  font-size: 0.625rem;
+  font-weight: 800;
+  padding: 0.2rem 0.45rem;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
 .menuCardBg {
   position: absolute;
   top: -2.5rem;
@@ -533,10 +605,17 @@
   height: 6rem;
   flex-shrink: 0;
   border-radius: 0.75rem;
-  background-size: cover;
-  background-position: center;
+  overflow: hidden;
+  background: rgb(243 244 246);
   border: 2px solid #ffffff;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.menuCardImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .menuCardInfo {

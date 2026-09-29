@@ -6,21 +6,24 @@ export type PickupRewardBreakdown = {
   totalOrderCount: number
   totalWalkingDistanceM: number
   tierName: string
+  tierCode: string
   tierUpgraded: boolean
   previousTierName?: string
+  /** 서버 orderCount가 기준 대비 증가했는지 */
+  rewardApplied: boolean
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** 픽업 완료 후 비동기 리워드 적립이 반영될 때까지 /rewards/me 재조회 */
+/** 픽업 완료 후 서버 리워드 적립이 반영될 때까지 /rewards/me 재조회 */
 export async function pollRewardAfterPickup(
   before: RewardMeResponse,
   options?: { maxAttempts?: number; intervalMs?: number },
 ): Promise<RewardMeResponse> {
-  const maxAttempts = options?.maxAttempts ?? 10
-  const intervalMs = options?.intervalMs ?? 350
+  const maxAttempts = options?.maxAttempts ?? 12
+  const intervalMs = options?.intervalMs ?? 400
 
   for (let i = 0; i < maxAttempts; i++) {
     const after = await fetchRewardMe()
@@ -28,6 +31,12 @@ export async function pollRewardAfterPickup(
       return after
     }
     if (after.totalWalkingDistance > before.totalWalkingDistance) {
+      return after
+    }
+    if (
+      after.tier.trim().toUpperCase() !== before.tier.trim().toUpperCase() &&
+      after.tier.trim() !== ''
+    ) {
       return after
     }
     await sleep(intervalMs)
@@ -50,9 +59,11 @@ export function buildPickupRewardBreakdown(
     orderCountGain,
     totalOrderCount: after.orderCount,
     totalWalkingDistanceM: after.totalWalkingDistance,
-    tierName: after.tierName,
+    tierName: after.tierName || after.tier || '—',
+    tierCode: after.tier,
     tierUpgraded,
-    previousTierName: tierUpgraded ? before.tierName : undefined,
+    previousTierName: tierUpgraded ? before.tierName || before.tier : undefined,
+    rewardApplied: orderCountGain > 0 || walkedMeters > 0 || tierUpgraded,
   }
 }
 

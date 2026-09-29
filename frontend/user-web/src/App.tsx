@@ -7,7 +7,7 @@
  *
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   LoginPage,
   SignUpPage,
@@ -29,11 +29,18 @@ import {
   NotificationsPage,
   RankingPage,
 } from './pages'
-import { SimpleAlertModal } from './components'
+import { SimpleAlertModal, PickupRewardModal } from './components'
 import { clearTokens, getAccessToken } from './lib/authStorage'
 import { pruneUnpaidLocalOrders } from './lib/orderResolve'
 import { useActivePickup } from './hooks/useActivePickup'
+import { formatDepartureBannerLine, formatPickupHhMm } from './lib/pickupEta'
+import {
+  buildPickupRewardBreakdown,
+  pollRewardAfterPickup,
+  type PickupRewardBreakdown,
+} from './lib/pickupReward'
 import { fetchMyCart, mapCartListToUiLines, type ServerCartLineUi } from './api/cart'
+import { fetchRewardMe, notifyRewardsUpdated } from './api/rewards'
 import type { ReviewWritePayload } from './api/reviews'
 import type { NotificationNavigateTarget } from './lib/notificationNavigation'
 
@@ -68,20 +75,128 @@ function App() {
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null)
   /** 알림 → 주문 현황 등 특정 주문으로 열 때 */
   const [focusOrderId, setFocusOrderId] = useState<number | null>(null)
+  const [pickupRewardOpen, setPickupRewardOpen] = useState(false)
+  const [pickupRewardLoading, setPickupRewardLoading] = useState(false)
+  const [pickupRewardStoreName, setPickupRewardStoreName] = useState('')
+  const [pickupRewardBreakdown, setPickupRewardBreakdown] =
+    useState<PickupRewardBreakdown | null>(null)
+  const [pickupRewardOrderId, setPickupRewardOrderId] = useState<number | null>(null)
+  const [pickupRewardStoreId, setPickupRewardStoreId] = useState<number | null>(null)
+  const handledPickupRewardIds = useRef<Set<number>>(new Set())
+  const rewardBaselineRef = useRef<Awaited<ReturnType<typeof fetchRewardMe>> | null>(null)
 
   const {
     activeOrder,
+    trackableOrders,
     destination: pickupDestination,
+    estimatedPickupTime,
+    departureRecommendation,
     hasActivePickup,
     hasWaitingAccept,
+    hasTrackableOrder,
     rejectNotice,
     dismissRejectNotice,
     loading: pickupContextLoading,
     refresh: refreshActivePickup,
   } = useActivePickup(focusOrderId)
 
-  /** 사장님 수락 이후만 주문현황·픽업 경로 배너 */
+  /** 사장님 수락 이후만 홈/지도 픽업 경로 배너 */
   const hasActiveOrder = hasActivePickup
+  /** 수락 대기·조리 중 — 주문현황(픽업 HH:mm) 진입 가능 */
+  const hasOrderStatus = hasTrackableOrder
+
+  const openOrderStatus = useCallback((orderId?: number) => {
+    setFocusOrderId(orderId != null && orderId > 0 ? orderId : null)
+    setCurrentPage('orderStatus')
+  }, [])
+
+  const runPickupRewardFlow = useCallback(
+    (info: { orderId: number; storeName?: string; storeId?: number | null }) => {
+      if (!getAccessToken()) return
+      if (handledPickupRewardIds.current.has(info.orderId)) return
+      handledPickupRewardIds.current.add(info.orderId)
+
+      const storeName =
+        info.storeName?.trim() ||
+        (activeOrder?.orderId === info.orderId ? activeOrder.storeName?.trim() : '') ||
+        '매장'
+      const storeId =
+        info.storeId != null && info.storeId > 0
+          ? info.storeId
+          : activeOrder?.orderId === info.orderId && activeOrder.storeId > 0
+            ? activeOrder.storeId
+            : null
+
+      setPickupRewardOrderId(info.orderId)
+      setPickupRewardStoreId(storeId)
+      setPickupRewardStoreName(storeName)
+      setPickupRewardBreakdown(null)
+      setPickupRewardLoading(true)
+      setPickupRewardOpen(true)
+
+      void (async () => {
+        try {
+          // 진행 중 찍어 둔 기준값 사용 (완료 직후 조회하면 이미 반영돼 gain=0으로 보일 수 있음)
+          const before =
+            rewardBaselineRef.current ?? (await fetchRewardMe())
+          const after = await pollRewardAfterPickup(before)
+          setPickupRewardBreakdown(buildPickupRewardBreakdown(before, after))
+          rewardBaselineRef.current = after
+          notifyRewardsUpdated()
+        } catch {
+          notifyRewardsUpdated()
+        } finally {
+          setPickupRewardLoading(false)
+        }
+      })()
+    },
+    [activeOrder?.orderId, activeOrder?.storeId, activeOrder?.storeName],
+  )
+
+  // 진행 주문이 생기는 순간 리워드 기준 스냅샷 (픽업 완료 후 증가분 비교용)
+  useEffect(() => {
+    if (!getAccessToken()) return
+    if (!hasTrackableOrder) return
+    let cancelled = false
+    void fetchRewardMe()
+      .then((me) => {
+        if (!cancelled) rewardBaselineRef.current = me
+      })
+      .catch(() => {
+        /* ignore */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [hasTrackableOrder, trackableOrders.length])
+
+  const handlePickupComplete = useCallback(
+    (info: { kind: 'completed' | 'rejected'; orderId: number }) => {
+      void refreshActivePickup()
+      if (info.kind !== 'completed') return
+      runPickupRewardFlow({
+        orderId: info.orderId,
+        storeName: activeOrder?.orderId === info.orderId ? activeOrder.storeName : undefined,
+        storeId: activeOrder?.orderId === info.orderId ? activeOrder.storeId : null,
+      })
+    },
+    [activeOrder?.orderId, activeOrder?.storeId, activeOrder?.storeName, refreshActivePickup, runPickupRewardFlow],
+  )
+
+  useEffect(() => {
+    const onPickup = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ orderId?: number; storeName?: string; storeId?: number }>)
+        .detail
+      if (detail?.orderId == null || detail.orderId <= 0) return
+      runPickupRewardFlow({
+        orderId: detail.orderId,
+        storeName: detail.storeName,
+        storeId: detail.storeId,
+      })
+    }
+    window.addEventListener('jubjub:pickup-completed', onPickup)
+    return () => window.removeEventListener('jubjub:pickup-completed', onPickup)
+  }, [runPickupRewardFlow])
 
   const handleRejectNoticeClose = useCallback(() => {
     dismissRejectNotice()
@@ -90,16 +205,36 @@ function App() {
     setCurrentPage('orders')
   }, [dismissRejectNotice, refreshActivePickup])
 
-  /** 수락 전에는 주문현황에 머물지 않음 (거절 모달 표시 중에는 유지) */
+  /** 거절·완료로 활성 주문이 사라지면 주문현황에서 나감 (수락 대기는 현황 유지) */
   useEffect(() => {
     if (currentPage !== 'orderStatus') return
     if (pickupContextLoading) return
     if (rejectNotice) return
-    if (hasWaitingAccept) {
+    // focus로 연 주문이 완료·거절이면 다른 주문으로 넘기지 않고 현황 유지 (뒤로가기 시 해제)
+    if (
+      focusOrderId != null &&
+      activeOrder?.orderId === focusOrderId &&
+      (activeOrder.pickupCompleted ||
+        activeOrder.orderStatus === 'COMPLETED' ||
+        activeOrder.orderStatus === 'REFUNDED')
+    ) {
+      return
+    }
+    if (!hasOrderStatus && !hasActiveOrder) {
       setFocusOrderId(null)
       setCurrentPage('orders')
     }
-  }, [currentPage, hasWaitingAccept, pickupContextLoading, rejectNotice])
+  }, [
+    currentPage,
+    hasOrderStatus,
+    hasActiveOrder,
+    pickupContextLoading,
+    rejectNotice,
+    focusOrderId,
+    activeOrder?.orderId,
+    activeOrder?.pickupCompleted,
+    activeOrder?.orderStatus,
+  ])
 
   /** 리뷰 작성/수정 진입 — 뒤로가기 시 직전 화면으로 복귀 */
   const openReviewWrite = useCallback(
@@ -238,15 +373,32 @@ function App() {
             onCategoryClick={goTo('category')} 
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
-            onOrderStatusClick={goTo('orderStatus')}
+            onOrderStatusClick={() => {
+              if (trackableOrders.length > 1) {
+                setCurrentPage('orders')
+                return
+              }
+              openOrderStatus(trackableOrders[0]?.order.orderId)
+            }}
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
             onStoreSelect={openStoreById}
             onRankingClick={goTo('ranking')}
-            hasActiveOrder={hasActiveOrder}
-            activeOrderLabel={activeOrder?.storeName ?? pickupDestination?.name}
+            hasActiveOrder={hasActiveOrder || hasWaitingAccept}
+            activeOrderLabel={(() => {
+              const n = trackableOrders.length
+              if (n > 1) {
+                return `진행 중 주문 ${n}건 · 주문내역에서 모두 확인`
+              }
+              const store = activeOrder?.storeName ?? pickupDestination?.name ?? '주문'
+              if (departureRecommendation) {
+                return `${store} · ${formatDepartureBannerLine(departureRecommendation)}`
+              }
+              const hhmm = formatPickupHhMm(estimatedPickupTime)
+              return hhmm ? `${store} · 픽업 ${hhmm} 예정` : store
+            })()}
             cartCount={cartCount}
           />
         )
@@ -308,7 +460,6 @@ function App() {
               goTo('store')()
             }}
             onAfterAddToCart={refreshCart}
-            onGoToCart={goTo('cart')}
           />
         ) : null
       case 'cart':
@@ -320,8 +471,10 @@ function App() {
               setCartItems([])
               setCartStoreId(null)
               setCartStoreName(null)
-              // 수락 전에는 주문내역(대기) · 수락 후 현황/경로 노출
-              setCurrentPage('orders')
+              setAppliedCoupon(null)
+              setFocusOrderId(null)
+              // 결제 직후 주문현황에서 픽업 HH:mm(서버 estimatedPickupTime) 확인
+              setCurrentPage('orderStatus')
             }}
             onCouponClick={() => {
               setCouponHighlightExpiring(false)
@@ -381,16 +534,13 @@ function App() {
             onBack={goTo('home')}
             onGoHome={goTo('home')} 
             onCartClick={goTo('cart')}
-            onOrderStatusClick={goTo('orderStatus')}
+            onOrderStatusClick={(orderId) => openOrderStatus(orderId)}
             onMapClick={goTo('map')}
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
             onReviewWriteClick={openReviewWrite}
-            hasActiveOrder={hasActiveOrder}
-            hasWaitingAccept={hasWaitingAccept}
-            activeOrder={activeOrder}
-            pickupDestination={pickupDestination}
+            trackableOrders={trackableOrders}
             cartCount={cartCount}
           />
         )
@@ -409,11 +559,9 @@ function App() {
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
             onReviewWriteClick={openReviewWrite}
-            onPickupComplete={() => {
-              setFocusOrderId(null)
-              void refreshActivePickup()
-            }}
+            onPickupComplete={handlePickupComplete}
             activeOrder={activeOrder}
+            estimatedPickupTime={estimatedPickupTime}
             pickupDestination={pickupDestination}
             pickupContextLoading={pickupContextLoading}
             cartCount={cartCount}
@@ -426,7 +574,7 @@ function App() {
             onGoHome={goTo('home')} 
             onCartClick={goTo('cart')} 
             onOrdersClick={goTo('orders')}
-            onOrderStatusClick={goTo('orderStatus')}
+            onOrderStatusClick={() => openOrderStatus(activeOrder?.orderId)}
             onPickupStoreDetail={() => {
               const id = pickupDestination?.storeId ?? activeOrder?.storeId
               if (id) openStoreById(id)
@@ -537,7 +685,7 @@ function App() {
         return (
           <HomePage
             onCategoryClick={goTo('category')}
-            hasActiveOrder={hasActiveOrder}
+            hasActiveOrder={hasActiveOrder || hasWaitingAccept}
           />
         )
     }
@@ -556,6 +704,29 @@ function App() {
         confirmLabel="주문내역 보기"
         variant="error"
         onClose={handleRejectNoticeClose}
+      />
+      <PickupRewardModal
+        open={pickupRewardOpen}
+        onClose={() => {
+          setPickupRewardOpen(false)
+          setPickupRewardBreakdown(null)
+          setPickupRewardLoading(false)
+        }}
+        storeName={pickupRewardStoreName}
+        loading={pickupRewardLoading}
+        rewards={pickupRewardBreakdown}
+        onWriteReview={() => {
+          setPickupRewardOpen(false)
+          if (pickupRewardOrderId != null && pickupRewardStoreId != null) {
+            openReviewWrite({
+              storeName: pickupRewardStoreName,
+              orderId: pickupRewardOrderId,
+              storeId: pickupRewardStoreId,
+            })
+            return
+          }
+          goTo('orders')()
+        }}
       />
     </>
   )

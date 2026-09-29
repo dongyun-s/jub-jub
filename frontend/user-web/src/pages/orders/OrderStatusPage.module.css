@@ -230,6 +230,34 @@
   font-weight: 700;
 }
 
+.departureBox {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(246, 49, 154, 0.18);
+  text-align: left;
+}
+
+.departureBoxUrgent {
+  background: rgba(246, 49, 154, 0.08);
+  border-color: rgba(246, 49, 154, 0.35);
+}
+
+.departureTitle {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.departureDesc {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgb(75 85 99);
+}
+
 .reviewLinkBtn {
   margin-top: 0.25rem;
   padding: 0.55rem 1rem;

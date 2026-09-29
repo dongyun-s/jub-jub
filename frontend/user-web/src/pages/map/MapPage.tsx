@@ -26,6 +26,7 @@ import type { PickupDestination } from '../../hooks/useActivePickup'
 import { GeolocationError, geolocationErrorMessage, getUserCoords } from '../../lib/geolocation'
 import { haversineDistanceMeters, estimateWalkMinutes } from '../../lib/geoDistance'
 import { formatStoreDistanceMeters } from '../../lib/storeUi'
+import { formatStoreCardPickupLabel } from '../../lib/pickupEta'
 import {
   applyTmapMarkerAppearance,
   buildMarkerIconHtml,
@@ -836,7 +837,7 @@ function MapPage({
               category: s.categoryName?.trim() || '매장',
               distance: formatStoreDistanceMeters(s.distanceMeters) || '—',
               rating: Math.round(s.averageRating * 10) / 10 || 0,
-              pickupTime: `${s.cookingTimeMinutes}분`,
+              pickupTime: formatStoreCardPickupLabel(s.cookingTimeMinutes),
               image: STORE_LIST_CARD_IMAGES[Math.abs(s.storeId) % STORE_LIST_CARD_IMAGES.length],
               lat: s.latitude!,
               lng: s.longitude!,
@@ -1349,7 +1350,9 @@ function MapPage({
                               </span>
                               <span className={styles.storeRowDot}>•</span>
                               <span className={styles.storeRowTime}>
-                                도보 {currentLocation ? getWalkTimeText(store.lat, store.lng) : store.pickupTime}
+                                {currentLocation
+                                  ? `도보 ${getWalkTimeText(store.lat, store.lng)} · ${store.pickupTime}`
+                                  : store.pickupTime}
                               </span>
                             </div>
                           </div>

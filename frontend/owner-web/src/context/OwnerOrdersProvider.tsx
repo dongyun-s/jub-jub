@@ -40,7 +40,8 @@ type OwnerOrdersContextValue = {
   loading: boolean
   error: string | null
   refreshOrders: () => Promise<void>
-  handleStartCooking: (id: number) => Promise<void>
+  /** cookingMinutes: 수락 전 조절한 분(로컬 미리보기·mock ETA). 실 API accept 바디는 없음 */
+  handleStartCooking: (id: number, cookingMinutes?: number) => Promise<void>
   handlePickupMinutesChange: (id: number, adjustMinutes: number) => void
   handleCookDone: (id: number) => Promise<void>
   handlePickupDone: (id: number) => Promise<void>
@@ -81,22 +82,60 @@ export function OwnerOrdersProvider({ children }: { children: ReactNode }) {
       const mapped = list.map(mapOwnerOrderSummary).filter(Boolean) as MockOwnerOrder[]
       setOrders((prev) => {
         const prevById = new Map(prev.map((o) => [o.orderId, o]))
-        return mapped.map((o) => {
+        const merged = mapped.map((o) => {
           const old = prevById.get(o.orderId)
-          if (old && detailCache.current.has(o.orderId) && old.items?.length) {
-            return {
-              ...o,
-              items: old.items,
-              customerNote: old.customerNote,
-              subtotal: old.subtotal,
-              discount: old.discount,
-              total: old.total,
-              summary: old.summary || o.summary,
-            }
+          if (!old) {
+            // 신규 주문은 매장 기본 조리시간만 (이전 주문 조절분 미상속)
+            return { ...o, pickupAdjustMinutes: 0 }
           }
-          return o
+          return {
+            ...o,
+            // 목록 API에 ETA가 없어도 상세로 받은 값·수락 시각 유지
+            estimatedPickupTime: o.estimatedPickupTime ?? old.estimatedPickupTime ?? null,
+            acceptedAtMs: o.acceptedAtMs ?? old.acceptedAtMs,
+            readyAtMs: o.readyAtMs ?? old.readyAtMs,
+            completedAtMs: o.completedAtMs ?? old.completedAtMs,
+            // 수락 전 조절분은 해당 주문에만 유지 (다른 주문으로 넘어가지 않음)
+            pickupAdjustMinutes: old.pickupAdjustMinutes ?? 0,
+            items: detailCache.current.has(o.orderId) && old.items?.length ? old.items : o.items,
+            customerNote: detailCache.current.has(o.orderId) ? old.customerNote : o.customerNote,
+            subtotal: detailCache.current.has(o.orderId) ? old.subtotal : o.subtotal,
+            discount: detailCache.current.has(o.orderId) ? old.discount : o.discount,
+            total: detailCache.current.has(o.orderId) ? old.total : o.total,
+            summary:
+              detailCache.current.has(o.orderId) && old.summary ? old.summary || o.summary : o.summary,
+          }
         })
+        return merged
       })
+
+      // 목록에 ETA가 없으면 상세로 보강 (FastAPI/기본 조리시간 반영값)
+      const needEta = mapped
+        .filter((o) => o.status !== 'completed' && !o.rejected && !o.estimatedPickupTime)
+        .slice(0, 30)
+      if (needEta.length > 0) {
+        void Promise.all(
+          needEta.map(async (o) => {
+            try {
+              const detail = await fetchOwnerOrderDetail(o.orderId)
+              if (!detail.estimatedPickupTime) return
+              detailCache.current.add(o.orderId)
+              setOrders((prev) => {
+                const idx = prev.findIndex((x) => x.orderId === o.orderId)
+                if (idx < 0) return prev
+                const next = [...prev]
+                next[idx] = {
+                  ...next[idx]!,
+                  estimatedPickupTime: detail.estimatedPickupTime,
+                }
+                return next
+              })
+            } catch {
+              /* 상세 실패 시 기본 조리시간 라벨로 폴백 */
+            }
+          }),
+        )
+      }
       setError(null)
       failStreak.current = 0
       nextPollAt.current = 0
@@ -173,41 +212,105 @@ export function OwnerOrdersProvider({ children }: { children: ReactNode }) {
   }, [orders])
 
   const handleStartCooking = useCallback(
-    async (id: number) => {
+    async (id: number, cookingMinutes?: number) => {
       if (useMock) {
         setOrders((prev) =>
           prev.map((o) => {
             if (o.orderId !== id || o.status !== 'new') return o
+            const mins = Math.max(
+              1,
+              cookingMinutes ?? 15 + (o.pickupAdjustMinutes ?? 0),
+            )
+            const acceptedAtMs = Date.now()
             return {
               ...o,
               status: 'progress' as const,
               label: '조리 중',
-              acceptedAtMs: Date.now(),
+              acceptedAtMs,
+              estimatedPickupTime: new Date(acceptedAtMs + mins * 60_000).toISOString(),
               time: '방금 수락',
             }
           }),
         )
         return
       }
-      await acceptOwnerOrder(id)
-      await refreshOrders()
-      await loadOrderDetail(id)
+      let snapshot: MockOwnerOrder | undefined
+      const acceptedAtMs = Date.now()
+      const localEta =
+        cookingMinutes != null && cookingMinutes > 0
+          ? new Date(acceptedAtMs + cookingMinutes * 60_000).toISOString()
+          : null
+      setOrders((prev) => {
+        snapshot = prev.find((o) => o.orderId === id)
+        return prev.map((o) =>
+          o.orderId === id
+            ? {
+                ...o,
+                status: 'progress' as const,
+                label: '조리 중',
+                acceptedAtMs,
+                ...(localEta ? { estimatedPickupTime: localEta } : {}),
+              }
+            : o,
+        )
+      })
+      try {
+        const accepted = await acceptOwnerOrder(id)
+        // 서버 ETA가 오면 우선, 없으면 수락 전 조절한 로컬 ETA 유지
+        const nextEta = accepted.estimatedPickupTime ?? localEta
+        if (nextEta) {
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.orderId === id
+                ? {
+                    ...o,
+                    status: 'progress' as const,
+                    label: '조리 중',
+                    acceptedAtMs,
+                    estimatedPickupTime: nextEta,
+                  }
+                : o,
+            ),
+          )
+        }
+        await refreshOrders()
+        await loadOrderDetail(id)
+      } catch (e) {
+        setOrders((prev) =>
+          prev.map((o) => {
+            if (o.orderId !== id) return o
+            if (snapshot) return { ...snapshot }
+            return {
+              ...o,
+              status: 'new' as const,
+              label: '신규',
+              acceptedAtMs: undefined,
+              estimatedPickupTime: null,
+              time: snapshot?.time ?? o.time,
+            }
+          }),
+        )
+        const raw =
+          e instanceof ApiError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : '주문 수락에 실패했습니다.'
+        setError(raw)
+        await refreshOrders()
+      }
     },
     [useMock, refreshOrders, loadOrderDetail],
   )
 
-  const handlePickupMinutesChange = useCallback(
-    (id: number, adjustMinutes: number) => {
-      if (!useMock) return
-      setOrders((prev) =>
-        prev.map((o) => {
-          if (o.orderId !== id || isPickupTimeLocked(o)) return o
-          return { ...o, pickupAdjustMinutes: adjustMinutes }
-        }),
-      )
-    },
-    [useMock],
-  )
+  const handlePickupMinutesChange = useCallback((id: number, adjustMinutes: number) => {
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.orderId !== id || isPickupTimeLocked(o)) return o
+        return { ...o, pickupAdjustMinutes: adjustMinutes }
+      }),
+    )
+  }, [])
 
   const handleCookDone = useCallback(
     async (id: number) => {

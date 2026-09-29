@@ -38,9 +38,6 @@ export function MenuPage() {
   const [editDesc, setEditDesc] = useState('')
   const [editPrice, setEditPrice] = useState('')
   const [editCategory, setEditCategory] = useState<OwnerMenuCategory>('MAIN')
-  const [editSpicy, setEditSpicy] = useState(false)
-  const [editVegetarian, setEditVegetarian] = useState(false)
-  const [editBest, setEditBest] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<OwnerMenuListItem | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -67,9 +64,6 @@ export function MenuPage() {
     setEditDesc(m.description)
     setEditPrice(String(m.price))
     setEditCategory(m.category)
-    setEditSpicy(m.isSpicy)
-    setEditVegetarian(m.isVegetarian)
-    setEditBest(m.isBest)
   }
 
   const closeEdit = () => {
@@ -97,9 +91,9 @@ export function MenuPage() {
         price: Math.floor(price),
         category: editCategory,
         imageUrl: editTarget.imageUrl,
-        isSpicy: editSpicy,
-        isVegetarian: editVegetarian,
-        isBest: editBest,
+        isSpicy: editTarget.isSpicy,
+        isVegetarian: editTarget.isVegetarian,
+        isBest: editTarget.isBest,
       })
       setEditTarget(null)
       setAlert({
@@ -268,11 +262,6 @@ export function MenuPage() {
                         <span className={styles.price}>{formatPrice(m.price)}</span>
                       </div>
                       <p className={styles.itemDesc}>{m.description || '설명 없음'}</p>
-                      <div className={styles.chipRow}>
-                        {m.isBest ? <span className={styles.chip}>베스트</span> : null}
-                        {m.isSpicy ? <span className={styles.chip}>매운맛</span> : null}
-                        {m.isVegetarian ? <span className={styles.chip}>비건</span> : null}
-                      </div>
                     </div>
                     <div className={styles.footer}>
                       <button
@@ -333,7 +322,7 @@ export function MenuPage() {
         <h2 id={editTitleId} className={mc.titleLeft}>
           메뉴 수정
         </h2>
-        <p className={mc.messageLeft}>메뉴 정보·카테고리·태그를 수정합니다.</p>
+        <p className={mc.messageLeft}>메뉴 정보·카테고리를 수정합니다.</p>
         <div className={styles.editFields}>
           <label className={mc.label}>
             메뉴명
@@ -381,35 +370,6 @@ export function MenuPage() {
               ))}
             </select>
           </label>
-          <div className={styles.editTagRow}>
-            <label className={styles.editTag}>
-              <input
-                type="checkbox"
-                checked={editSpicy}
-                onChange={(e) => setEditSpicy(e.target.checked)}
-                disabled={editSaving}
-              />
-              매운맛
-            </label>
-            <label className={styles.editTag}>
-              <input
-                type="checkbox"
-                checked={editVegetarian}
-                onChange={(e) => setEditVegetarian(e.target.checked)}
-                disabled={editSaving}
-              />
-              비건
-            </label>
-            <label className={styles.editTag}>
-              <input
-                type="checkbox"
-                checked={editBest}
-                onChange={(e) => setEditBest(e.target.checked)}
-                disabled={editSaving}
-              />
-              베스트
-            </label>
-          </div>
         </div>
         <div className={mc.btnRow}>
           <button type="button" className={mc.btnCancel} onClick={closeEdit} disabled={editSaving}>

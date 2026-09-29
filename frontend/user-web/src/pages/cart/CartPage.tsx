@@ -135,6 +135,7 @@ function CartPage({
     if (cartItems.length === 0) return
     if (!useApiCart || !onRefreshCart) {
       applyCartItems(() => [])
+      onRemoveCoupon?.()
       return
     }
     setClearConfirmOpen(true)
@@ -148,6 +149,7 @@ function CartPage({
     void (async () => {
       try {
         await clearCart()
+        onRemoveCoupon?.()
         await onRefreshCart()
       } catch (e) {
         showCartAlert({
@@ -357,12 +359,13 @@ function CartPage({
           /* ignore */
         }
 
-        // 5) 장바구니 비우기 + 화면 진행
+        // 5) 장바구니 비우기 + 적용 쿠폰 잔여 제거 + 화면 진행
         try {
           await clearCart()
         } catch {
           /* ignore */
         }
+        onRemoveCoupon?.()
         await onRefreshCart()
 
         showCartAlert({
@@ -512,7 +515,11 @@ function CartPage({
         memberCouponIds: appliedCoupon ? [appliedCoupon.id] : [],
       })
         .then(setPricingPreview)
-        .catch(() => setPricingPreview(null))
+        .catch(() => {
+          setPricingPreview(null)
+          // 이미 사용·만료된 쿠폰이 장바구니에 남아 있으면 해제
+          if (appliedCoupon) onRemoveCoupon?.()
+        })
     }, 400)
     return () => {
       if (pricingDebounceRef.current) clearTimeout(pricingDebounceRef.current)

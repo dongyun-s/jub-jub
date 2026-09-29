@@ -21,9 +21,6 @@ export function MenuAddPage() {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState<OwnerMenuCategory>('MAIN')
-  const [isSpicy, setIsSpicy] = useState(false)
-  const [isVegetarian, setIsVegetarian] = useState(false)
-  const [isBest, setIsBest] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -67,9 +64,9 @@ export function MenuAddPage() {
         price: Math.floor(priceNum),
         category,
         imageUrl,
-        isSpicy,
-        isVegetarian,
-        isBest,
+        isSpicy: false,
+        isVegetarian: false,
+        isBest: false,
       })
       setAlert({
         title: '등록 완료',
@@ -183,42 +180,6 @@ export function MenuAddPage() {
                       </select>
                     </div>
                   </div>
-                </div>
-              </section>
-
-              <section className={styles.card}>
-                <h2 className={styles.cardTitlePlain}>태그</h2>
-                <div className={styles.tags}>
-                  <label className={styles.tagLabel}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      checked={isSpicy}
-                      onChange={(e) => setIsSpicy(e.target.checked)}
-                      disabled={saving}
-                    />
-                    <span>매운맛</span>
-                  </label>
-                  <label className={styles.tagLabel}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      checked={isVegetarian}
-                      onChange={(e) => setIsVegetarian(e.target.checked)}
-                      disabled={saving}
-                    />
-                    <span>비건</span>
-                  </label>
-                  <label className={styles.tagLabel}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      checked={isBest}
-                      onChange={(e) => setIsBest(e.target.checked)}
-                      disabled={saving}
-                    />
-                    <span>베스트</span>
-                  </label>
                 </div>
               </section>
             </div>

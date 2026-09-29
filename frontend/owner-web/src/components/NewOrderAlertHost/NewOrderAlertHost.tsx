@@ -5,6 +5,7 @@ import { useOwnerOrders } from '../../context/OwnerOrdersProvider'
 import { useOwnerStoreDetail } from '../../hooks/useOwnerStoreDetail'
 import { useOwnerCookingTime } from '../../hooks/useOwnerCookingTime'
 import { useNewOrderAlerts } from '../../hooks/useNewOrderAlerts'
+import { resolvePickupMinutes } from '../../lib/ownerPickupTime'
 import {
   canUseDesktopNotification,
   focusOwnerWindow,
@@ -44,11 +45,14 @@ export function NewOrderAlertHost() {
     return newOrders.find((o) => o.orderId === incomingOrder.orderId) ?? incomingOrder
   }, [incomingOrder, newOrders])
 
-  const handleStartFromModal = (id: number) => {
-    void handleStartCooking(id)
+  const handleStartFromModal = (id: number, cookingMinutes?: number) => {
+    const order = newOrders.find((o) => o.orderId === id)
+    const mins =
+      cookingMinutes ?? resolvePickupMinutes(baseMinutes, order?.pickupAdjustMinutes ?? 0)
+    void handleStartCooking(id, mins)
     dismiss()
     stopFlashPageTitle()
-    handleActivate({ orderId: id })
+    // 수락은 모달에서 바로 처리 — 주문 화면으로 추가 이동하지 않음
   }
 
   /** 나중에: 모달만 닫지 않고 주문 화면에서 해당 건 선택 → 우측 메뉴·결제 내역 표시 */
@@ -79,6 +83,8 @@ export function NewOrderAlertHost() {
         open={alertOrder != null}
         order={alertOrder}
         baseMinutes={baseMinutes}
+        newOrders={newOrders}
+        allowPickupAdjust
         onPickupMinutesChange={handlePickupMinutesChange}
         onStartCooking={handleStartFromModal}
         onReject={setRejectTargetId}

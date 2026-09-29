@@ -24,8 +24,14 @@ import {
   type MenuItem,
   type MenuCategory,
 } from '../../lib/storeDetailMenu'
+import { DEFAULT_MENU_IMAGE } from '../../lib/menuImage'
 import { fetchRewardMe } from '../../api/rewards'
 import { getTierDiscountRate } from '../../lib/rewardTierTheme'
+import { estimatePickupHhMmFromMinutes } from '../../lib/pickupEta'
+import {
+  readCachedStoreCategoryLabel,
+  storeCategoryLabelFromId,
+} from '../../lib/storeUi'
 import styles from './StoreDetailPage.module.css'
 
 interface StoreDetailPageProps {
@@ -57,11 +63,24 @@ function MenuItemCard({
   showRank?: boolean
   onClick?: () => void 
 }) {
+  const soldOut = Boolean(item.isSoldOut)
+  const [imgSrc, setImgSrc] = useState(item.image || DEFAULT_MENU_IMAGE)
+
+  useEffect(() => {
+    setImgSrc(item.image || DEFAULT_MENU_IMAGE)
+  }, [item.image, item.id])
+
   return (
-    <button type="button" onClick={onClick} className={styles.menuCard}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={[styles.menuCard, soldOut ? styles.menuCardSoldOut : ''].filter(Boolean).join(' ')}
+      aria-disabled={soldOut || undefined}
+    >
       <div className={styles.menuCardBg} />
-      {(item.tags.length > 0 || (item.rank && showRank)) && (
+      {(item.tags.length > 0 || (item.rank && showRank) || soldOut) && (
         <div className={styles.menuCardTags}>
+          {soldOut ? <span className={styles.menuCardSoldOutBadge}>품절</span> : null}
           {item.rank && showRank && (
             <span className={styles.menuCardRank}>🔥 인기 {item.rank}위</span>
           )}
@@ -71,24 +90,28 @@ function MenuItemCard({
           </div>
         </div>
       )}
-      {item.image && (
-        <div className={styles.menuCardImage} style={{ backgroundImage: `url("${item.image}")` }} />
-      )}
+      <div className={styles.menuCardImage}>
+        <img
+          src={imgSrc}
+          alt=""
+          className={styles.menuCardImg}
+          onError={() => setImgSrc(DEFAULT_MENU_IMAGE)}
+        />
+      </div>
       <div className={styles.menuCardInfo}>
         <div>
-          <h4 className={styles.menuCardName}>
-            {item.name}
-            {item.isSoldOut ? ' (품절)' : ''}
-          </h4>
+          <h4 className={styles.menuCardName}>{item.name}</h4>
           {item.description && <p className={styles.menuCardDesc}>{item.description}</p>}
         </div>
         <div className={styles.menuCardBottom}>
           <div className={styles.menuCardPriceWrap}>
             <span className={styles.menuCardPrice}>{formatPrice(item.price)}</span>
           </div>
-          <div className={styles.menuCardAddBtn}>
-            <span className="material-symbols-outlined">add</span>
-          </div>
+          {!soldOut ? (
+            <div className={styles.menuCardAddBtn}>
+              <span className="material-symbols-outlined">add</span>
+            </div>
+          ) : null}
         </div>
       </div>
     </button>
@@ -217,8 +240,18 @@ function StoreDetailPage({
     STORE_LIST_CARD_IMAGES[Math.abs(Number(storeId)) % STORE_LIST_CARD_IMAGES.length]
   const storeName = (detail?.name ?? '매장').trim()
   const addressLine = detail?.address?.trim() || '주소 정보 없음'
-  const minOrderLabel = detail ? `${detail.minOrderAmount.toLocaleString()}원` : '—'
-  const cookTimeLabel = detail ? `약 ${detail.cookingTimeMinutes}분` : '—'
+  const categoryLabel =
+    detail?.categoryName?.trim() ||
+    storeCategoryLabelFromId(detail?.categoryId) ||
+    readCachedStoreCategoryLabel(Number(storeId)) ||
+    null
+  const cookTimeLabel = detail
+    ? (() => {
+        const mins = Math.max(1, detail.cookingTimeMinutes || 15)
+        const hhmm = estimatePickupHhMmFromMinutes(mins)
+        return hhmm ? `${hhmm} (약 ${mins}분)` : `약 ${mins}분`
+      })()
+    : '—'
 
   const tabs = [
     { id: 'menu', label: '메뉴' },
@@ -437,33 +470,47 @@ function StoreDetailPage({
                 <div>
                   <div className={styles.profileTitleRow}>
                     <h1 className={styles.storeName}>{storeName}</h1>
-                    <span className={styles.verifiedBadge}>Verified</span>
+                    {categoryLabel ? (
+                      <span className={styles.categoryBadge}>{categoryLabel}</span>
+                    ) : null}
                   </div>
                   <div className={styles.profileMeta}>
-                    <span className={`material-symbols-outlined ${styles.starIcon}`}>star</span>
-                    <span className={styles.profileRating}>
-                      {reviewsLoading ? '…' : reviewStats.count > 0 ? reviewStats.avg.toFixed(1) : '—'}
-                    </span>
-                    <span>
-                      {reviewsLoading
-                        ? ''
-                        : reviewStats.count > 0
-                          ? `(${reviewStats.count}개 리뷰)`
-                          : '(리뷰 없음)'}
-                    </span>
-                    <span className={styles.profileMetaDot}>•</span>
                     <span>{addressLine}</span>
                   </div>
                 </div>
               </div>
               <div className={styles.statsRow}>
                 <div className={styles.statBox}>
-                  <span className={styles.statLabel}>최소주문</span>
-                  <span className={styles.statValue}>{minOrderLabel}</span>
+                  <span className={styles.statLabel}>평점</span>
+                  <span className={styles.statRatingValue}>
+                    {reviewsLoading ? (
+                      '…'
+                    ) : reviewStats.count > 0 ? (
+                      <>
+                        <span
+                          className={`material-symbols-outlined ${styles.statStarIcon}`}
+                          aria-hidden
+                        >
+                          star
+                        </span>
+                        <span>{reviewStats.avg.toFixed(1)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span
+                          className={`material-symbols-outlined ${styles.statStarIconMuted}`}
+                          aria-hidden
+                        >
+                          star
+                        </span>
+                        <span>—</span>
+                      </>
+                    )}
+                  </span>
                 </div>
                 <div className={styles.statBox}>
-                  <span className={styles.statLabel}>포장시간</span>
-                  <span className={styles.statValue}>{cookTimeLabel}</span>
+                  <span className={styles.statLabel}>예상 픽업</span>
+                  <span className={styles.statValueCompact}>{cookTimeLabel}</span>
                 </div>
                 <div className={`${styles.statBox} ${styles.statBoxHighlight}`}>
                   <span className={`${styles.statLabel} ${styles.statLabelPrimary}`}>등급 할인</span>

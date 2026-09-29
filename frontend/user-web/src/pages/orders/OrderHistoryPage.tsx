@@ -1,7 +1,8 @@
 /**
  * OrderHistoryPage.tsx
  * 주문 내역 페이지 (탭: 주문내역)
- * - 최근 주문: 리뷰 미작성 / 지난 주문: 리뷰 작성 완료
+ * - 최근 주문: 픽업완료·리뷰 미작성 / 지난 주문: 리뷰완료·거절
+ * - 진행 중(PAID)은 상단 trackable 카드만 (내역 목록에는 넣지 않음)
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -21,12 +22,12 @@ import { fetchStores } from '../../api/store'
 import { ApiError } from '../../api/authClient'
 import { getAccessToken, getCachedMemberProfileId } from '../../lib/authStorage'
 import { useProfile } from '../../hooks/useProfile'
-import type { PickupDestination } from '../../hooks/useActivePickup'
+import type { TrackablePickup } from '../../hooks/useActivePickup'
 import {
   readLocalOrdersPendingApiSync,
   syncLocalOrdersWithApiList,
-  type OrderContextRow,
 } from '../../lib/orderResolve'
+import { formatPickupHhMm } from '../../lib/pickupEta'
 import { storeCardImage } from '../../lib/storeGeo'
 import styles from './OrderHistoryPage.module.css'
 
@@ -34,18 +35,15 @@ interface OrderHistoryPageProps {
   onBack?: () => void
   onGoHome: () => void
   onCartClick?: () => void
-  onOrderStatusClick?: () => void
+  onOrderStatusClick?: (orderId?: number) => void
   onMapClick?: () => void
   onMypageClick?: () => void
   onFavoritesClick?: () => void
   onNotificationsClick?: () => void
   /** 리뷰 쓰기 클릭 시 주문·매장 정보 전달 후 리뷰 작성 페이지로 이동 */
   onReviewWriteClick?: (payload: ReviewWritePayload) => void
-  hasActiveOrder?: boolean
-  /** 결제 완료·매장 수락 대기 (현황/경로 없음) */
-  hasWaitingAccept?: boolean
-  activeOrder?: OrderContextRow | null
-  pickupDestination?: PickupDestination | null
+  /** 결제 완료·픽업 전인 주문 전부 */
+  trackableOrders?: TrackablePickup[]
   cartCount?: number
 }
 
@@ -53,6 +51,8 @@ interface OrderItem {
   id: number
   storeId: number
   storeName: string
+  /** 서버 orderNo (없으면 orderId로 표시) */
+  orderNo: string
   date: string
   menu: string
   price: number
@@ -141,6 +141,13 @@ function isLocalOrderPaid(o: LocalOrder): boolean {
   return false
 }
 
+function historyStatusFromOrder(orderStatus?: string | null): OrderItem['status'] | null {
+  if (orderStatus === 'REFUNDED') return 'rejected'
+  if (orderStatus === 'COMPLETED') return 'completed'
+  // PAID·그 외 진행 중은 주문 내역 목록에 넣지 않음 (픽업 완료만)
+  return null
+}
+
 function parseOrderDisplayDate(date: string): number {
   const parts = date.split('.')
   if (parts.length === 3) {
@@ -163,10 +170,7 @@ function OrderHistoryPage({
   onFavoritesClick,
   onNotificationsClick,
   onReviewWriteClick,
-  hasActiveOrder,
-  hasWaitingAccept,
-  activeOrder,
-  pickupDestination,
+  trackableOrders = [],
   cartCount = 0,
 }: OrderHistoryPageProps) {
   const { profile } = useProfile()
@@ -179,13 +183,6 @@ function OrderHistoryPage({
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<number>>(() => new Set())
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
-
-  const activeOrderTitle =
-    activeOrder?.storeName?.trim() || pickupDestination?.name?.trim() || '진행 중인 주문'
-  const activeOrderSubtitle =
-    activeOrder?.menuSummary?.trim() || '주문 현황에서 단계를 확인하세요.'
-  const waitingSubtitle =
-    activeOrder?.menuSummary?.trim() || '매장에서 주문을 확인하면 현황·경로가 열려요.'
 
   const reloadMyOrdersApi = useCallback(() => {
     if (!getAccessToken()) {
@@ -293,21 +290,27 @@ function OrderHistoryPage({
     }
 
     return dedupeOrdersById(
-      myOrdersApi.map((o) => {
-        const storeId = resolveStoreIdForServerOrder(o, localOrders, storeNameToId)
-        return {
-          id: o.orderId,
-          storeId,
-          storeName: o.storeName,
-          date: formatDate(o.orderedAt),
-          menu: formatOrderMenuSummary(o),
-          price: o.finalAmount,
-          distance: formatPickupDistance(o.pickupDistanceMeters),
-          image: storeId > 0 ? storeCardImage(storeId) : storeCardImage(1),
-          status: o.orderStatus === 'REFUNDED' ? ('rejected' as const) : ('completed' as const),
-          orderStatus: o.orderStatus,
-        }
-      }),
+      myOrdersApi
+        .filter((o) => isPaidOrderForHistory(o))
+        .map((o) => {
+          const status = historyStatusFromOrder(o.orderStatus)
+          if (status == null) return null
+          const storeId = resolveStoreIdForServerOrder(o, localOrders, storeNameToId)
+          return {
+            id: o.orderId,
+            storeId,
+            storeName: o.storeName,
+            orderNo: (o.orderNo && String(o.orderNo).trim()) || String(o.orderId),
+            date: formatDate(o.orderedAt),
+            menu: formatOrderMenuSummary(o),
+            price: o.finalAmount,
+            distance: formatPickupDistance(o.pickupDistanceMeters),
+            image: storeId > 0 ? storeCardImage(storeId) : storeCardImage(1),
+            status,
+            orderStatus: o.orderStatus,
+          }
+        })
+        .filter((o): o is OrderItem => o != null),
     )
   }, [myOrdersApi, localOrders, storeNameToId])
 
@@ -323,21 +326,32 @@ function OrderHistoryPage({
     }
     const apiIds = new Set(myOrdersApi.map((o) => o.orderId))
     return dedupeOrdersById(
-      readLocalOrdersPendingApiSync(apiIds).map((o) => {
-        const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
-        return {
-          id: o.orderId,
-          storeId: o.storeId,
-          storeName: o.storeName,
-          date: formatDate(o.createdAt ?? ''),
-          menu: o.menuSummary ?? '주문',
-          price,
-          distance: '',
-          image: storeCardImage(o.storeId),
-          status: o.orderStatus === 'REFUNDED' ? ('rejected' as const) : ('completed' as const),
-          orderStatus: o.orderStatus,
-        }
-      }),
+      readLocalOrdersPendingApiSync(apiIds)
+        .map((o) => {
+          const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
+          // 로컬 동기화 대기 건도 픽업 완료·거절만 내역에 노출
+          const status: OrderItem['status'] | null =
+            o.orderStatus === 'REFUNDED'
+              ? 'rejected'
+              : o.pickupCompleted || o.orderStatus === 'COMPLETED'
+                ? 'completed'
+                : null
+          if (status == null) return null
+          return {
+            id: o.orderId,
+            storeId: o.storeId,
+            storeName: o.storeName,
+            orderNo: String(o.orderId),
+            date: formatDate(o.createdAt ?? ''),
+            menu: o.menuSummary ?? '주문',
+            price,
+            distance: '',
+            image: storeCardImage(o.storeId),
+            status,
+            orderStatus: o.orderStatus as OrderStatus | undefined,
+          }
+        })
+        .filter((o): o is OrderItem => o != null),
     )
   }, [myOrdersApi])
 
@@ -346,15 +360,18 @@ function OrderHistoryPage({
     return applyReviewedStatus(base, reviewedOrderIds)
   }, [apiOrders, pendingLocalOrders, reviewedOrderIds])
 
-  /** 최근 주문 — 리뷰를 아직 쓰지 않은 주문 */
+  /** 최근 주문 — 픽업 완료·리뷰 미작성만 */
   const recentTabOrders = useMemo(
-    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status !== 'reviewed')),
+    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status === 'completed')),
     [allOrders],
   )
 
-  /** 지난 주문 — 리뷰 작성이 완료된 주문 */
+  /** 지난 주문 — 리뷰 완료 또는 거절·환불 */
   const pastTabOrders = useMemo(
-    () => sortOrdersByDateDesc(allOrders.filter((o) => o.status === 'reviewed')),
+    () =>
+      sortOrdersByDateDesc(
+        allOrders.filter((o) => o.status === 'reviewed' || o.status === 'rejected'),
+      ),
     [allOrders],
   )
 
@@ -401,51 +418,52 @@ function OrderHistoryPage({
               )}
             </div>
           )}
-          {/* 수락 대기 */}
-          {hasWaitingAccept && !hasActiveOrder && (
-            <div className={styles.activeOrderSection}>
-              <p className={styles.activeOrderLabel}>
-                <span className="material-symbols-outlined text-sm">hourglass_top</span>
-                수락 대기 중
-              </p>
-              <div className={styles.activeOrderButton} style={{ cursor: 'default' }}>
-                <div className={styles.activeOrderIcon}>
-                  <span className="material-symbols-outlined text-white text-2xl">receipt_long</span>
-                </div>
-                <div className={styles.activeOrderText}>
-                  <div className={styles.activeOrderStatusRow}>
-                    <span className={styles.activeOrderStatusBadge}>수락 대기</span>
-                  </div>
-                  <p className={styles.activeOrderStoreName}>{activeOrderTitle}</p>
-                  <p className={styles.activeOrderSubtitle}>{waitingSubtitle}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 진행 중인 주문 (수락 후) */}
-          {hasActiveOrder && (
+          {/* 진행·대기 주문 — 결제한 건수만큼 표시 */}
+          {trackableOrders.length > 0 && (
             <div className={styles.activeOrderSection}>
               <p className={styles.activeOrderLabel}>
                 <span className="material-symbols-outlined text-sm">pending</span>
-                진행 중인 주문
+                진행 중인 주문{trackableOrders.length > 1 ? ` ${trackableOrders.length}건` : ''}
               </p>
-              <button
-                onClick={onOrderStatusClick}
-                className={styles.activeOrderButton}
-              >
-                <div className={styles.activeOrderIcon}>
-                  <span className="material-symbols-outlined text-white text-2xl">skillet</span>
-                </div>
-                <div className={styles.activeOrderText}>
-                  <div className={styles.activeOrderStatusRow}>
-                    <span className={styles.activeOrderStatusBadge}>진행 중</span>
-                  </div>
-                  <p className={styles.activeOrderStoreName}>{activeOrderTitle}</p>
-                  <p className={styles.activeOrderSubtitle}>{activeOrderSubtitle}</p>
-                </div>
-                <span className="material-symbols-outlined text-primary">chevron_right</span>
-              </button>
+              <div className={styles.activeOrderList}>
+                {trackableOrders.map((item) => {
+                  const waiting = item.phase === 'waiting'
+                  const hhmm = formatPickupHhMm(item.estimatedPickupTime)
+                  const title = item.order.storeName?.trim() || '진행 중인 주문'
+                  const subtitle = waiting
+                    ? hhmm
+                      ? `픽업 ${hhmm} 예정 · 매장 수락을 기다리고 있어요.`
+                      : item.order.menuSummary?.trim() || '매장에서 주문을 확인하면 조리가 시작돼요.'
+                    : hhmm
+                      ? `픽업 ${hhmm} 예정 · ${item.order.menuSummary?.trim() || '주문 현황에서 단계를 확인하세요.'}`
+                      : item.order.menuSummary?.trim() || '주문 현황에서 단계를 확인하세요.'
+                  return (
+                    <button
+                      key={item.order.orderId}
+                      type="button"
+                      onClick={() => onOrderStatusClick?.(item.order.orderId)}
+                      className={styles.activeOrderButton}
+                    >
+                      <div className={styles.activeOrderIcon}>
+                        <span className="material-symbols-outlined text-white text-2xl">
+                          {waiting ? 'receipt_long' : 'skillet'}
+                        </span>
+                      </div>
+                      <div className={styles.activeOrderText}>
+                        <div className={styles.activeOrderStatusRow}>
+                          <span className={styles.activeOrderStatusBadge}>
+                            {waiting ? '수락 대기' : '진행 중'}
+                          </span>
+                          <span className={styles.activeOrderStatusTime}>#{item.order.orderId}</span>
+                        </div>
+                        <p className={styles.activeOrderStoreName}>{title}</p>
+                        <p className={styles.activeOrderSubtitle}>{subtitle}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-primary">chevron_right</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
@@ -504,6 +522,7 @@ function OrderHistoryPage({
                             : '리뷰완료'}
                       </span>
                     </div>
+                    <p className={styles.orderNo}>주문번호 #{order.orderNo}</p>
                     <p className={styles.orderMeta}>
                       <span>{order.date}</span>
                       <span>{order.menu}</span>

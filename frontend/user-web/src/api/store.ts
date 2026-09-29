@@ -28,6 +28,8 @@ export interface MenuDto {
   description: string
   isSoldOut: boolean
   rewardXp: number
+  /** 사장님 등록 메뉴 이미지 (없으면 null/미포함) */
+  imageUrl?: string | null
   options: MenuOptionDto[]
 }
 
@@ -152,7 +154,43 @@ export async function fetchStoreDetail(storeId: number): Promise<StoreDetailDto>
           : null,
     categoryId: p.categoryId != null ? num(p.categoryId ?? p.category_id) : null,
     categoryName: String(p.categoryName ?? p.category_name ?? '').trim() || null,
-    menus: Array.isArray(p.menus) ? (p.menus as StoreDetailDto['menus']) : [],
+    menus: Array.isArray(p.menus) ? p.menus.map(normalizeMenuDto).filter((m): m is MenuDto => m != null) : [],
+  }
+}
+
+function normalizeMenuDto(raw: unknown): MenuDto | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const m = raw as Record<string, unknown>
+  const menuId = num(m.menuId ?? m.menu_id)
+  const name = String(m.name ?? '').trim()
+  if (!menuId || !name) return null
+  const imageRaw = m.imageUrl ?? m.image_url ?? m.imagePath ?? m.image_path ?? m.image
+  const imageUrl =
+    typeof imageRaw === 'string' && imageRaw.trim() !== '' ? imageRaw.trim() : null
+  const optionsRaw = Array.isArray(m.options) ? m.options : []
+  return {
+    menuId,
+    name,
+    price: num(m.price),
+    description: String(m.description ?? '').trim(),
+    isSoldOut: Boolean(m.isSoldOut ?? m.is_sold_out),
+    rewardXp: num(m.rewardXp ?? m.reward_xp),
+    imageUrl,
+    options: optionsRaw
+      .map((o) => {
+        if (typeof o !== 'object' || o === null) return null
+        const opt = o as Record<string, unknown>
+        const optionId = num(opt.optionId ?? opt.option_id)
+        const optName = String(opt.name ?? '').trim()
+        if (!optionId || !optName) return null
+        return {
+          optionId,
+          name: optName,
+          additionalPrice: num(opt.additionalPrice ?? opt.additional_price),
+          isRequired: Boolean(opt.isRequired ?? opt.is_required),
+        } satisfies MenuOptionDto
+      })
+      .filter((o): o is MenuOptionDto => o != null),
   }
 }
 

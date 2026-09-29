@@ -116,30 +116,34 @@ function mapApiOrderToContext(hit: MyOrderItem, localMatch?: OrderContextRow): O
   }
 }
 
-function pickNewestActivePickup(orders: MyOrderItem[]): MyOrderItem | undefined {
+function listActivePickupCandidates(orders: MyOrderItem[]): MyOrderItem[] {
   const localDoneIds = new Set(
     readLocalOrders()
       .filter((o) => o.pickupCompleted || o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED')
       .map((o) => o.orderId),
   )
-  const pending = orders.filter((o) => isActivePickupOrder(o) && !localDoneIds.has(o.orderId))
-  if (pending.length === 0) return undefined
-  return [...pending].sort((a, b) => {
-    const ta = new Date(a.orderedAt).getTime()
-    const tb = new Date(b.orderedAt).getTime()
-    return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta)
-  })[0]
+  return orders
+    .filter((o) => isActivePickupOrder(o) && !localDoneIds.has(o.orderId))
+    .sort((a, b) => {
+      const ta = new Date(a.orderedAt).getTime()
+      const tb = new Date(b.orderedAt).getTime()
+      return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta)
+    })
 }
 
 export function getActivePaidOrderFromLocal(): OrderContextRow | null {
+  const all = getActivePaidOrdersFromLocal()
+  return all[0] ?? null
+}
+
+export function getActivePaidOrdersFromLocal(): OrderContextRow[] {
   pruneUnpaidLocalOrders()
   const paid = readLocalOrders().filter((o) => o?.orderId && isPickupPending(o))
-  if (paid.length === 0) return null
   return [...paid].sort((a, b) => {
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
     const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
     return tb - ta
-  })[0] ?? null
+  })
 }
 
 export async function resolveOrderById(orderId: number): Promise<OrderContextRow | null> {
@@ -157,11 +161,26 @@ export async function resolveOrderById(orderId: number): Promise<OrderContextRow
     }
   }
 
-  const local = readLocalOrders().find((o) => o.orderId === orderId && isPickupPending(o))
-  return local ?? null
+  const local = readLocalOrders().find((o) => o.orderId === orderId)
+  if (!local) return null
+  if (
+    isPickupPending(local) ||
+    local.pickupCompleted ||
+    local.orderStatus === 'COMPLETED' ||
+    local.orderStatus === 'REFUNDED'
+  ) {
+    return local
+  }
+  return null
 }
 
 export async function resolveActivePaidOrder(): Promise<OrderContextRow | null> {
+  const all = await resolveAllActivePaidOrders()
+  return all[0] ?? null
+}
+
+/** 결제 완료·픽업 전인 주문 전부 (최신순) */
+export async function resolveAllActivePaidOrders(): Promise<OrderContextRow[]> {
   pruneUnpaidLocalOrders()
 
   if (getAccessToken()) {
@@ -169,14 +188,20 @@ export async function resolveActivePaidOrder(): Promise<OrderContextRow | null> 
       const list = await getMyOrders()
       const rows = Array.isArray(list) ? list : []
       syncLocalOrdersWithApiList(rows)
-      const paid = pickNewestActivePickup(rows)
-      if (paid) {
-        return resolveOrderById(paid.orderId)
-      }
-      return null
+      const pending = listActivePickupCandidates(rows)
+      const mapped = await Promise.all(pending.map((p) => resolveOrderById(p.orderId)))
+      const fromApi = mapped.filter((o): o is OrderContextRow => o != null && isPickupPending(o))
+
+      const apiIds = new Set(fromApi.map((o) => o.orderId))
+      const localOnly = getActivePaidOrdersFromLocal().filter((o) => !apiIds.has(o.orderId))
+      return [...fromApi, ...localOnly].sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return tb - ta
+      })
     } catch {
-      return null
+      return getActivePaidOrdersFromLocal()
     }
   }
-  return getActivePaidOrderFromLocal()
+  return getActivePaidOrdersFromLocal()
 }

@@ -3,18 +3,16 @@
  * 메뉴 상세 — GET /api/v1/stores/{storeId} 로 메뉴·옵션 조회 후 장바구니 담기(POST /api/v1/carts)
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Layout from '../../components/Layout'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { fetchStoreDetail } from '../../api/store'
 import type { MenuDto } from '../../api/store'
-import { addCartItem } from '../../api/cart'
+import { addOrMergeCartItem } from '../../api/cart'
 import { ApiError } from '../../api/authClient'
 import { getAccessToken } from '../../lib/authStorage'
+import { resolveMenuImageUrl, DEFAULT_MENU_IMAGE } from '../../lib/menuImage'
 import styles from './MenuDetailPage.module.css'
-
-const HERO_FALLBACK =
-  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop'
 
 interface MenuDetailPageProps {
   storeId: number
@@ -22,19 +20,11 @@ interface MenuDetailPageProps {
   onBack: () => void
   /** 장바구니 API 반영 후 App에서 목록 갱신 */
   onAfterAddToCart?: () => void | Promise<void>
-  /** 담기 후 이동할 때 (예: 장바구니 탭) */
-  onGoToCart?: () => void
 }
 
-function menuHeroImage(m: MenuDto | null, menuIndex: number): string {
-  if (!m) return HERO_FALLBACK
-  const pool = [
-    'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&h=600&fit=crop',
-  ]
-  return pool[menuIndex % pool.length]
+function menuHeroImage(m: MenuDto | null): string {
+  if (!m) return DEFAULT_MENU_IMAGE
+  return resolveMenuImageUrl(m.imageUrl)
 }
 
 function MenuDetailPage({
@@ -42,13 +32,13 @@ function MenuDetailPage({
   menuId,
   onBack,
   onAfterAddToCart,
-  onGoToCart,
 }: MenuDetailPageProps) {
   const [menu, setMenu] = useState<MenuDto | null>(null)
-  const [menuIndex, setMenuIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const addingRef = useRef(false)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
+  const [heroBroken, setHeroBroken] = useState(false)
 
   const [quantity, setQuantity] = useState(1)
   /** 선택한 옵션 ID (필수 옵션은 초기에 자동 포함) */
@@ -58,12 +48,11 @@ function MenuDetailPage({
     let cancelled = false
     setLoading(true)
     setMenu(null)
+    setHeroBroken(false)
     fetchStoreDetail(storeId)
       .then((detail) => {
         if (cancelled) return
-        const idx = detail.menus.findIndex((m) => m.menuId === menuId)
-        const found = idx >= 0 ? detail.menus[idx] : null
-        setMenuIndex(idx >= 0 ? idx : 0)
+        const found = detail.menus.find((m) => m.menuId === menuId) ?? null
         setMenu(found)
         if (found) {
           const initial = new Set<number>()
@@ -86,7 +75,10 @@ function MenuDetailPage({
     }
   }, [storeId, menuId])
 
-  const heroUrl = useMemo(() => menuHeroImage(menu, menuIndex), [menu, menuIndex])
+  const heroUrl = useMemo(() => {
+    if (heroBroken) return DEFAULT_MENU_IMAGE
+    return menuHeroImage(menu)
+  }, [menu, heroBroken])
 
   const toggleOption = (optionId: number, isRequired: boolean) => {
     if (isRequired) return
@@ -113,6 +105,7 @@ function MenuDetailPage({
   const formatPrice = (price: number) => price.toLocaleString() + '원'
 
   const handleAddToCart = async () => {
+    if (addingRef.current) return
     if (!menu || menu.isSoldOut) return
     if (!getAccessToken()) {
       setAlertMessage('로그인 후 장바구니에 담을 수 있습니다.')
@@ -125,9 +118,10 @@ function MenuDetailPage({
       return
     }
 
+    addingRef.current = true
     setAdding(true)
     try {
-      await addCartItem({
+      await addOrMergeCartItem({
         storeId,
         menuId: menu.menuId,
         quantity,
@@ -135,7 +129,8 @@ function MenuDetailPage({
         optionIds: Array.from(selectedOptionIds),
       })
       await onAfterAddToCart?.()
-      onGoToCart?.()
+      // 장바구니로 바로 가지 않고 매장 메뉴로 복귀 → 다른 메뉴도 담을 수 있게
+      onBack()
     } catch (e) {
       const msg =
         e instanceof ApiError
@@ -145,6 +140,7 @@ function MenuDetailPage({
             : '장바구니에 담지 못했습니다.'
       setAlertMessage(msg)
     } finally {
+      addingRef.current = false
       setAdding(false)
     }
   }
@@ -197,10 +193,13 @@ function MenuDetailPage({
 
         <div className={styles.scrollArea}>
           <div className={styles.heroWrap}>
-            <div
-              className={styles.heroImage}
-              style={{ backgroundImage: `url('${heroUrl}')` }}
-            >
+            <div className={styles.heroImage}>
+              <img
+                src={heroUrl}
+                alt=""
+                className={styles.heroImg}
+                onError={() => setHeroBroken(true)}
+              />
               <div className={styles.heroOverlay} />
             </div>
             <div className={styles.tagsWrap}>

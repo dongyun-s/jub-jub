@@ -12,12 +12,22 @@ import type { ReviewWritePayload } from '../../api/reviews'
 import type { PickupDestination } from '../../hooks/useActivePickup'
 import type { OrderContextRow } from '../../lib/orderResolve'
 import {
+  fetchDepartureRecommendation,
   fetchOrderTracking,
   mapTrackingToOrderStep,
+  type DepartureRecommendationResponse,
   type OrderStep,
 } from '../../api/orderTracking'
 import { getAccessToken } from '../../lib/authStorage'
+import {
+  formatDepartureDetail,
+  formatDepartureTitle,
+  formatPickupEtaBadge,
+  formatPickupEtaSentence,
+  formatPickupHhMm,
+} from '../../lib/pickupEta'
 import { useDistanceToCoords } from '../../hooks/useDistanceToCoords'
+import { useUserLocation } from '../../hooks/useUserLocation'
 import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
 import { MapTmapCanvas } from '../map/MapPage'
 import type { MapTmapMarker } from '../../lib/mapCategoryMarkers'
@@ -33,14 +43,17 @@ interface OrderStatusPageProps {
   onFavoritesClick?: () => void
   onNotificationsClick?: () => void
   onReviewWriteClick?: (payload: ReviewWritePayload) => void
-  onPickupComplete?: () => void
+  onPickupComplete?: (info: { kind: 'completed' | 'rejected'; orderId: number }) => void
   activeOrder?: OrderContextRow | null
+  /** 상위 폴링 ETA — 있으면 초기값·동기화에 사용 */
+  estimatedPickupTime?: string | null
   pickupDestination?: PickupDestination | null
   pickupContextLoading?: boolean
   cartCount?: number
 }
 
 const TRACKING_POLL_MS = 10_000
+const DEPARTURE_POLL_MS = 30_000
 
 const LOCAL_ORDERS_KEY = '__jubjub_local_orders'
 
@@ -99,13 +112,6 @@ function formatOrderNumber(orderId: number) {
   return String(orderId)
 }
 
-function formatPickupTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
 const steps: { key: OrderStep; label: string; icon: string }[] = [
   { key: 'received', label: '주문접수', icon: 'check_circle' },
   { key: 'cooking', label: '조리중', icon: 'skillet' },
@@ -125,17 +131,44 @@ function OrderStatusPage({
   onReviewWriteClick,
   onPickupComplete,
   activeOrder = null,
+  estimatedPickupTime: estimatedPickupTimeProp = null,
   pickupDestination = null,
   pickupContextLoading = false,
   cartCount = 0,
 }: OrderStatusPageProps) {
   const [orderStep, setOrderStep] = useState<OrderStep>('received')
-  const [estimatedPickupTime, setEstimatedPickupTime] = useState<string | null>(null)
+  const [estimatedPickupTime, setEstimatedPickupTime] = useState<string | null>(
+    estimatedPickupTimeProp,
+  )
   const [trackingLoading, setTrackingLoading] = useState(false)
   const [trackingStoreLat, setTrackingStoreLat] = useState<number | null>(null)
   const [trackingStoreLng, setTrackingStoreLng] = useState<number | null>(null)
   const [trackingStoreAddress, setTrackingStoreAddress] = useState<string | null>(null)
+  const [departure, setDeparture] = useState<DepartureRecommendationResponse | null>(null)
   const completedNotifiedRef = useRef<number | null>(null)
+  const { coords: userCoords, needsPermission, locationError, retry: retryLocation } = useUserLocation()
+
+  useEffect(() => {
+    setEstimatedPickupTime(estimatedPickupTimeProp ?? null)
+  }, [estimatedPickupTimeProp])
+
+  useEffect(() => {
+    setEstimatedPickupTime(estimatedPickupTimeProp ?? null)
+    setTrackingStoreLat(null)
+    setTrackingStoreLng(null)
+    setTrackingStoreAddress(null)
+    setDeparture(null)
+    completedNotifiedRef.current = null
+    if (activeOrder?.orderStatus === 'REFUNDED') {
+      setOrderStep('rejected')
+      return
+    }
+    if (activeOrder?.pickupCompleted || activeOrder?.orderStatus === 'COMPLETED') {
+      setOrderStep('completed')
+      return
+    }
+    setOrderStep('received')
+  }, [activeOrder?.orderId])
 
   useEffect(() => {
     if (activeOrder?.orderStatus === 'REFUNDED') {
@@ -153,14 +186,14 @@ function OrderStatusPage({
       if (completedNotifiedRef.current === activeOrder.orderId) return
       completedNotifiedRef.current = activeOrder.orderId
       markLocalOrderPickupCompleted(activeOrder.orderId)
-      onPickupComplete?.()
+      onPickupComplete?.({ kind: 'completed', orderId: activeOrder.orderId })
       return
     }
     if (orderStep === 'rejected') {
       if (completedNotifiedRef.current === activeOrder.orderId) return
       completedNotifiedRef.current = activeOrder.orderId
       markLocalOrderRejected(activeOrder.orderId)
-      onPickupComplete?.()
+      onPickupComplete?.({ kind: 'rejected', orderId: activeOrder.orderId })
     }
   }, [orderStep, activeOrder?.orderId, onPickupComplete])
 
@@ -184,6 +217,7 @@ function OrderStatusPage({
       try {
         const data = await fetchOrderTracking(orderId)
         if (cancelled) return
+        // 서버 ETA만 사용 (결제 시각·생성 시각으로 가짜 HH:mm 만들지 않음)
         setEstimatedPickupTime(data.estimatedPickupTime)
         if (data.storeLatitude != null && data.storeLongitude != null) {
           setTrackingStoreLat(data.storeLatitude)
@@ -216,11 +250,67 @@ function OrderStatusPage({
     }
   }, [activeOrder?.orderId, activeOrder?.orderStatus, activeOrder?.pickupCompleted])
 
+  // 주문별 픽업·출발 추천 (위치 필요, minutesUntilDeparture 갱신 위해 폴링)
+  useEffect(() => {
+    const orderId = activeOrder?.orderId
+    if (!orderId || !getAccessToken()) return
+    if (
+      orderStep === 'completed' ||
+      orderStep === 'rejected' ||
+      activeOrder?.pickupCompleted ||
+      activeOrder?.orderStatus === 'COMPLETED' ||
+      activeOrder?.orderStatus === 'REFUNDED'
+    ) {
+      setDeparture(null)
+      return
+    }
+    if (userCoords == null) {
+      setDeparture(null)
+      return
+    }
+
+    let cancelled = false
+
+    const poll = async () => {
+      if (cancelled) return
+      try {
+        const data = await fetchDepartureRecommendation(
+          orderId,
+          userCoords.latitude,
+          userCoords.longitude,
+        )
+        if (cancelled) return
+        setDeparture(data)
+        if (data.estimatedPickupTime) {
+          setEstimatedPickupTime(data.estimatedPickupTime)
+        }
+      } catch {
+        /* 409 등 — 진행 불가·좌표 없음이면 추천 UI만 숨김 */
+        if (!cancelled) setDeparture(null)
+      }
+    }
+
+    void poll()
+    const intervalId = window.setInterval(() => void poll(), DEPARTURE_POLL_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [
+    activeOrder?.orderId,
+    activeOrder?.orderStatus,
+    activeOrder?.pickupCompleted,
+    orderStep,
+    userCoords?.latitude,
+    userCoords?.longitude,
+  ])
+
   const display = useMemo(() => {
     if (!activeOrder) return emptyDisplay
+    const hhmm = formatPickupHhMm(estimatedPickupTime)
     return {
       orderNumber: formatOrderNumber(activeOrder.orderId),
-      pickupTime: formatPickupTime(estimatedPickupTime ?? activeOrder.createdAt),
+      pickupTime: hhmm ?? '—',
       menuName: activeOrder.menuSummary?.trim() || '주문',
       storeId: activeOrder.storeId,
       storeName: activeOrder.storeName,
@@ -276,6 +366,11 @@ function OrderStatusPage({
     retry: retryStoreDistance,
   } = useDistanceToCoords(storeCoords)
 
+  const walkLabel =
+    departure != null && departure.walkingMinutes > 0
+      ? `도보 약 ${departure.walkingMinutes}분`
+      : storeWalkTimeLabel
+
   const getStepStatus = (index: number) => {
     if (index < currentStepIndex) return 'completed'
     if (index === currentStepIndex) return 'active'
@@ -299,6 +394,13 @@ function OrderStatusPage({
               message={storeDistanceError}
               onRetry={() => void retryStoreDistance()}
               loading={storeDistanceLoading}
+            />
+          )}
+          {!storeDistanceError && needsPermission && locationError && (
+            <LocationPermissionBanner
+              message={locationError}
+              onRetry={() => void retryLocation()}
+              loading={false}
             />
           )}
           <div className={styles.mapWrap}>
@@ -336,8 +438,8 @@ function OrderStatusPage({
                     {storeDistanceLoading
                       ? '위치 확인 중…'
                       : storeDistanceLabel || '—'}{' '}
-                    {storeWalkTimeLabel && !storeDistanceLoading && (
-                      <span className={styles.distanceTime}>({storeWalkTimeLabel})</span>
+                    {walkLabel && !storeDistanceLoading && (
+                      <span className={styles.distanceTime}>({walkLabel})</span>
                     )}
                   </p>
                   {storeDistanceError && !storeDistanceLoading && (
@@ -356,7 +458,7 @@ function OrderStatusPage({
               <span className={styles.pickupBadge}>
                 {orderStep === 'completed'
                   ? '픽업 완료'
-                  : `픽업 ${display.pickupTime} 예정`}
+                  : formatPickupEtaBadge(estimatedPickupTime)}
               </span>
             </div>
             <h2 className={styles.orderTitle}>{display.menuName}</h2>
@@ -417,8 +519,18 @@ function OrderStatusPage({
                 </div>
                 <p className={styles.cookingWaitTitle}>주문이 접수되었어요</p>
                 <p className={styles.cookingWaitDesc}>
-                  {trackingLoading ? '매장 상태를 확인하는 중…' : '매장에서 주문을 확인하고 있어요.'}
+                  {trackingLoading && !estimatedPickupTime
+                    ? '매장 상태를 확인하는 중…'
+                    : estimatedPickupTime
+                      ? formatPickupEtaSentence(estimatedPickupTime, ' · 매장 수락을 기다리고 있어요.')
+                      : '매장에서 주문을 확인하고 있어요.'}
                 </p>
+                {departure ? (
+                  <div className={`${styles.departureBox} ${departure.leaveNow ? styles.departureBoxUrgent : ''}`}>
+                    <p className={styles.departureTitle}>{formatDepartureTitle(departure)}</p>
+                    <p className={styles.departureDesc}>{formatDepartureDetail(departure)}</p>
+                  </div>
+                ) : null}
               </div>
             )}
             {orderStep === 'cooking' && (
@@ -429,9 +541,15 @@ function OrderStatusPage({
                 <p className={styles.cookingWaitTitle}>조리 중이에요</p>
                 <p className={styles.cookingWaitDesc}>
                   {estimatedPickupTime
-                    ? `픽업 예정 ${formatPickupTime(estimatedPickupTime)}`
+                    ? formatPickupEtaSentence(estimatedPickupTime)
                     : '조리가 끝나면 픽업 준비 알림이 올 거예요.'}
                 </p>
+                {departure ? (
+                  <div className={`${styles.departureBox} ${departure.leaveNow ? styles.departureBoxUrgent : ''}`}>
+                    <p className={styles.departureTitle}>{formatDepartureTitle(departure)}</p>
+                    <p className={styles.departureDesc}>{formatDepartureDetail(departure)}</p>
+                  </div>
+                ) : null}
               </div>
             )}
             {orderStep === 'ready' && (
@@ -442,9 +560,17 @@ function OrderStatusPage({
                 <p className={styles.cookingWaitTitle}>픽업 준비됐어요</p>
                 <p className={styles.cookingWaitDesc}>
                   {estimatedPickupTime
-                    ? `픽업 예정 ${formatPickupTime(estimatedPickupTime)} · 매장에서 수령해 주세요.`
+                    ? formatPickupEtaSentence(estimatedPickupTime, ' · 매장에서 수령해 주세요.')
                     : '매장에서 메뉴를 수령해 주세요. 픽업이 끝나면 상태가 완료로 바뀌어요.'}
                 </p>
+                {departure ? (
+                  <div className={`${styles.departureBox} ${styles.departureBoxUrgent}`}>
+                    <p className={styles.departureTitle}>
+                      {departure.leaveNow ? '지금 출발하세요' : formatDepartureTitle(departure)}
+                    </p>
+                    <p className={styles.departureDesc}>{formatDepartureDetail(departure)}</p>
+                  </div>
+                ) : null}
               </div>
             )}
             {orderStep === 'completed' && (

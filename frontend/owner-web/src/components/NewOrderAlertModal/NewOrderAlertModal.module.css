@@ -5,11 +5,11 @@
 
 .orderNo {
   margin: 0.5rem 0 0;
-  font-size: 1.75rem;
-  font-weight: 900;
+  font-size: 1.25rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
-  line-height: 1.15;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
   color: var(--owner-on-surface);
 }
 
@@ -50,6 +50,22 @@
   font-size: 0.875rem;
   font-weight: 800;
   color: var(--owner-primary-container);
+  text-align: center;
+}
+
+.queueHint {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--owner-on-surface-variant);
+  text-align: center;
+}
+
+.pickupHint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--owner-on-surface-variant);
   text-align: center;
 }
 

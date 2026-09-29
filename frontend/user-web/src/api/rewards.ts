@@ -37,6 +37,17 @@ function str(v: unknown, fallback = ''): string {
   return typeof v === 'string' ? v : fallback
 }
 
+/** Jackson enum 문자열·객체({ name })·기타 표기 흡수 */
+function tierCode(v: unknown): string {
+  if (typeof v === 'string' && v.trim()) return v.trim()
+  if (typeof v === 'object' && v != null && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>
+    if (typeof o.name === 'string' && o.name.trim()) return o.name.trim()
+    if (typeof o.tier === 'string' && o.tier.trim()) return o.tier.trim()
+  }
+  return ''
+}
+
 function normalizeRewardMePayload(payload: unknown): RewardMeResponse {
   if (typeof payload !== 'object' || payload === null) {
     throw new ApiError('리워드 정보 형식이 올바르지 않습니다.', { status: 200 })
@@ -46,7 +57,7 @@ function normalizeRewardMePayload(payload: unknown): RewardMeResponse {
     nextTierRequiredCount: num(p.nextTierRequiredCount ?? p.next_tier_required_count),
     nickname: str(p.nickname),
     orderCount: num(p.orderCount ?? p.order_count),
-    tier: str(p.tier),
+    tier: tierCode(p.tier),
     tierName: str(p.tierName ?? p.tier_name),
     totalWalkingDistance: num(p.totalWalkingDistance ?? p.total_walking_distance),
   }

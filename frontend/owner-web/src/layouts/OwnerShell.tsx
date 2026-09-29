@@ -68,9 +68,13 @@ export function OwnerShell() {
       <div className={styles.content}>
         <OwnerSalesProvider>
           <OwnerOrdersProvider>
-            <OwnerNotificationBanner />
-            <NewOrderAlertHost />
-            <Outlet />
+            <div className={styles.shellBody}>
+              <OwnerNotificationBanner />
+              <NewOrderAlertHost />
+              <div className={styles.pageArea}>
+                <Outlet />
+              </div>
+            </div>
           </OwnerOrdersProvider>
         </OwnerSalesProvider>
       </div>

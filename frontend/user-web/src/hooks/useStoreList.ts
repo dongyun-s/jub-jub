@@ -63,11 +63,30 @@ export function useStoreList({
       return
     }
 
+    // 기본 정렬도 위치가 있으면 sorted API 사용 → 평점·리뷰 수 포함
+    // (GET /stores 목록 응답에는 averageRating 이 없음)
     try {
-      const list = await fetchStores(tabParam)
-      setRestaurants(list.map(mapStoreListItemToFeatured))
-      if (list.length === 0) {
-        setHint('등록된 매장이 없습니다.')
+      if (coords) {
+        const list = await fetchSortedStores({
+          sortBy: 'DISTANCE',
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          ...tabParam,
+        })
+        setRestaurants(list.map(mapSortedStoreToFeatured))
+        if (list.length === 0) {
+          setHint('3km 이내에 해당하는 매장이 없습니다.')
+        } else {
+          setHint('내 주변 3km 이내 매장')
+        }
+      } else {
+        const list = await fetchStores(tabParam)
+        setRestaurants(list.map(mapStoreListItemToFeatured))
+        if (list.length === 0) {
+          setHint('등록된 매장이 없습니다.')
+        } else {
+          setHint('위치 권한이 있으면 평점·거리를 함께 볼 수 있어요.')
+        }
       }
     } catch {
       setRestaurants([])
