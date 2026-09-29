@@ -1,4 +1,5 @@
 import type { MenuDto } from '../api/store'
+import { resolveMenuImageUrl } from './menuImage'
 
 export interface MenuItem {
   id: number
@@ -18,13 +19,6 @@ export interface MenuCategory {
   items: MenuItem[]
 }
 
-const MENU_IMAGES = [
-  'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1550547660-d9450f859349?w=200&h=200&fit=crop',
-]
-
 function dtoToMenuItem(m: MenuDto, idx: number): MenuItem {
   const tags: ('best' | 'loot')[] = []
   if (!m.isSoldOut) {
@@ -36,7 +30,7 @@ function dtoToMenuItem(m: MenuDto, idx: number): MenuItem {
     name: m.name,
     description: m.description || undefined,
     price: m.price,
-    image: MENU_IMAGES[idx % MENU_IMAGES.length],
+    image: resolveMenuImageUrl(m.imageUrl),
     tags,
     isSoldOut: m.isSoldOut,
   }

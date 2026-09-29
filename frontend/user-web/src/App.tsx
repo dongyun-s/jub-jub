@@ -471,6 +471,7 @@ function App() {
               setCartItems([])
               setCartStoreId(null)
               setCartStoreName(null)
+              setAppliedCoupon(null)
               setFocusOrderId(null)
               // 결제 직후 주문현황에서 픽업 HH:mm(서버 estimatedPickupTime) 확인
               setCurrentPage('orderStatus')

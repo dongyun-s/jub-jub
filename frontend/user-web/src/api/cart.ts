@@ -2,6 +2,7 @@
  * 장바구니 API — /api/v1/carts (인증 필요)
  */
 import { apiV1FetchPlain } from './authClient'
+import { resolveMenuImageUrl } from '../lib/menuImage'
 
 export interface CartOptionLineDto {
   optionId: number
@@ -18,6 +19,7 @@ export interface CartItemLineDto {
   requestMemo: string | null
   options: CartOptionLineDto[]
   itemTotalPrice: number
+  imageUrl?: string | null
 }
 
 export interface CartListDto {
@@ -34,13 +36,6 @@ export interface CartAddBody {
   requestMemo?: string
   optionIds: number[]
 }
-
-const MENU_FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1550547660-d9450f859349?w=200&h=200&fit=crop',
-]
 
 /** 카트 줄 단위 UI 모델 (App·CartPage 공용) */
 export interface ServerCartLineUi {
@@ -62,10 +57,6 @@ function optionSummary(opts: CartOptionLineDto[]): string {
   return opts.map((o) => o.optionName).join(', ')
 }
 
-function lineImage(menuId: number): string {
-  return MENU_FALLBACK_IMAGES[Math.abs(Number(menuId)) % MENU_FALLBACK_IMAGES.length]
-}
-
 export function mapCartListToUiLines(data: CartListDto): ServerCartLineUi[] {
   return data.cartItems.map((it) => {
     const unit =
@@ -77,7 +68,7 @@ export function mapCartListToUiLines(data: CartListDto): ServerCartLineUi[] {
       options: optionSummary(it.options),
       price: unit,
       quantity: it.quantity,
-      image: lineImage(it.menuId),
+      image: resolveMenuImageUrl(it.imageUrl),
       optionIds: it.options.map((o) => o.optionId),
       requestMemo: it.requestMemo ?? '',
     }

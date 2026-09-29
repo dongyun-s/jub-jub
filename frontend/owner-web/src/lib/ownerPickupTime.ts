@@ -59,7 +59,7 @@ export function formatPickupEtaLabel(acceptedAtMs: number | undefined, pickupMin
     return formatPickupPreviewLabel(pickupMinutes)
   }
   const eta = new Date(acceptedAtMs + pickupMinutes * 60_000)
-  return `픽업 ${formatClockLabel(eta)} (${formatPickupMinutes(pickupMinutes)})`
+  return `픽업 ${formatClockLabel(eta)} · ${formatPickupMinutes(pickupMinutes)}`
 }
 
 function formatClockLabel(d: Date): string {
@@ -89,9 +89,10 @@ export function formatPickupEtaDisplay(
     const d = new Date(estimatedPickupTime)
     if (!Number.isNaN(d.getTime())) {
       const hhmm = formatPickupHhMm(estimatedPickupTime)
+      // 카드 폭이 좁아 한 줄로 유지 (겹침 방지)
       return hhmm
-        ? `픽업 ${hhmm} 예정 (${formatPickupMinutes(pickupMinutes)})`
-        : `픽업 ${formatClockLabel(d)} (${formatPickupMinutes(pickupMinutes)})`
+        ? `픽업 ${hhmm} · ${formatPickupMinutes(pickupMinutes)}`
+        : `픽업 ${formatClockLabel(d)} · ${formatPickupMinutes(pickupMinutes)}`
     }
   }
   return formatPickupEtaLabel(acceptedAtMs, pickupMinutes)

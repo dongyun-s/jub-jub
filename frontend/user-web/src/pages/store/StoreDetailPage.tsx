@@ -24,6 +24,7 @@ import {
   type MenuItem,
   type MenuCategory,
 } from '../../lib/storeDetailMenu'
+import { DEFAULT_MENU_IMAGE } from '../../lib/menuImage'
 import { fetchRewardMe } from '../../api/rewards'
 import { getTierDiscountRate } from '../../lib/rewardTierTheme'
 import { estimatePickupHhMmFromMinutes } from '../../lib/pickupEta'
@@ -63,6 +64,12 @@ function MenuItemCard({
   onClick?: () => void 
 }) {
   const soldOut = Boolean(item.isSoldOut)
+  const [imgSrc, setImgSrc] = useState(item.image || DEFAULT_MENU_IMAGE)
+
+  useEffect(() => {
+    setImgSrc(item.image || DEFAULT_MENU_IMAGE)
+  }, [item.image, item.id])
+
   return (
     <button
       type="button"
@@ -83,9 +90,14 @@ function MenuItemCard({
           </div>
         </div>
       )}
-      {item.image && (
-        <div className={styles.menuCardImage} style={{ backgroundImage: `url("${item.image}")` }} />
-      )}
+      <div className={styles.menuCardImage}>
+        <img
+          src={imgSrc}
+          alt=""
+          className={styles.menuCardImg}
+          onError={() => setImgSrc(DEFAULT_MENU_IMAGE)}
+        />
+      </div>
       <div className={styles.menuCardInfo}>
         <div>
           <h4 className={styles.menuCardName}>{item.name}</h4>
