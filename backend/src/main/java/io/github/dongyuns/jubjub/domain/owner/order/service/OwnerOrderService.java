@@ -9,6 +9,8 @@ import io.github.dongyuns.jubjub.domain.core.ordertracking.entity.OrderTracking;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.entity.OrderTrackingStatus;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.repository.OrderTrackingRepository;
 import io.github.dongyuns.jubjub.domain.core.ordertracking.service.OrderTrackingLifecycleService;
+import io.github.dongyuns.jubjub.domain.core.ordertracking.service.PickupTimePredictionService;
+import io.github.dongyuns.jubjub.domain.core.ordertracking.service.PickupTrainingDataService;
 import io.github.dongyuns.jubjub.domain.core.payment.service.PaymentService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.owner.order.dto.OwnerOrderDetailResponse;
@@ -16,6 +18,7 @@ import io.github.dongyuns.jubjub.domain.owner.order.dto.OwnerOrderListResponse;
 import io.github.dongyuns.jubjub.domain.owner.order.dto.OwnerOrderStatusResponse;
 import io.github.dongyuns.jubjub.domain.owner.store.service.OwnerStoreResolver;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OwnerOrderService {
 
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+
     private static final List<OrderStatus> POS_ORDER_STATUSES = List.of(
             OrderStatus.PAID,
             OrderStatus.COMPLETED,
@@ -38,6 +43,8 @@ public class OwnerOrderService {
     private final OrderRepository orderRepository;
     private final OrderTrackingRepository orderTrackingRepository;
     private final OrderTrackingLifecycleService orderTrackingLifecycleService;
+    private final PickupTimePredictionService pickupTimePredictionService;
+    private final PickupTrainingDataService pickupTrainingDataService;
     private final PaymentService paymentService;
     private final OrderService orderService;
 
@@ -85,10 +92,17 @@ public class OwnerOrderService {
     public OwnerOrderStatusResponse accept(String accountEmail, Long orderId) {
         Order order = getPaidOwnedOrder(accountEmail, orderId);
         OrderTracking tracking = getTrackingForUpdate(order);
+        validateTrackingStatus(tracking, OrderTrackingStatus.RECEIVED);
+        LocalDateTime startedAt = LocalDateTime.now(KOREA_ZONE);
+        PickupTimePredictionService.PredictionResult prediction =
+                pickupTimePredictionService.predictOnAcceptance(order, startedAt);
+        // 결제 순서보다 실제 조리 상황을 우선해 다시 예측한다.
         transition(() -> tracking.acceptAndStartCooking(
-                LocalDateTime.now(),
-                order.getStore().getCookingTimeMinutes()
+                startedAt,
+                prediction.estimatedReadyAt()
         ));
+        // 수락 당시의 예측 입력값을 저장하고, 조리 완료 시 실제 소요시간을 채운다.
+        pickupTrainingDataService.startCollection(order, startedAt, prediction);
         orderTrackingLifecycleService.notifyStatusChange(order, tracking);
         return OwnerOrderStatusResponse.from(order, tracking);
     }
@@ -97,7 +111,9 @@ public class OwnerOrderService {
     public OwnerOrderStatusResponse markReady(String accountEmail, Long orderId) {
         Order order = getPaidOwnedOrder(accountEmail, orderId);
         OrderTracking tracking = getTrackingForUpdate(order);
-        transition(() -> tracking.markReadyForPickup(LocalDateTime.now()));
+        LocalDateTime readyAt = LocalDateTime.now(KOREA_ZONE);
+        transition(() -> tracking.markReadyForPickup(readyAt));
+        pickupTrainingDataService.completeCollection(orderId, readyAt);
         orderTrackingLifecycleService.notifyStatusChange(order, tracking);
         return OwnerOrderStatusResponse.from(order, tracking);
     }

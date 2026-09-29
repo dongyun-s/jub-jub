@@ -18,15 +18,23 @@ services:
     build: ./backend
     container_name: jubjub-backend
     restart: always
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     depends_on:
       - db
+      - ai-service
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      AI_SERVICE_BASE_URL: http://ai-service:8000
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
+  ai-service:
+    build: ./ai-service
+    restart: always
 
 volumes:
   mysql_data:

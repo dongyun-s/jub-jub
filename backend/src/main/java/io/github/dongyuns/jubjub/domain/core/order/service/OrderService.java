@@ -10,6 +10,7 @@ import io.github.dongyuns.jubjub.domain.core.account.repository.AccountRepositor
 import io.github.dongyuns.jubjub.domain.customer.coupon.dto.DiscountCalculateRequest;
 import io.github.dongyuns.jubjub.domain.customer.coupon.dto.DiscountCalculateResponse;
 import io.github.dongyuns.jubjub.domain.core.reward.event.PickupCompletedEvent;
+import io.github.dongyuns.jubjub.domain.core.reward.service.RewardService;
 import io.github.dongyuns.jubjub.domain.core.coupon.service.DiscountCalculatorService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.core.store.repository.StoreRepository;
@@ -49,6 +50,7 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final DiscountCalculatorService discountCalculatorService;
     private final PickupDistanceService pickupDistanceService;
+    private final RewardService rewardService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -97,7 +99,7 @@ public class OrderService {
         return OrderResponse.from(orderRepository.save(order));
     }
 
-    // 픽업 완료 처리 및 리워드 이벤트 발행
+    // 주문 완료와 적립 내역을 한 트랜잭션에서 확정하고, 쿠폰은 커밋 후 발급한다.
     @Transactional
     public void completePickup(Long orderId) {
         // 1. 주문 조회
@@ -114,15 +116,17 @@ public class OrderService {
                 order.getStore()
         );
 
-        // 2. 주문 상태를 픽업 완료로 변경 (Order 엔티티에 해당 메서드가 있다고 가정)
+        // 적립이 실패하면 주문 완료와 주문 추적 상태도 함께 롤백된다.
         order.completePickup();
+        RewardService.PickupRewardResult reward = rewardService.givePickupReward(
+                order.getMemberProfile(), 100, walkedDistanceMeters, order.getId());
 
-        // 3. 리워드 적립 이벤트 발행
+        // 쿠폰 발급 실패는 이미 완료된 주문과 적립을 되돌리지 않는다.
         eventPublisher.publishEvent(new PickupCompletedEvent(
-                order.getMemberProfile().getAccount().getEmail(),
-                100,
-                walkedDistanceMeters,
+                reward.memberProfileId(),
                 order.getId(),
+                reward.tierUpgraded(),
+                reward.distanceCouponCount(),
                 Boolean.TRUE.equals(order.getUseMultiUseContainer())
         ));
     }

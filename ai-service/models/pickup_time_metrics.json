@@ -1,0 +1,10 @@
+{
+  "training_rows": 150,
+  "test_rows": 30,
+  "mae_by_model": {
+    "LINEAR_REGRESSION": 0.9728,
+    "RANDOM_FOREST": 2.0388
+  },
+  "selected_model": "LINEAR_REGRESSION",
+  "trained_at": "2026-09-28T07:26:54.590473+00:00"
+}

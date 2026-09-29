@@ -20,13 +20,16 @@ public class CouponDataInitializer implements CommandLineRunner {
         // 2. 거리 보상 정책 (DISTANCE / 1000원 / 30일)
         savePolicyIfAbsent("5km 달성 기념 거리 보상 쿠폰", "DISTANCE", 1000, 30);
 
-        // 3. 출석 랜덤박스 - 일반 당첨 (ATTENDANCE / 100원 / 30일)
+        // 3. 등급 승급 보상 정책 (TIER_UPGRADE / 1000원 / 30일)
+        savePolicyIfAbsent("등급 승급 축하 쿠폰", "TIER_UPGRADE", 1000, 30);
+
+        // 4. 출석 랜덤박스 - 일반 당첨 (ATTENDANCE / 100원 / 30일)
         savePolicyIfAbsent("출석체크 일반 당첨 쿠폰", "ATTENDANCE", 100, 30);
 
-        // 4. 출석 랜덤박스 - 잭팟 (ATTENDANCE / 1000원 / 30일)
+        // 5. 출석 랜덤박스 - 잭팟 (ATTENDANCE / 1000원 / 30일)
         savePolicyIfAbsent("출석체크 잭팟 당첨 쿠폰", "ATTENDANCE", 1000, 30);
 
-        // 5. 이벤트 쿠폰 (EVENT / 1000원, 3000원, 5000원 / 30일)
+        // 6. 이벤트 쿠폰 (EVENT / 1000원, 3000원, 5000원 / 30일)
         savePolicyIfAbsent("이벤트 쿠폰 1000원", "EVENT", 1000, 30);
         savePolicyIfAbsent("이벤트 쿠폰 3000원", "EVENT", 3000, 30);
         savePolicyIfAbsent("이벤트 쿠폰 5000원", "EVENT", 5000, 30);

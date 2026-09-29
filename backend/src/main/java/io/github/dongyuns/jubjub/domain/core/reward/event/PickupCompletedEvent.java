@@ -3,14 +3,14 @@ package io.github.dongyuns.jubjub.domain.core.reward.event;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 /**
- * 픽업 완료 시 발행되는 리워드 적립용 이벤트 객체
+ * 픽업 적립이 완료된 뒤, 쿠폰 발급을 위해 발행하는 이벤트
  */
 @Getter
 @RequiredArgsConstructor
 public class PickupCompletedEvent {
-    private final String email;           // 사용자 식별값
-    private final int earnedXp;          // 이번 주문으로 얻은 경험치
-    private final int walkedDistance;    // 이번에 걸은 거리 (m)
-    private final Long orderId;     // 주문 ID (리워드 적립 시 주문과 연관짓기 위해 필요)
-    private final boolean useMultiUseContainer; // 다회용기 사용 여부 (주문 생성 시 선택한 값)
+    private final Long memberProfileId;
+    private final Long orderId;
+    private final boolean tierUpgraded;
+    private final int distanceCouponCount;
+    private final boolean useMultiUseContainer;
 }
