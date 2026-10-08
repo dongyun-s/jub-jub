@@ -2,6 +2,7 @@ package io.github.dongyuns.jubjub.domain.owner.store.controller;
 
 import io.github.dongyuns.jubjub.common.response.ApiResponse;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.OwnerStoreResponse;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreImageRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreLocationRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreStatusRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.service.OwnerStoreService;
@@ -42,5 +43,13 @@ public class OwnerStoreController {
         return ApiResponse.success(
                 ownerStoreService.updateLocationAndCategory(authentication.getName(), request)
         );
+    }
+
+    @PatchMapping("/image")
+    public ApiResponse<OwnerStoreResponse> updateImage(
+            Authentication authentication,
+            @Valid @RequestBody UpdateStoreImageRequest request
+    ) {
+        return ApiResponse.success(ownerStoreService.updateImage(authentication.getName(), request));
     }
 }

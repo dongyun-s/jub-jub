@@ -1,8 +1,10 @@
 package io.github.dongyuns.jubjub.domain.owner.store.service;
 
+import io.github.dongyuns.jubjub.domain.core.media.service.MediaCrudService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.core.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.OwnerStoreResponse;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreImageRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreLocationRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreStatusRequest;
 import io.github.dongyuns.jubjub.domain.shared.external.tmap.AddressGeocoder;
@@ -17,13 +19,15 @@ public class OwnerStoreService {
 
     private final OwnerStoreResolver ownerStoreResolver;
     private final AddressGeocoder addressGeocoder;
+    private final MediaCrudService mediaCrudService;
 
     /**
      * 내 매장 조회 (Response)
      */
     @Transactional(readOnly = true)
     public OwnerStoreResponse getMyStore(String accountEmail) {
-        return OwnerStoreResponse.from(ownerStoreResolver.getCurrentOwnerStore(accountEmail));
+        Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
+        return toResponse(store);
     }
 
     /**
@@ -47,7 +51,7 @@ public class OwnerStoreService {
 
         store.updateStatus(request.status().name());
 
-        return OwnerStoreResponse.from(store);
+        return toResponse(store);
     }
 
     /**
@@ -73,6 +77,20 @@ public class OwnerStoreService {
                 category.getId()
         );
 
-        return OwnerStoreResponse.from(store);
+        return toResponse(store);
+    }
+
+    @Transactional
+    public OwnerStoreResponse updateImage(
+            String accountEmail,
+            UpdateStoreImageRequest request
+    ) {
+        Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
+        String imageUrl = mediaCrudService.saveStoreImage(store.getId(), request.imageUrl());
+        return OwnerStoreResponse.from(store, imageUrl);
+    }
+
+    private OwnerStoreResponse toResponse(Store store) {
+        return OwnerStoreResponse.from(store, mediaCrudService.getStoreImage(store.getId()));
     }
 }

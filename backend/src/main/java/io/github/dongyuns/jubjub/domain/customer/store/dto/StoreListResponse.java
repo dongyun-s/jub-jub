@@ -11,9 +11,10 @@ public record StoreListResponse(
         int cookingTimeMinutes,
         int minOrderAmount,
         Double latitude,
-        Double longitude
+        Double longitude,
+        String imageUrl
 ) {
-    public static StoreListResponse from(Store store) {
+    public static StoreListResponse from(Store store, String imageUrl) {
         return new StoreListResponse(
                 store.getId(),
                 store.getName(),
@@ -22,7 +23,8 @@ public record StoreListResponse(
                 store.getCookingTimeMinutes(),
                 store.getMinOrderAmount(),
                 store.getLatitude(),
-                store.getLongitude()
+                store.getLongitude(),
+                imageUrl
         );
     }
 }

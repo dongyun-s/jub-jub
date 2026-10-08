@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -41,9 +42,20 @@ public class StoreService {
                 ? storeRepository.findAll()
                 : storeRepository.findByCategoryIdOrderByIdAsc(resolvedCategory.getId());
 
-        return stores.stream()
+        List<Store> sortedStores = stores.stream()
                 .sorted((left, right) -> Long.compare(left.getId(), right.getId()))
-                .map(StoreListResponse::from)
+                .toList();
+
+        if (sortedStores.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> imagesByStoreId = mediaCrudService.getStoreImages(
+                sortedStores.stream().map(Store::getId).toList()
+        );
+
+        return sortedStores.stream()
+                .map(store -> StoreListResponse.from(store, imagesByStoreId.get(store.getId())))
                 .toList();
     }
 
@@ -69,7 +81,8 @@ public class StoreService {
                 store.getOriginInfo(),
                 store.getCookingTimeMinutes(),
                 store.getMinOrderAmount(),
-                menus
+                menus,
+                mediaCrudService.getStoreImage(store.getId())
         );
     }
 }

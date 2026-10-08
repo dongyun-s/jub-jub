@@ -13,9 +13,10 @@ public record OwnerStoreResponse(
         Double latitude,
         Double longitude,
         String status,
-        Integer cookingTimeMinutes
+        Integer cookingTimeMinutes,
+        String imageUrl
 ) {
-    public static OwnerStoreResponse from(Store store) {
+    public static OwnerStoreResponse from(Store store, String imageUrl) {
         return new OwnerStoreResponse(
                 store.getId(),
                 store.getName(),
@@ -26,7 +27,8 @@ public record OwnerStoreResponse(
                 store.getLatitude(),
                 store.getLongitude(),
                 store.getStatus(),
-                store.getCookingTimeMinutes()
+                store.getCookingTimeMinutes(),
+                imageUrl
         );
     }
 }
