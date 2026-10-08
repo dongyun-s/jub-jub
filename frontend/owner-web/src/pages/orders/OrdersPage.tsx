@@ -21,7 +21,10 @@ export function OrdersPage() {
   const navigate = useNavigate()
   const { storeId, store, mockMode } = useOwnerStoreDetail()
   const ownerProfile = getActiveOwnerStoreProfile()
-  const { baseMinutes, setBaseMinutes } = useOwnerCookingTime(storeId, store?.cookingTimeMinutes)
+  const { baseMinutes, setBaseMinutes, error: cookingTimeError } = useOwnerCookingTime(
+    storeId,
+    store?.cookingTimeMinutes,
+  )
   const {
     newOrders,
     activeOrders,
@@ -130,10 +133,11 @@ export function OrdersPage() {
         <section className={styles.pickupToolbar} aria-label="매장 기본 픽업 시간">
           <PickupTimeStepper
             label="기본 조리·픽업 시간"
-            hint="신규 주문에서 픽업 시간을 정한 뒤 수락·조리 시작하세요."
+            hint="바꾸면 매장 기본 조리 시간으로 저장됩니다. 이미 접수된 주문의 픽업 시각은 바뀌지 않습니다."
             minutes={baseMinutes}
             onChange={setBaseMinutes}
           />
+          {cookingTimeError ? <p className={styles.cookingTimeError}>{cookingTimeError}</p> : null}
           {useMock ? (
             <div className={styles.toolbarActions}>
               <button type="button" className={styles.mockIncomingBtn} onClick={simulateIncomingOrder}>

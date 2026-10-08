@@ -12,6 +12,8 @@ export interface StoreListItem {
   minOrderAmount: number
   latitude: number | null
   longitude: number | null
+  /** 매장 대표 이미지. 백엔드가 주면 카드에 사용 */
+  imageUrl?: string | null
 }
 
 export interface MenuOptionDto {
@@ -46,7 +48,23 @@ export interface StoreDetailDto {
   longitude?: number | null
   categoryId?: number | null
   categoryName?: string | null
+  imageUrl?: string | null
+  /** 운영시간 안내. 미등록 시 null */
+  operatingHours?: string | null
+  /** 매장 안내사항. 미등록 시 null */
+  notice?: string | null
   menus: MenuDto[]
+}
+
+function optionalText(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const trimmed = v.trim()
+  return trimmed === '' ? null : trimmed
+}
+
+function optionalImageUrl(p: Record<string, unknown>): string | null {
+  const imageRaw = p.imageUrl ?? p.image_url ?? p.imagePath ?? p.image_path ?? p.coverImageUrl ?? p.cover_image_url
+  return typeof imageRaw === 'string' && imageRaw.trim() !== '' ? imageRaw.trim() : null
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -83,6 +101,7 @@ function normalizeStoreListItem(raw: unknown): StoreListItem | null {
         : p.lng != null
           ? num(p.lng)
           : null,
+    imageUrl: optionalImageUrl(p),
   }
 }
 
@@ -154,6 +173,9 @@ export async function fetchStoreDetail(storeId: number): Promise<StoreDetailDto>
           : null,
     categoryId: p.categoryId != null ? num(p.categoryId ?? p.category_id) : null,
     categoryName: String(p.categoryName ?? p.category_name ?? '').trim() || null,
+    imageUrl: optionalImageUrl(p),
+    operatingHours: optionalText(p.operatingHours ?? p.operating_hours),
+    notice: optionalText(p.notice),
     menus: Array.isArray(p.menus) ? p.menus.map(normalizeMenuDto).filter((m): m is MenuDto => m != null) : [],
   }
 }
@@ -208,6 +230,7 @@ export interface SortedStoreListItem {
   distanceMeters: number
   averageRating: number
   reviewCount: number
+  imageUrl?: string | null
 }
 
 export type FetchSortedStoresParams = {
@@ -246,6 +269,7 @@ function normalizeSortedStoreItem(raw: unknown): SortedStoreListItem | null {
     distanceMeters: num(p.distanceMeters ?? p.distance_meters),
     averageRating: num(p.averageRating ?? p.average_rating, 0),
     reviewCount: num(p.reviewCount ?? p.review_count),
+    imageUrl: optionalImageUrl(p),
   }
 }
 

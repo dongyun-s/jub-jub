@@ -1,6 +1,7 @@
 import type { SortedStoreListItem, StoreListItem } from '../api/store'
 import type { FeaturedRestaurant } from '../constants'
-import { CATEGORY_TAB_TO_ID, STORE_LIST_CARD_IMAGES } from '../constants'
+import { CATEGORY_TAB_TO_ID } from '../constants'
+import { resolveStoreCardImage } from './menuImage'
 import { formatStoreCardPickupLabel } from './pickupEta'
 
 export function formatStoreDistanceMeters(meters: number): string {
@@ -40,7 +41,7 @@ export function readCachedStoreCategoryLabel(storeId: number): string | null {
 
 export function mapSortedStoreToFeatured(s: SortedStoreListItem): FeaturedRestaurant {
   const id = Number(s.storeId)
-  const img = STORE_LIST_CARD_IMAGES[Math.abs(id) % STORE_LIST_CARD_IMAGES.length]
+  const img = resolveStoreCardImage(s.imageUrl)
   const categoryLabel = s.categoryName?.trim() || undefined
   const dist = formatStoreDistanceMeters(s.distanceMeters)
   if (categoryLabel) cacheStoreCategoryLabel(id, categoryLabel)
@@ -56,7 +57,7 @@ export function mapSortedStoreToFeatured(s: SortedStoreListItem): FeaturedRestau
     delivery: dist
       ? `${dist} · ${formatStoreCardPickupLabel(s.cookingTimeMinutes)}`
       : formatStoreCardPickupLabel(s.cookingTimeMinutes),
-    minOrder: `최소 주문 ${s.minOrderAmount.toLocaleString()}원`,
+    minOrder: s.minOrderAmount > 0 ? `최소 주문 ${s.minOrderAmount.toLocaleString()}원` : '최소 주문 없음',
     rating: Math.round(s.averageRating * 10) / 10 || 0,
     reviews: s.reviewCount,
     hashtags: categoryLabel ? [`#${categoryLabel}`, '#줍줍'] : ['#줍줍'],
@@ -69,7 +70,7 @@ export function mapSortedStoreToFeatured(s: SortedStoreListItem): FeaturedRestau
 
 export function mapStoreListItemToFeatured(s: StoreListItem): FeaturedRestaurant {
   const id = Number(s.storeId)
-  const img = STORE_LIST_CARD_IMAGES[Math.abs(id) % STORE_LIST_CARD_IMAGES.length]
+  const img = resolveStoreCardImage(s.imageUrl)
   const categoryLabel = s.categoryName?.trim() || storeCategoryLabelFromId(s.categoryId) || undefined
   if (categoryLabel) cacheStoreCategoryLabel(id, categoryLabel)
   return {
@@ -78,7 +79,7 @@ export function mapStoreListItemToFeatured(s: StoreListItem): FeaturedRestaurant
     tags: ['포장 픽업'],
     title: s.name,
     delivery: formatStoreCardPickupLabel(s.cookingTimeMinutes),
-    minOrder: `최소 주문 ${s.minOrderAmount.toLocaleString()}원`,
+    minOrder: s.minOrderAmount > 0 ? `최소 주문 ${s.minOrderAmount.toLocaleString()}원` : '최소 주문 없음',
     rating: 0,
     reviews: 0,
     hashtags: categoryLabel ? [`#${categoryLabel}`, '#줍줍'] : ['#줍줍'],

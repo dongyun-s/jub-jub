@@ -19,6 +19,9 @@ export interface StoreDetailDto {
   minOrderAmount: number
   /** 매장 업종 (API 연동 시) */
   categoryId?: number | null
+  imageUrl?: string | null
+  operatingHours?: string | null
+  notice?: string | null
   menus: MenuDto[]
 }
 

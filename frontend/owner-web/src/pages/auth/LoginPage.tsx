@@ -118,7 +118,7 @@ export function LoginPage() {
         </div>
 
         <h1 className={styles.title}>환영합니다</h1>
-        <p className={styles.subtitle}>주문/메뉴/정산을 관리하려면 로그인이 필요합니다.</p>
+        <p className={styles.subtitle}>주문과 메뉴를 관리하려면 로그인이 필요합니다.</p>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.row}>
