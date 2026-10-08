@@ -14,7 +14,6 @@ const nav: { to: string; label: string; icon: string; end?: boolean }[] = [
   { to: '/orders/completed', label: '완료 주문', icon: 'task_alt' },
   { to: '/store', label: '매장 정보', icon: 'store' },
   { to: '/menu', label: '메뉴관리', icon: 'restaurant_menu' },
-  { to: '/payments', label: '결제내역', icon: 'payments' },
   { to: '/reviews', label: '리뷰관리', icon: 'rate_review' },
 ]
 

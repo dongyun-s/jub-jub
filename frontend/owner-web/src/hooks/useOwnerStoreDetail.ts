@@ -42,10 +42,13 @@ export function useOwnerStoreDetail() {
           name: mine.name,
           address: mine.address,
           phoneNumber: mine.phoneNumber,
-          originInfo: '',
+          originInfo: mine.originInfo?.trim() || '',
           cookingTimeMinutes: mine.cookingTimeMinutes ?? 15,
           minOrderAmount: mine.minOrderAmount ?? 0,
           categoryId: mine.categoryId ?? null,
+          imageUrl: mine.imageUrl?.trim() || null,
+          operatingHours: mine.operatingHours ?? null,
+          notice: mine.notice ?? null,
           menus: [],
         })
         // 메뉴 목록이 필요하면 고객용 상세로 보강
@@ -57,6 +60,10 @@ export function useOwnerStoreDetail() {
               categoryId: full.categoryId ?? mine.categoryId ?? null,
               minOrderAmount: full.minOrderAmount ?? mine.minOrderAmount ?? 0,
               cookingTimeMinutes: full.cookingTimeMinutes ?? mine.cookingTimeMinutes ?? 15,
+              imageUrl: full.imageUrl?.trim() || mine.imageUrl?.trim() || null,
+              operatingHours:
+                full.operatingHours !== undefined ? full.operatingHours : (mine.operatingHours ?? null),
+              notice: full.notice !== undefined ? full.notice : (mine.notice ?? null),
             })
           }
         } catch {

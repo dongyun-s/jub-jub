@@ -9,7 +9,6 @@ import {
   MenuPage,
   OrdersPage,
   CompletedOrdersPage,
-  PaymentsPage,
   ReviewsPage,
 } from './pages'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -38,7 +37,7 @@ export default function App() {
             <Route path="store" element={<StoreSettingsPage />} />
             <Route path="menu/new" element={<MenuAddPage />} />
             <Route path="menu" element={<MenuPage />} />
-            <Route path="payments" element={<PaymentsPage />} />
+            <Route path="payments" element={<Navigate to="/dashboard" replace />} />
             <Route path="reviews" element={<ReviewsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
