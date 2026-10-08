@@ -8,16 +8,18 @@ public record MenuResponse(
         String name,
         int price,
         String description,
+        String imageUrl,
         boolean isSoldOut,
         int rewardXp,
         List<MenuOptionResponse> options
 ) {
-    public static MenuResponse from(Menu menu) {
+    public static MenuResponse from(Menu menu, String imageUrl) {
         return new MenuResponse(
                 menu.getId(),
                 menu.getName(),
                 menu.getPrice(),
                 menu.getDescription(),
+                imageUrl,
                 menu.isSoldOut(),
                 menu.getRewardXp(),
                 menu.getOptions().stream()

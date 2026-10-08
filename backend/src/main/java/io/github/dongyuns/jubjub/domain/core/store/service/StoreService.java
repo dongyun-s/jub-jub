@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.domain.customer.menu.dto.MenuResponse;
 import io.github.dongyuns.jubjub.domain.customer.store.dto.StoreDetailResponse;
 import io.github.dongyuns.jubjub.domain.customer.store.dto.StoreListResponse;
 import io.github.dongyuns.jubjub.domain.core.menu.repository.MenuRepository;
+import io.github.dongyuns.jubjub.domain.core.media.service.MediaCrudService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.core.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.core.store.repository.StoreRepository;
@@ -20,6 +21,7 @@ public class StoreService {
 
     private final StoreRepository storeRepository;
     private final MenuRepository menuRepository;
+    private final MediaCrudService mediaCrudService;
 
     /**
      * 모든 매장 조회
@@ -56,7 +58,7 @@ public class StoreService {
         List<MenuResponse> menus = menuRepository
                 .findByStoreIdAndIsDeletedFalse(storeId)
                 .stream()
-                .map(MenuResponse::from)
+                .map(menu -> MenuResponse.from(menu, mediaCrudService.getMenuImage(menu.getId())))
                 .toList();
 
         return new StoreDetailResponse(
