@@ -1,0 +1,52 @@
+name: jubjub-prod
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: jubjub-backend
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AI_SERVICE_BASE_URL: http://ai-service:8000
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ai-service:
+    build:
+      context: ./ai-service
+    container_name: jubjub-ai-service
+    restart: unless-stopped
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

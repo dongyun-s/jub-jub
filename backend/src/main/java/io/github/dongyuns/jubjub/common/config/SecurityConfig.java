@@ -17,12 +17,15 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.List;
+
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final CorsProperties corsProperties;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -32,7 +35,6 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 🌟 1. CORS 설정 (아래 만들어둔 메서드 호출)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .formLogin(formLogin -> formLogin.disable())
@@ -40,7 +42,6 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // 🌟 [추가됨: OPTIONS 메서드 모두 허용] 프론트엔드의 CORS Preflight(사전 요청) 에러 완벽 차단!
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // [Swagger 패스]
                         .requestMatchers(
@@ -49,7 +50,9 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
                                 "/api-docs",
-                                "/api-docs/**"
+                                "/api-docs/**",
+                                "/actuator/health",
+                                "/actuator/health/**"
                         ).permitAll()
 
                         // [인증(로그인/가입) 패스]
@@ -80,14 +83,14 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 🌟 2. 빠져있던 CORS 허용 규칙 메서드 추가! (이게 있어야 프론트에서 찔렀을 때 에러가 안 납니다)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.addAllowedOriginPattern("*"); // 모든 주소 허용 (로컬 테스트용)
-        configuration.addAllowedMethod("*"); // GET, POST, PUT, DELETE 모두 허용
-        configuration.addAllowedHeader("*"); // 모든 헤더 허용
-        configuration.setAllowCredentials(true); // 인증 정보(쿠키, 토큰 등) 포함 허용
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
