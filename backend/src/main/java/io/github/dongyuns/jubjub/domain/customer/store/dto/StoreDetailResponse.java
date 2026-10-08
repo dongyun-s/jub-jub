@@ -12,5 +12,7 @@ public record StoreDetailResponse(
         int cookingTimeMinutes,
         int minOrderAmount,
         List<MenuResponse> menus, // 이 매장에 속한 메뉴들이 리스트로 들어갑니다!
-        String imageUrl
+        String imageUrl,
+        String operatingHours,
+        String notice
 ) {}

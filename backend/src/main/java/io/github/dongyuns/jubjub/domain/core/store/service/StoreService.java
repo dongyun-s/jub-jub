@@ -82,7 +82,9 @@ public class StoreService {
                 store.getCookingTimeMinutes(),
                 store.getMinOrderAmount(),
                 menus,
-                mediaCrudService.getStoreImage(store.getId())
+                mediaCrudService.getStoreImage(store.getId()),
+                store.getOperatingHours(),
+                store.getNotice()
         );
     }
 }
