@@ -53,6 +53,8 @@ class StoreSortServiceTest {
         Store nearestStore = createStore(1L, "가까운 매장", 37.5005, 127.0305);
         Store fartherStore = createStore(2L, "조금 먼 매장", 37.5080, 127.0350);
         Store farthestStore = createStore(3L, "가장 먼 매장", 37.5300, 127.0600);
+        nearestStore.updateCookingTimeMinutes(20);
+        fartherStore.updateCookingTimeMinutes(25);
         String nearestImage = "https://images.example.com/store/nearest.jpg";
         String farthestImage = "https://images.example.com/store/farthest.jpg";
 
@@ -75,6 +77,9 @@ class StoreSortServiceTest {
         assertThat(result)
                 .extracting(SortedStoreResponse::storeId)
                 .containsExactly(1L, 2L, 3L);
+        assertThat(result)
+                .extracting(SortedStoreResponse::cookingTimeMinutes)
+                .containsExactly(20, 25, 15);
         assertThat(result.get(0).distanceMeters()).isLessThan(result.get(1).distanceMeters());
         assertThat(result)
                 .extracting(SortedStoreResponse::imageUrl)
@@ -90,6 +95,8 @@ class StoreSortServiceTest {
         Store higherRatedStore = createStore(1L, "평점 높은 매장", 37.5007, 127.0302);
         Store sameRatingButCloserStore = createStore(2L, "동점이지만 더 가까운 매장", 37.5003, 127.0301);
         Store lowerRatedStore = createStore(3L, "평점 낮은 매장", 37.5010, 127.0303);
+        higherRatedStore.updateCookingTimeMinutes(20);
+        sameRatingButCloserStore.updateCookingTimeMinutes(25);
         String higherRatedImage = "https://images.example.com/store/high-rating.jpg";
         String closerImage = "https://images.example.com/store/closer.jpg";
 
@@ -116,6 +123,9 @@ class StoreSortServiceTest {
         assertThat(result)
                 .extracting(SortedStoreResponse::storeId)
                 .containsExactly(2L, 1L, 3L);
+        assertThat(result)
+                .extracting(SortedStoreResponse::cookingTimeMinutes)
+                .containsExactly(25, 20, 15);
         assertThat(result.get(0).averageRating()).isEqualTo(4.8);
         assertThat(result.get(0).reviewCount()).isEqualTo(7L);
         assertThat(result)

@@ -36,11 +36,31 @@ public class Store {
     @Column(columnDefinition = "TEXT")
     private String originInfo; // 원산지 통합 정보
 
+    @Column(columnDefinition = "TEXT")
+    private String operatingHours;
+
+    @Column(columnDefinition = "TEXT")
+    private String notice;
+
     // 💡 UI 프로토타입 구현을 위해 유지!
     private int minOrderAmount = 0; // 최소 주문 금액
 
     @Builder
-    public Store(Long ownerProfileId, Integer categoryId, String name, String address, String phoneNumber, Double latitude, Double longitude, int cookingTimeMinutes, String status, String originInfo, int minOrderAmount) {
+    public Store(
+            Long ownerProfileId,
+            Integer categoryId,
+            String name,
+            String address,
+            String phoneNumber,
+            Double latitude,
+            Double longitude,
+            int cookingTimeMinutes,
+            String status,
+            String originInfo,
+            int minOrderAmount,
+            String operatingHours,
+            String notice
+    ) {
         this.ownerProfileId = ownerProfileId;
         this.categoryId = categoryId;
         this.name = name;
@@ -52,10 +72,35 @@ public class Store {
         this.status = status == null || status.isBlank() ? "OPEN" : status;
         this.originInfo = originInfo;
         this.minOrderAmount = minOrderAmount;
+        this.operatingHours = normalizeInfo(operatingHours);
+        this.notice = normalizeInfo(notice);
     }
 
     public void updateStatus(String status) {
         this.status = status;
+    }
+
+    public void updateCookingTimeMinutes(int cookingTimeMinutes) {
+        if (cookingTimeMinutes < 1) {
+            throw new IllegalArgumentException("조리 시간은 1분 이상이어야 합니다.");
+        }
+        this.cookingTimeMinutes = cookingTimeMinutes;
+    }
+
+    public void updateInfo(String operatingHours, String notice) {
+        this.operatingHours = normalizeInfo(operatingHours);
+        this.notice = normalizeInfo(notice);
+    }
+
+    public void updateOriginInfo(String originInfo) {
+        this.originInfo = normalizeInfo(originInfo);
+    }
+
+    public void updateMinOrderAmount(int minOrderAmount) {
+        if (minOrderAmount < 0) {
+            throw new IllegalArgumentException("최소 주문 금액은 0원 이상이어야 합니다.");
+        }
+        this.minOrderAmount = minOrderAmount;
     }
 
     public void updateLocationAndCategory(String address, double latitude, double longitude, int categoryId) {
@@ -63,5 +108,9 @@ public class Store {
         this.latitude = latitude;
         this.longitude = longitude;
         this.categoryId = categoryId;
+    }
+
+    private static String normalizeInfo(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 }

@@ -4,7 +4,11 @@ import io.github.dongyuns.jubjub.domain.core.media.service.MediaCrudService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.core.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.OwnerStoreResponse;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreOriginRequest;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreMinOrderRequest;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreCookingTimeRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreImageRequest;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreInfoRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreLocationRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreStatusRequest;
 import io.github.dongyuns.jubjub.domain.shared.external.tmap.AddressGeocoder;
@@ -88,6 +92,40 @@ public class OwnerStoreService {
         Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
         String imageUrl = mediaCrudService.saveStoreImage(store.getId(), request.imageUrl());
         return OwnerStoreResponse.from(store, imageUrl);
+    }
+
+    @Transactional
+    public OwnerStoreResponse updateCookingTime(
+            String accountEmail,
+            UpdateStoreCookingTimeRequest request
+    ) {
+        Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
+        store.updateCookingTimeMinutes(request.cookingTimeMinutes());
+        return toResponse(store);
+    }
+
+    @Transactional
+    public OwnerStoreResponse updateInfo(
+            String accountEmail,
+            UpdateStoreInfoRequest request
+    ) {
+        Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
+        store.updateInfo(request.operatingHours(), request.notice());
+        return toResponse(store);
+    }
+
+    @Transactional
+    public OwnerStoreResponse updateOrigin(String accountEmail, UpdateStoreOriginRequest request) {
+        Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
+        store.updateOriginInfo(request.originInfo());
+        return toResponse(store);
+    }
+
+    @Transactional
+    public OwnerStoreResponse updateMinOrder(String accountEmail, UpdateStoreMinOrderRequest request) {
+        Store store = ownerStoreResolver.getCurrentOwnerStore(accountEmail);
+        store.updateMinOrderAmount(request.minOrderAmount());
+        return toResponse(store);
     }
 
     private OwnerStoreResponse toResponse(Store store) {

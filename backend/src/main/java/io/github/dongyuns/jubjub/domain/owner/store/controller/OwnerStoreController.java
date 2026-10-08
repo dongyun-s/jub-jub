@@ -2,7 +2,11 @@ package io.github.dongyuns.jubjub.domain.owner.store.controller;
 
 import io.github.dongyuns.jubjub.common.response.ApiResponse;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.OwnerStoreResponse;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreOriginRequest;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreMinOrderRequest;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreCookingTimeRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreImageRequest;
+import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreInfoRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreLocationRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.dto.UpdateStoreStatusRequest;
 import io.github.dongyuns.jubjub.domain.owner.store.service.OwnerStoreService;
@@ -51,5 +55,37 @@ public class OwnerStoreController {
             @Valid @RequestBody UpdateStoreImageRequest request
     ) {
         return ApiResponse.success(ownerStoreService.updateImage(authentication.getName(), request));
+    }
+
+    @PatchMapping("/cooking-time")
+    public ApiResponse<OwnerStoreResponse> updateCookingTime(
+            Authentication authentication,
+            @Valid @RequestBody UpdateStoreCookingTimeRequest request
+    ) {
+        return ApiResponse.success(ownerStoreService.updateCookingTime(authentication.getName(), request));
+    }
+
+    @PatchMapping("/origin")
+    public ApiResponse<OwnerStoreResponse> updateOrigin(
+            Authentication authentication,
+            @Valid @RequestBody UpdateStoreOriginRequest request
+    ) {
+        return ApiResponse.success(ownerStoreService.updateOrigin(authentication.getName(), request));
+    }
+
+    @PatchMapping("/min-order")
+    public ApiResponse<OwnerStoreResponse> updateMinOrder(
+            Authentication authentication,
+            @Valid @RequestBody UpdateStoreMinOrderRequest request
+    ) {
+        return ApiResponse.success(ownerStoreService.updateMinOrder(authentication.getName(), request));
+    }
+
+    @PatchMapping("/info")
+    public ApiResponse<OwnerStoreResponse> updateInfo(
+            Authentication authentication,
+            @Valid @RequestBody UpdateStoreInfoRequest request
+    ) {
+        return ApiResponse.success(ownerStoreService.updateInfo(authentication.getName(), request));
     }
 }
