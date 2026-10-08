@@ -4,6 +4,7 @@ import io.github.dongyuns.jubjub.domain.customer.menu.dto.MenuResponse;
 import io.github.dongyuns.jubjub.domain.customer.store.dto.StoreDetailResponse;
 import io.github.dongyuns.jubjub.domain.customer.store.dto.StoreListResponse;
 import io.github.dongyuns.jubjub.domain.core.menu.repository.MenuRepository;
+import io.github.dongyuns.jubjub.domain.core.media.service.MediaCrudService;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
 import io.github.dongyuns.jubjub.domain.core.store.entity.StoreCategory;
 import io.github.dongyuns.jubjub.domain.core.store.repository.StoreRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +22,7 @@ public class StoreService {
 
     private final StoreRepository storeRepository;
     private final MenuRepository menuRepository;
+    private final MediaCrudService mediaCrudService;
 
     /**
      * 모든 매장 조회
@@ -39,9 +42,20 @@ public class StoreService {
                 ? storeRepository.findAll()
                 : storeRepository.findByCategoryIdOrderByIdAsc(resolvedCategory.getId());
 
-        return stores.stream()
+        List<Store> sortedStores = stores.stream()
                 .sorted((left, right) -> Long.compare(left.getId(), right.getId()))
-                .map(StoreListResponse::from)
+                .toList();
+
+        if (sortedStores.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> imagesByStoreId = mediaCrudService.getStoreImages(
+                sortedStores.stream().map(Store::getId).toList()
+        );
+
+        return sortedStores.stream()
+                .map(store -> StoreListResponse.from(store, imagesByStoreId.get(store.getId())))
                 .toList();
     }
 
@@ -56,7 +70,7 @@ public class StoreService {
         List<MenuResponse> menus = menuRepository
                 .findByStoreIdAndIsDeletedFalse(storeId)
                 .stream()
-                .map(MenuResponse::from)
+                .map(menu -> MenuResponse.from(menu, mediaCrudService.getMenuImage(menu.getId())))
                 .toList();
 
         return new StoreDetailResponse(
@@ -67,7 +81,8 @@ public class StoreService {
                 store.getOriginInfo(),
                 store.getCookingTimeMinutes(),
                 store.getMinOrderAmount(),
-                menus
+                menus,
+                mediaCrudService.getStoreImage(store.getId())
         );
     }
 }

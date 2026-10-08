@@ -14,9 +14,10 @@ public record SortedStoreResponse(
         Double longitude,
         double distanceMeters,
         double averageRating,
-        long reviewCount
+        long reviewCount,
+        String imageUrl
 ) {
-    public static SortedStoreResponse of(Store store, double distanceMeters, double averageRating, long reviewCount) {
+    public static SortedStoreResponse of(Store store, double distanceMeters, double averageRating, long reviewCount, String imageUrl) {
         return new SortedStoreResponse(
                 store.getId(),
                 store.getName(),
@@ -28,7 +29,8 @@ public record SortedStoreResponse(
                 store.getLongitude(),
                 distanceMeters,
                 averageRating,
-                reviewCount
+                reviewCount,
+                imageUrl
         );
     }
 }

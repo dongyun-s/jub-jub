@@ -14,12 +14,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class MediaCrudService {
 
     private static final String PROFILE_OWNER_TYPE = "PROFILE";
     private static final String MENU_OWNER_TYPE = "MENU";
+    private static final String STORE_OWNER_TYPE = "STORE";
 
     private final AccountRepository accountRepository;
     private final MemberProfileRepository memberProfileRepository;
@@ -175,6 +180,63 @@ public class MediaCrudService {
         mediaRepository
                 .findFirstByOwnerTypeAndOwnerId(MENU_OWNER_TYPE, menuId)
                 .ifPresent(mediaRepository::delete);
+    }
+
+    /**
+     * ==========================
+     * STORE IMAGE
+     * ==========================
+     */
+
+    @Transactional(readOnly = true)
+    public String getStoreImage(Long storeId) {
+
+        return mediaRepository
+                .findFirstByOwnerTypeAndOwnerId(STORE_OWNER_TYPE, storeId)
+                .map(Media::getImagePath)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, String> getStoreImages(List<Long> storeIds) {
+
+        if (storeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, String> storeImages = new HashMap<>();
+        for (Media media : mediaRepository.findByOwnerTypeAndOwnerIdIn(STORE_OWNER_TYPE, storeIds)) {
+            if (!storeImages.containsKey(media.getOwnerId())) {
+                storeImages.put(media.getOwnerId(), media.getImagePath());
+            }
+        }
+
+        return storeImages;
+    }
+
+    @Transactional
+    public String saveStoreImage(Long storeId, String imagePath) {
+
+        imagePath = validateImagePath(imagePath);
+
+        Media media = mediaRepository
+                .findFirstByOwnerTypeAndOwnerId(STORE_OWNER_TYPE, storeId)
+                .orElse(null);
+
+        if (media != null) {
+            media.setImagePath(imagePath);
+            return media.getImagePath();
+        }
+
+        Media saved = mediaRepository.save(
+                Media.builder()
+                        .ownerType(STORE_OWNER_TYPE)
+                        .ownerId(storeId)
+                        .imagePath(imagePath)
+                        .build()
+        );
+
+        return saved.getImagePath();
     }
 
     /**
