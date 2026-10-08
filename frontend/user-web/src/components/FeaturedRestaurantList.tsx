@@ -28,7 +28,15 @@ function FeaturedRestaurantList({ restaurants, onCardClick }: FeaturedRestaurant
             className={styles.restaurantCard}
           >
             <div className={styles.restaurantImageWrapper}>
-              <img src={item.image} alt={item.title} className={styles.restaurantImage} />
+              <img
+                src={item.image}
+                alt={item.title}
+                className={styles.restaurantImage}
+                onError={(e) => {
+                  if (e.currentTarget.src.endsWith('/logo.png')) return
+                  e.currentTarget.src = '/logo.png'
+                }}
+              />
               <div className={styles.restaurantImageOverlay} />
               <div className={styles.restaurantTags}>
                 {item.tags.map((tag, idx) => (
@@ -62,6 +70,7 @@ function FeaturedRestaurantList({ restaurants, onCardClick }: FeaturedRestaurant
                   <h3 className={styles.restaurantTitle}>{item.title}</h3>
                   <p className={styles.restaurantMeta}>
                     {item.delivery}
+                    {item.minOrder ? ` · ${item.minOrder}` : ''}
                   </p>
                 </div>
                 {categoryBadge ? (

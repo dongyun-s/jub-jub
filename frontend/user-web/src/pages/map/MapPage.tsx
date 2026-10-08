@@ -20,8 +20,8 @@ import { fetchTmapRoute } from '../../lib/tmap/tmapRouteApi'
 import Layout from '../../components/Layout'
 import Header from '../../components/Header'
 import BottomNav from '../../components/BottomNav'
-import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import { fetchSortedStores } from '../../api/store'
+import { resolveStoreCardImage } from '../../lib/menuImage'
 import type { PickupDestination } from '../../hooks/useActivePickup'
 import { GeolocationError, geolocationErrorMessage, getUserCoords } from '../../lib/geolocation'
 import { haversineDistanceMeters, estimateWalkMinutes } from '../../lib/geoDistance'
@@ -69,6 +69,7 @@ type NearbyStoreUi = {
   distance: string
   rating: number
   pickupTime: string
+  minOrderLabel: string
   image: string
   lat: number
   lng: number
@@ -612,7 +613,7 @@ function MapPage({
     }
     return {
       storeName: '픽업 매장',
-      storeImage: STORE_LIST_CARD_IMAGES[0],
+      storeImage: resolveStoreCardImage(null),
       storeAddress: '',
       storeCategory: '매장',
       lat: MAP_DEFAULT_CENTER.lat,
@@ -838,7 +839,9 @@ function MapPage({
               distance: formatStoreDistanceMeters(s.distanceMeters) || '—',
               rating: Math.round(s.averageRating * 10) / 10 || 0,
               pickupTime: formatStoreCardPickupLabel(s.cookingTimeMinutes),
-              image: STORE_LIST_CARD_IMAGES[Math.abs(s.storeId) % STORE_LIST_CARD_IMAGES.length],
+              minOrderLabel:
+                s.minOrderAmount > 0 ? `최소 ${s.minOrderAmount.toLocaleString()}원` : '최소주문 없음',
+              image: resolveStoreCardImage(s.imageUrl),
               lat: s.latitude!,
               lng: s.longitude!,
             })),
@@ -1336,7 +1339,15 @@ function MapPage({
                           }}
                           className={styles.storeRow}
                         >
-                          <img src={store.image} alt={store.name} className={styles.storeRowImage} />
+                          <img
+                            src={store.image}
+                            alt={store.name}
+                            className={styles.storeRowImage}
+                            onError={(e) => {
+                              if (e.currentTarget.src.endsWith('/logo.png')) return
+                              e.currentTarget.src = '/logo.png'
+                            }}
+                          />
                           <div className={styles.storeRowInfo}>
                             <h3 className={styles.storeRowName}>{store.name}</h3>
                             <div className={styles.storeRowMeta}>
@@ -1353,6 +1364,7 @@ function MapPage({
                                 {currentLocation
                                   ? `도보 ${getWalkTimeText(store.lat, store.lng)} · ${store.pickupTime}`
                                   : store.pickupTime}
+                                {` · ${store.minOrderLabel}`}
                               </span>
                             </div>
                           </div>

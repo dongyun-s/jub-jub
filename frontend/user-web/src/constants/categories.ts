@@ -49,14 +49,6 @@ export const FILTER_OPTIONS = [
   { id: 'sort', label: '정렬', icon: 'tune' },
 ]
 
-/** API 매장 카드용 이미지 순환 */
-export const STORE_LIST_CARD_IMAGES = [
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1550547660-d9450f859349?w=400&h=300&fit=crop',
-]
-
 export interface FeaturedRestaurant {
   id: number
   image: string
@@ -75,8 +67,7 @@ export interface FeaturedRestaurant {
   distanceMeters?: number
 }
 
-/** 매장 ID 기준 카드 썸네일 (API 이미지 없을 때) */
-export function storeCardImageById(storeId?: number | null): string {
-  const idx = storeId != null ? Math.abs(storeId) % STORE_LIST_CARD_IMAGES.length : 0
-  return STORE_LIST_CARD_IMAGES[idx]!
+/** 매장 대표 이미지가 없을 때 카드·주문 썸네일 */
+export function storeCardImageById(_storeId?: number | null): string {
+  return '/logo.png'
 }

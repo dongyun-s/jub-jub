@@ -3,7 +3,7 @@
  * 우선순위: 호출측 override → 목록 API → 상세 API(있을 때)
  */
 import { fetchStoreDetail, fetchStores, type StoreListItem } from '../api/store'
-import { STORE_LIST_CARD_IMAGES } from '../constants'
+import { resolveStoreCardImage } from './menuImage'
 
 export type StoreGeo = {
   storeId: number
@@ -27,8 +27,8 @@ let listCache: StoreListItem[] | null = null
 let listCacheAt = 0
 const CACHE_MS = 60_000
 
-export function storeCardImage(storeId: number): string {
-  return STORE_LIST_CARD_IMAGES[Math.abs(storeId) % STORE_LIST_CARD_IMAGES.length]
+export function storeCardImage(_storeId: number, imageUrl?: string | null): string {
+  return resolveStoreCardImage(imageUrl)
 }
 
 async function getStoresCached(): Promise<StoreListItem[]> {
@@ -68,10 +68,12 @@ export async function fetchStoreGeo(
   let detailLat: number | null = null
   let detailLng: number | null = null
   let detailName = ''
+  let detailImageUrl: string | null = null
   try {
     const detail = await fetchStoreDetail(storeId)
     address = address || detail.address?.trim() || ''
     detailName = detail.name?.trim() || ''
+    detailImageUrl = detail.imageUrl?.trim() || null
     const dLat = detail.latitude ?? null
     const dLng = detail.longitude ?? null
     const fromDetail = pickCoords(dLat, dLng)
@@ -96,7 +98,7 @@ export async function fetchStoreGeo(
     address,
     lat: picked.lat,
     lng: picked.lng,
-    imageUrl: storeCardImage(storeId),
+    imageUrl: storeCardImage(storeId, row?.imageUrl || detailImageUrl),
     categoryName: override?.categoryName?.trim() || row?.categoryName?.trim() || undefined,
   }
 }

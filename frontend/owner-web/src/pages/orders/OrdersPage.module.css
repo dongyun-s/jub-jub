@@ -24,6 +24,13 @@
   background: var(--owner-surface-low);
 }
 
+.cookingTimeError {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+}
+
 .mockIncomingBtn {
   flex-shrink: 0;
   cursor: pointer;

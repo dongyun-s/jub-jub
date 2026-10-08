@@ -18,7 +18,6 @@ import NotificationIconButton from '../../components/NotificationIconButton/Noti
 import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount'
 import { getAccessToken } from '../../lib/authStorage'
 import { normalizeReviewImageList, resolveDisplayImageUrl } from '../../lib/imageUrl'
-import { STORE_LIST_CARD_IMAGES } from '../../constants'
 import {
   buildMenuCategoriesFromApi,
   type MenuItem,
@@ -236,8 +235,14 @@ function StoreDetailPage({
     if (first) setActiveCategory(first)
   }, [menuCategories])
 
-  const heroImage =
-    STORE_LIST_CARD_IMAGES[Math.abs(Number(storeId)) % STORE_LIST_CARD_IMAGES.length]
+  const coverFromApi = resolveDisplayImageUrl(detail?.imageUrl)
+  const heroImage = coverFromApi || '/logo.png'
+  const heroIsFallback = !coverFromApi
+  const hourLines = (detail?.operatingHours ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const noticeText = detail?.notice?.trim() ?? ''
   const storeName = (detail?.name ?? '매장').trim()
   const addressLine = detail?.address?.trim() || '주소 정보 없음'
   const categoryLabel =
@@ -453,12 +458,16 @@ function StoreDetailPage({
         />
 
         <div ref={scrollContainerRef} className={styles.scrollArea}>
-          <div
-            className={styles.hero}
-            style={{
-              backgroundImage: `url("${heroImage}")`,
-            }}
-          >
+          <div className={[styles.hero, heroIsFallback ? styles.heroFallback : ''].filter(Boolean).join(' ')}>
+            <img
+              src={heroImage}
+              alt=""
+              className={styles.heroImg}
+              onError={(e) => {
+                if (e.currentTarget.src.endsWith('/logo.png')) return
+                e.currentTarget.src = '/logo.png'
+              }}
+            />
             <div className={styles.heroOverlay} />
             <div className={styles.heroOverlay2} />
           </div>
@@ -477,6 +486,13 @@ function StoreDetailPage({
                   <div className={styles.profileMeta}>
                     <span>{addressLine}</span>
                   </div>
+                  {detail ? (
+                    <p className={styles.minOrderLine}>
+                      {detail.minOrderAmount > 0
+                        ? `최소 주문 ${detail.minOrderAmount.toLocaleString()}원`
+                        : '최소 주문 금액 없음'}
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <div className={styles.statsRow}>
@@ -788,38 +804,40 @@ function StoreDetailPage({
             <div className={styles.infoTab}>
               <div className={styles.infoSection}>
                 <h3 className={styles.infoTitle}>원산지</h3>
-                <p className={styles.infoText}>
-                  {detail?.originInfo ??
-                    '서버에서 불러오면 원산지 정보가 표시됩니다. 포장·테이크아웃 전문 매장입니다.'}
+                <p className={detail?.originInfo?.trim() ? styles.infoTextPre : styles.infoText}>
+                  {detail?.originInfo?.trim() || '등록된 원산지가 없습니다.'}
                 </p>
               </div>
 
               <div className={styles.infoSection}>
                 <h3 className={styles.infoTitle}>운영 시간</h3>
-                <ul className={styles.infoList}>
-                  <li>월–금: 11:00 ~ 21:00</li>
-                  <li>토요일: 11:00 ~ 20:00</li>
-                  <li>일요일/공휴일: 휴무</li>
-                </ul>
-              </div>
-
-              <div className={styles.infoSection}>
-                <h3 className={styles.infoTitle}>위치</h3>
-                <p className={styles.infoText}>{detail?.address ?? addressLine}</p>
-                {detail?.phoneNumber && (
-                  <p className={styles.infoSubText}>전화 {detail.phoneNumber}</p>
+                {hourLines.length > 0 ? (
+                  <ul className={styles.infoList}>
+                    {hourLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={styles.infoText}>등록된 운영 시간이 없습니다.</p>
                 )}
               </div>
 
               <div className={styles.infoSection}>
+                <h3 className={styles.infoTitle}>위치</h3>
+                <p className={styles.infoText}>{detail?.address?.trim() || addressLine}</p>
+                {detail?.phoneNumber?.trim() ? (
+                  <p className={styles.infoSubText}>전화 {detail.phoneNumber.trim()}</p>
+                ) : null}
+                {detail?.cookingTimeMinutes ? (
+                  <p className={styles.infoSubText}>기본 조리 약 {detail.cookingTimeMinutes}분</p>
+                ) : null}
+              </div>
+
+              <div className={styles.infoSection}>
                 <h3 className={styles.infoTitle}>안내 사항</h3>
-                <ul className={styles.infoList}>
-                  <li>포장 주문만 가능하며, 매장 내 취식은 어려운 점 양해 부탁드립니다.</li>
-                  <li>
-                    모든 메뉴는 주문 후 바로 제조되며, 평균 준비 시간은 약 {detail?.cookingTimeMinutes ?? 15}분입니다.
-                  </li>
-                  <li>땅콩·견과류 알레르기가 있는 경우 주문 시 꼭 미리 말씀해주세요.</li>
-                </ul>
+                <p className={noticeText ? styles.infoTextPre : styles.infoText}>
+                  {noticeText || '등록된 안내 사항이 없습니다.'}
+                </p>
               </div>
             </div>
           )}
