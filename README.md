@@ -1,4 +1,4 @@
-# 🛍️ 줍줍 · JubJub
+# 줍줍 (JubJub)
 
 <p align="center">
   <img src="docs/images/jubjub-banner.png" alt="줍줍 쇼핑백을 들고 있는 손과 JUB-JUB 로고" width="560" />
@@ -10,7 +10,7 @@
 
 고객용 웹과 사장님용 웹, Spring Boot API, FastAPI 예측 서비스를 하나의 저장소에서 관리합니다. **픽업 시간 예측**, **TMAP 기반 출발 시각 추천**, **PortOne 결제 검증**, **픽업 리워드**, **AI 리뷰 작성·분석**을 연결해 주문 이후의 경험까지 구성했습니다.
 
-## 📗 프로젝트 아키텍처
+## 프로젝트 아키텍처
 
 아래 그림은 저장소의 운영용 Docker Compose와 [AWS 배포 문서](docs/aws-deployment.md)를 기준으로 한 구성입니다. 로컬에서는 RDS 대신 Docker의 MySQL을 사용하고, 두 프론트엔드는 Vite 개발 서버로 실행합니다.
 
@@ -71,7 +71,7 @@ flowchart TB
     class DB,S3,CDN data
 ```
 
-## 🎯 프로젝트 목표
+## 프로젝트 목표
 
 1. **픽업 대기 시간을 고려한 주문 경험**
 
@@ -93,7 +93,7 @@ flowchart TB
 
    고객·사장님 화면을 분리하고, 공통 도메인 로직과 외부 연동 코드를 구분합니다. 예측 모델은 별도 Python 서비스에서 실행합니다.
 
-## 🧩 사용 기술
+## 사용 기술
 
 | 영역 | 기술 | 활용 |
 | --- | --- | --- |
@@ -109,7 +109,7 @@ flowchart TB
 | Storage / Infra | AWS S3, CloudFront, EC2, RDS, Docker Compose, Nginx | 이미지 업로드·조회, API 배포 |
 | Documentation / Test | Springdoc OpenAPI, JUnit 5, Mockito, Python unittest | API 문서, 백엔드·예측 로직 테스트 |
 
-## ✏️ 프로토타입 · 사용자 흐름
+## 프로토타입과 사용자 흐름
 
 실제 구현된 페이지와 주문 처리 로직을 기준으로 정리한 **사용자 흐름도**입니다.
 
@@ -158,7 +158,7 @@ flowchart TD
     Dashboard --> Reviews["리뷰 조회 / 답글 / AI 분석"]
 ```
 
-## 📌 주요 기능
+## 주요 기능
 
 ### 1. 회원과 인증
 
@@ -210,7 +210,7 @@ flowchart TD
 - S3 Presigned URL을 사용한 이미지 업로드
 - 운영 구성에서 비공개 S3 이미지를 CloudFront를 통해 제공
 
-## ⏱️ 픽업 시간 예측 설계
+## 픽업 시간 예측 설계
 
 예측 서비스는 **기본 조리시간, 총 주문 수량, 메뉴 종류 수, 대기 주문 수, 피크 시간 여부, 주말 여부**를 입력으로 사용합니다. 결제 직후에는 앞선 수락 대기·조리 중 주문을, 사장님 수락 시에는 이미 조리 중인 주문을 반영합니다.
 
@@ -237,7 +237,7 @@ flowchart TD
 
 > 현재 저장소에 포함된 모델은 초기 검증용 **합성 데이터**로 학습했습니다. 저장된 평가 지표는 합성 데이터에 대한 결과이며, 실제 매장 운영 환경에서의 정확도를 의미하지 않습니다. 데이터 생성·학습 코드는 [ai-service/scripts](ai-service/scripts), 모델 평가 결과는 [pickup_time_metrics.json](ai-service/models/pickup_time_metrics.json)에서 확인할 수 있습니다.
 
-## 🗂️ 프로젝트 구조
+## 프로젝트 구조
 
 ```text
 jubjub-project/
@@ -267,7 +267,7 @@ jubjub-project/
 └── package.json                  # 프론트엔드 npm workspaces
 ```
 
-## 🚀 로컬 실행 방법
+## 로컬 실행 방법
 
 ### 준비 사항
 
@@ -361,7 +361,7 @@ npm run dev --workspace=owner-web
 | Swagger UI | http://localhost:8080/swagger-ui/index.html |
 | Backend Health | http://localhost:8080/actuator/health |
 
-## 🧪 빌드와 테스트
+## 빌드와 테스트
 
 백엔드에는 주문 처리, 픽업 예측·출발 추천, 리뷰, 리워드, 매장 관리 등의 테스트가 있습니다. AI 서비스에는 예측 입력 검증과 모델 학습 파이프라인 테스트가 있습니다.
 
@@ -385,9 +385,62 @@ python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-## ☁️ 배포
+## 배포
 
 운영용 Compose는 Spring Boot와 FastAPI를 실행하며, MySQL은 외부 RDS에 연결합니다. 백엔드 포트는 호스트의 `127.0.0.1:8080`에 바인딩하고 Nginx를 통해 접근하도록 구성되어 있습니다. 운영 도메인과 TLS 인증서 설정은 별도로 진행합니다.
+
+### AWS 운영 구성도
+
+```mermaid
+flowchart LR
+    Browser["브라우저<br/>고객용 / 사장님용 웹"]
+    ApiDomain["API 도메인<br/>DNS / TLS 별도 구성"]
+
+    subgraph AWS["AWS 운영 환경"]
+        subgraph EC2["EC2"]
+            Nginx["Nginx<br/>리버스 프록시"]
+            subgraph Compose["Docker Compose"]
+                Backend["Spring Boot API<br/>127.0.0.1:8080"]
+                AI["FastAPI<br/>컨테이너 내부 :8000"]
+            end
+            Role["EC2 IAM 역할<br/>임시 자격 증명"]
+        end
+        SSM["Systems Manager<br/>Session Manager"]
+        RDS[("비공개 RDS<br/>MySQL")]
+        S3["비공개 S3 버킷"]
+        CloudFront["CloudFront<br/>OAC"]
+    end
+
+    Browser -->|API 요청| ApiDomain
+    ApiDomain --> Nginx
+    Nginx --> Backend
+    Backend -->|픽업 시간 예측| AI
+    Backend --> RDS
+    Backend -->|사전 서명 URL 발급| Browser
+    Browser -->|이미지 업로드| S3
+    CloudFront -->|OAC로 이미지 읽기| S3
+    Browser -->|이미지 조회| CloudFront
+    Role -.->|S3 업로드 권한| Backend
+    SSM -->|관리 접속| EC2
+```
+
+프런트엔드 정적 호스팅과 API 도메인 및 TLS 설정은 운영용 Compose에 포함되지 않으며 별도로 구성합니다. 저장소에는 자동 배포 워크플로가 없으므로 EC2 접속 후 명령을 실행하는 수동 배포 흐름입니다.
+
+### 배포 흐름
+
+```mermaid
+flowchart TD
+    A["배포 대상 코드와 운영 변수 준비"] --> B["Session Manager로 EC2 접속"]
+    B --> C[".env.production 설정"]
+    C --> D["Docker Compose 설정 확인"]
+    D --> E["컨테이너 빌드 및 실행"]
+    E --> F{"컨테이너와 헬스 체크 정상?"}
+    F -->|예| G["Nginx 설정 검사 및 재적용"]
+    G --> H["API 헬스 체크"]
+    H --> I["사전 서명 업로드 및 CloudFront 조회 확인"]
+    F -->|아니오| J["컨테이너 상태와 백엔드 로그 확인"]
+    J --> C
+```
 
 - [AWS 배포 안내](docs/aws-deployment.md): EC2, RDS, S3, CloudFront, IAM 역할과 운영 환경 변수
 - [운영 Docker Compose](docker-compose.prod.yml): 서비스 실행, 헬스 체크, 로그 설정
