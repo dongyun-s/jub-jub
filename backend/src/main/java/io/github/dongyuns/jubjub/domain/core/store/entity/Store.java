@@ -7,7 +7,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "store")
+@Table(name = "store", indexes = {
+        @Index(name = "idx_store_lat_lng", columnList = "latitude, longitude"),
+        @Index(name = "idx_store_category_lat_lng", columnList = "category_id, latitude, longitude")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Store {

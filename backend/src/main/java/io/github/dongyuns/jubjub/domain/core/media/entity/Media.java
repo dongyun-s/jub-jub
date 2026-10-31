@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "media")
+@Table(name = "media", indexes = {
+        @Index(name = "idx_media_owner_type_owner_id", columnList = "owner_type, owner_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
