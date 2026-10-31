@@ -1,6 +1,7 @@
 package io.github.dongyuns.jubjub.domain.customer.store.sort.service;
 
 import io.github.dongyuns.jubjub.common.exception.BusinessException;
+import io.github.dongyuns.jubjub.common.performance.MeasuredOperation;
 import io.github.dongyuns.jubjub.domain.core.media.service.MediaCrudService;
 import io.github.dongyuns.jubjub.domain.core.review.repository.ReviewRepository;
 import io.github.dongyuns.jubjub.domain.core.store.entity.Store;
@@ -32,6 +33,7 @@ public class StoreSortService {
     private final StoreDistanceCalculator storeDistanceCalculator;
     private final MediaCrudService mediaCrudService;
 
+    @MeasuredOperation("store.search")
     public List<SortedStoreResponse> getStoresWithinRadius(
             String sortBy,
             double latitude,
