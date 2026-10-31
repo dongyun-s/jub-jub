@@ -31,6 +31,8 @@ def main() -> None:
     parser.add_argument("--latitude", required=True, type=float)
     parser.add_argument("--longitude", required=True, type=float)
     parser.add_argument("--sort-by", choices=("DISTANCE", "RATING"), default="DISTANCE")
+    parser.add_argument("--category-id", type=int,
+                        help="선택적으로 매장 카테고리 ID를 지정합니다.")
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--requests", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=1,
@@ -47,11 +49,14 @@ def main() -> None:
     if base.scheme not in ("http", "https") or not base.hostname:
         parser.error("--base-url에는 http 또는 https 주소를 지정해야 합니다.")
 
-    query = urlencode({
+    query_parameters = {
         "sortBy": args.sort_by,
         "latitude": args.latitude,
         "longitude": args.longitude,
-    })
+    }
+    if args.category_id is not None:
+        query_parameters["categoryId"] = args.category_id
+    query = urlencode(query_parameters)
     path = f"{base.path.rstrip('/')}/api/v1/stores/sorted?{query}"
     worker_counts = [args.requests // args.concurrency] * args.concurrency
     for index in range(args.requests % args.concurrency):
@@ -75,7 +80,11 @@ def main() -> None:
         ]
         samples = [sample for future in futures for sample in future.result()]
 
-    print(f"requests={len(samples)} warmupPerWorker={args.warmup} concurrency={args.concurrency} sortBy={args.sort_by}")
+    category_description = f" categoryId={args.category_id}" if args.category_id is not None else ""
+    print(
+        f"requests={len(samples)} warmupPerWorker={args.warmup} "
+        f"concurrency={args.concurrency} sortBy={args.sort_by}{category_description}"
+    )
     print(f"meanMs={statistics.fmean(samples):.2f}")
     print(f"p50Ms={percentile(samples, 0.50):.2f}")
     print(f"p95Ms={percentile(samples, 0.95):.2f}")
