@@ -14,7 +14,7 @@ class S3ConfigTest {
     void createsPresignerWithoutStaticAccessKeys() {
         S3Properties properties = new S3Properties(
                 "ap-southeast-2",
-                "jubjub-images-prod-294427323709-ap-southeast-2-an",
+                "test-jubjub-images",
                 "https://images.example.com",
                 Duration.ofMinutes(10),
                 10 * 1024 * 1024L,
