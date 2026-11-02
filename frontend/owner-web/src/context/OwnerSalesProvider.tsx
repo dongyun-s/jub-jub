@@ -50,9 +50,16 @@ export function OwnerSalesProvider({ children }: { children: ReactNode }) {
       const store = await fetchOwnerStore()
       setStoreName(store.name)
       const paused = store.status === 'PAUSED' || store.status === 'CLOSED'
-      const next = { paused, untilMs: null as number | null }
+      const sid = store.storeId || storeId
+      const local = readSalesPause(sid)
+      // 서버에는 중지 종료 시각이 없으므로, 일시 중지일 때 로컬 untilMs를 유지한다.
+      const untilMs =
+        paused && local.paused && local.untilMs != null && local.untilMs > Date.now()
+          ? local.untilMs
+          : null
+      const next = { paused, untilMs }
       setPauseState(next)
-      writeSalesPause(store.storeId || storeId, next)
+      writeSalesPause(sid, next)
     } catch {
       /* 로컬 상태 유지 */
     }

@@ -311,6 +311,13 @@ export function useActivePickup(focusOrderId?: number | null) {
             ...geo,
             name: primary.order.storeName?.trim() || geo.name,
           })
+          if (geo.imageUrl && !primary.order.image) {
+            setActiveOrder((prev) =>
+              prev && prev.orderId === primary.order.orderId
+                ? { ...prev, image: geo.imageUrl }
+                : prev,
+            )
+          }
         } else {
           setDestination(null)
         }

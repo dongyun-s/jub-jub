@@ -27,6 +27,7 @@ export function clearTokens(): void {
   window.localStorage.removeItem(REFRESH)
   window.localStorage.removeItem(SESSION_EMAIL)
   window.localStorage.removeItem(CACHED_MEMBER_PROFILE_ID)
+  window.dispatchEvent(new Event('jubjub:auth-cleared'))
 }
 
 export function setSessionEmail(email: string): void {

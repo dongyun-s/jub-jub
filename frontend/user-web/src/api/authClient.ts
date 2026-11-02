@@ -1,4 +1,5 @@
 import type { ApiResponse } from './types'
+import { clearTokens, getRefreshToken, setTokens } from '../lib/authStorage'
 
 /**
  * 비우거나 공백만 있으면 상대 경로(`/api` …) → Vite dev 프록시 → 백엔드 (CORS 없음).
@@ -138,12 +139,56 @@ export type ApiFetchInit = RequestInit & { skipAuth?: boolean }
 /** @deprecated `ApiFetchInit` 사용 */
 export type AuthFetchInit = ApiFetchInit
 
-export async function apiV1Fetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
-  const { skipAuth, headers: initHeaders, ...rest } = init
-  const headers = new Headers(initHeaders)
-  const rel = path.startsWith('/') ? path : `/${path}`
+let refreshInFlight: Promise<boolean> | null = null
 
-  if (!headers.has('Content-Type') && rest.body != null) {
+/** access 만료 시 refresh로 한 번 재발급. 실패하면 토큰을 지운다. */
+async function tryRefreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight
+  refreshInFlight = (async () => {
+    const refresh = getRefreshToken()
+    if (!refresh) {
+      clearTokens()
+      return false
+    }
+    try {
+      const headers = new Headers({ 'Content-Type': 'application/json' })
+      if (NGROK_SKIP_WARN) headers.set('ngrok-skip-browser-warning', 'true')
+      const res = await fetch(`${API_V1_BASE}/auth/reissue`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ refreshToken: refresh }),
+      })
+      if (!res.ok) {
+        clearTokens()
+        return false
+      }
+      const body = (await res.json()) as Record<string, unknown>
+      const data =
+        body && typeof body === 'object' && body.success === true && body.data && typeof body.data === 'object'
+          ? (body.data as Record<string, unknown>)
+          : body
+      const accessToken = String(data.accessToken ?? data.access_token ?? '').trim()
+      const refreshToken = String(data.refreshToken ?? data.refresh_token ?? '').trim()
+      if (!accessToken || !refreshToken) {
+        clearTokens()
+        return false
+      }
+      setTokens(accessToken, refreshToken)
+      return true
+    } catch {
+      clearTokens()
+      return false
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
+}
+
+function buildHeaders(init: ApiFetchInit): Headers {
+  const { skipAuth, headers: initHeaders, body } = init
+  const headers = new Headers(initHeaders)
+  if (!headers.has('Content-Type') && body != null) {
     headers.set('Content-Type', 'application/json')
   }
   if (!skipAuth) {
@@ -151,12 +196,24 @@ export async function apiV1Fetch<T>(path: string, init: ApiFetchInit = {}): Prom
       typeof window !== 'undefined' ? window.localStorage.getItem('jubjub_access_token') : null
     if (token) headers.set('Authorization', `Bearer ${token}`)
   }
-  /** ngrok 무료: 브라우저 fetch가 중간 HTML에 막히며 ERR_FAILED(200) 나는 경우 방지 */
   if (NGROK_SKIP_WARN && !headers.has('ngrok-skip-browser-warning')) {
     headers.set('ngrok-skip-browser-warning', 'true')
   }
+  return headers
+}
 
-  const res = await fetch(`${API_V1_BASE}${rel}`, { ...rest, headers })
+async function fetchWithAuthRetry(url: string, init: ApiFetchInit): Promise<Response> {
+  const { skipAuth, ...rest } = init
+  const first = await fetch(url, { ...rest, headers: buildHeaders(init) })
+  if (skipAuth || (first.status !== 401 && first.status !== 403)) return first
+  const refreshed = await tryRefreshAccessToken()
+  if (!refreshed) return first
+  return fetch(url, { ...rest, headers: buildHeaders(init) })
+}
+
+export async function apiV1Fetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
+  const rel = path.startsWith('/') ? path : `/${path}`
+  const res = await fetchWithAuthRetry(`${API_V1_BASE}${rel}`, init)
   return parseJson<T>(res)
 }
 
@@ -165,23 +222,8 @@ export async function apiV1Fetch<T>(path: string, init: ApiFetchInit = {}): Prom
  * (예: origin/develop 기준 Cart API는 ResponseEntity<String>/CartListResponse 형태)
  */
 export async function apiV1FetchPlain<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
-  const { skipAuth, headers: initHeaders, ...rest } = init
-  const headers = new Headers(initHeaders)
   const rel = path.startsWith('/') ? path : `/${path}`
-
-  if (!headers.has('Content-Type') && rest.body != null) {
-    headers.set('Content-Type', 'application/json')
-  }
-  if (!skipAuth) {
-    const token =
-      typeof window !== 'undefined' ? window.localStorage.getItem('jubjub_access_token') : null
-    if (token) headers.set('Authorization', `Bearer ${token}`)
-  }
-  if (NGROK_SKIP_WARN && !headers.has('ngrok-skip-browser-warning')) {
-    headers.set('ngrok-skip-browser-warning', 'true')
-  }
-
-  const res = await fetch(`${API_V1_BASE}${rel}`, { ...rest, headers })
+  const res = await fetchWithAuthRetry(`${API_V1_BASE}${rel}`, init)
   return parsePlainJson<T>(res)
 }
 
@@ -190,23 +232,8 @@ export async function apiV1FetchPlain<T>(path: string, init: ApiFetchInit = {}):
  * - 응답은 ApiResponse 래핑이 아닐 수 있어 plain JSON으로 파싱
  */
 export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
-  const { skipAuth, headers: initHeaders, ...rest } = init
-  const headers = new Headers(initHeaders)
   const rel = path.startsWith('/') ? path : `/${path}`
-
-  if (!headers.has('Content-Type') && rest.body != null) {
-    headers.set('Content-Type', 'application/json')
-  }
-  if (!skipAuth) {
-    const token =
-      typeof window !== 'undefined' ? window.localStorage.getItem('jubjub_access_token') : null
-    if (token) headers.set('Authorization', `Bearer ${token}`)
-  }
-  if (NGROK_SKIP_WARN && !headers.has('ngrok-skip-browser-warning')) {
-    headers.set('ngrok-skip-browser-warning', 'true')
-  }
-
-  const res = await fetch(`${API_BASE}${rel}`, { ...rest, headers })
+  const res = await fetchWithAuthRetry(`${API_BASE}${rel}`, init)
   return parsePlainJson<T>(res)
 }
 

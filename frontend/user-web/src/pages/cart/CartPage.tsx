@@ -29,6 +29,8 @@ import {
   estimateFinalPaymentAmount,
 } from '../../lib/orderPricing'
 import { fetchStoreDetail } from '../../api/store'
+import { DEFAULT_MENU_IMAGE, resolveMenuImageUrl, resolveStoreCardImage } from '../../lib/menuImage'
+import { formatStoreCardPickupLabel } from '../../lib/pickupEta'
 import { fetchStoreGeo, invalidateStoreListCache } from '../../lib/storeGeo'
 import styles from './CartPage.module.css'
 
@@ -128,8 +130,36 @@ function CartPage({
   /** 로그인 시 POST /rewards/calculate 미리보기 (주문 생성 금액은 장바구니 합계와 일치해야 함) */
   const [pricingPreview, setPricingPreview] = useState<RewardCalculateResponse | null>(null)
   const pricingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [cookingTimeMinutes, setCookingTimeMinutes] = useState(15)
+  const [storeImageUrl, setStoreImageUrl] = useState<string | null>(null)
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
+
+  useEffect(() => {
+    if (cartStoreId == null || cartStoreId <= 0) {
+      setCookingTimeMinutes(15)
+      setStoreImageUrl(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const detail = await fetchStoreDetail(cartStoreId)
+        if (cancelled) return
+        const mins = Number(detail.cookingTimeMinutes)
+        setCookingTimeMinutes(Number.isFinite(mins) && mins > 0 ? Math.round(mins) : 15)
+        setStoreImageUrl(resolveStoreCardImage(detail.imageUrl))
+      } catch {
+        if (!cancelled) {
+          setCookingTimeMinutes(15)
+          setStoreImageUrl(null)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [cartStoreId])
 
   const handleClearCart = () => {
     if (cartItems.length === 0) return
@@ -328,7 +358,9 @@ function CartPage({
           const raw = window.localStorage.getItem(key)
           const prev = raw ? (JSON.parse(raw) as unknown[]) : []
           const storeImage =
-            cartItems[0]?.image ?? (cartStoreId != null ? storeCardImageById(cartStoreId) : null)
+            resolveMenuImageUrl(cartItems[0]?.image) ||
+            storeImageUrl ||
+            (cartStoreId != null ? storeCardImageById(cartStoreId) : null)
           const menuSummary =
             cartItems.length === 0
               ? '주문'
@@ -617,7 +649,15 @@ function CartPage({
 
                   {/* 이미지 */}
                   <img
-                    src={item.image ?? storeCardImageById(cartStoreId)}
+                    src={
+                      resolveMenuImageUrl(item.image) ||
+                      storeImageUrl ||
+                      storeCardImageById(cartStoreId)
+                    }
+                    onError={(e) => {
+                      if (e.currentTarget.src.endsWith('/logo.png')) return
+                      e.currentTarget.src = DEFAULT_MENU_IMAGE
+                    }}
                     alt={item.name}
                     className={styles.orderItemImage}
                   />
@@ -809,7 +849,9 @@ function CartPage({
               <span className="material-symbols-outlined text-slate-400">schedule</span>
               <span>
                 예상 픽업 시간:{' '}
-                <span className={styles.pickupInfoHighlight}>약 15분 ~ 20분 후</span>
+                <span className={styles.pickupInfoHighlight}>
+                  {formatStoreCardPickupLabel(cookingTimeMinutes)}
+                </span>
               </span>
             </div>
           </section>

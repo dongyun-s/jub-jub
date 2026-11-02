@@ -40,6 +40,7 @@ interface OrderHistoryPageProps {
   onMypageClick?: () => void
   onFavoritesClick?: () => void
   onNotificationsClick?: () => void
+  onStoreClick?: (storeId: number) => void
   /** 리뷰 쓰기 클릭 시 주문·매장 정보 전달 후 리뷰 작성 페이지로 이동 */
   onReviewWriteClick?: (payload: ReviewWritePayload) => void
   /** 결제 완료·픽업 전인 주문 전부 */
@@ -169,6 +170,7 @@ function OrderHistoryPage({
   onMypageClick,
   onFavoritesClick,
   onNotificationsClick,
+  onStoreClick,
   onReviewWriteClick,
   trackableOrders = [],
   cartCount = 0,
@@ -180,6 +182,7 @@ function OrderHistoryPage({
   const [myOrdersError, setMyOrdersError] = useState<string | null>(null)
   const [localOrders, setLocalOrders] = useState<LocalOrder[]>([])
   const [storeNameToId, setStoreNameToId] = useState<Record<string, number>>({})
+  const [storeIdToImage, setStoreIdToImage] = useState<Record<number, string>>({})
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<number>>(() => new Set())
 
   const formatPrice = (price: number) => price.toLocaleString() + '원'
@@ -268,11 +271,14 @@ function OrderHistoryPage({
       try {
         const list = await fetchStores()
         const m: Record<string, number> = {}
+        const images: Record<number, string> = {}
         for (const s of list) {
           const n = s.name?.trim()
           if (n && m[n] === undefined) m[n] = s.storeId
+          images[s.storeId] = storeCardImage(s.storeId, s.imageUrl)
         }
         setStoreNameToId(m)
+        setStoreIdToImage(images)
       } catch {
         /* 매장 목록 실패 시에도 주문 목록은 표시 */
       }
@@ -292,10 +298,11 @@ function OrderHistoryPage({
     return dedupeOrdersById(
       myOrdersApi
         .filter((o) => isPaidOrderForHistory(o))
-        .map((o) => {
+        .map((o): OrderItem | null => {
           const status = historyStatusFromOrder(o.orderStatus)
           if (status == null) return null
           const storeId = resolveStoreIdForServerOrder(o, localOrders, storeNameToId)
+          const localImage = localOrders.find((lo) => lo.orderId === o.orderId)?.image
           return {
             id: o.orderId,
             storeId,
@@ -305,14 +312,19 @@ function OrderHistoryPage({
             menu: formatOrderMenuSummary(o),
             price: o.finalAmount,
             distance: formatPickupDistance(o.pickupDistanceMeters),
-            image: storeId > 0 ? storeCardImage(storeId) : storeCardImage(1),
+            image:
+              (typeof localImage === 'string' && localImage.trim()
+                ? storeCardImage(storeId, localImage)
+                : null) ||
+              (storeId > 0 ? storeIdToImage[storeId] : undefined) ||
+              storeCardImage(storeId),
             status,
             orderStatus: o.orderStatus,
           }
         })
         .filter((o): o is OrderItem => o != null),
     )
-  }, [myOrdersApi, localOrders, storeNameToId])
+  }, [myOrdersApi, localOrders, storeNameToId, storeIdToImage])
 
   const pendingLocalOrders: OrderItem[] = useMemo(() => {
     if (!getAccessToken()) return []
@@ -327,7 +339,7 @@ function OrderHistoryPage({
     const apiIds = new Set(myOrdersApi.map((o) => o.orderId))
     return dedupeOrdersById(
       readLocalOrdersPendingApiSync(apiIds)
-        .map((o) => {
+        .map((o): OrderItem | null => {
           const price = typeof o.finalAmount === 'number' ? o.finalAmount : o.totalAmount ?? 0
           // 로컬 동기화 대기 건도 픽업 완료·거절만 내역에 노출
           const status: OrderItem['status'] | null =
@@ -346,14 +358,17 @@ function OrderHistoryPage({
             menu: o.menuSummary ?? '주문',
             price,
             distance: '',
-            image: storeCardImage(o.storeId),
+            image:
+              (o.image ? storeCardImage(o.storeId, o.image) : null) ||
+              storeIdToImage[o.storeId] ||
+              storeCardImage(o.storeId),
             status,
             orderStatus: o.orderStatus as OrderStatus | undefined,
           }
         })
         .filter((o): o is OrderItem => o != null),
     )
-  }, [myOrdersApi])
+  }, [myOrdersApi, storeIdToImage])
 
   const allOrders = useMemo(() => {
     const base = dedupeOrdersById([...apiOrders, ...pendingLocalOrders])
@@ -445,9 +460,21 @@ function OrderHistoryPage({
                       className={styles.activeOrderButton}
                     >
                       <div className={styles.activeOrderIcon}>
-                        <span className="material-symbols-outlined text-white text-2xl">
-                          {waiting ? 'receipt_long' : 'skillet'}
-                        </span>
+                        {(item.order.image || storeIdToImage[item.order.storeId]) ? (
+                          <img
+                            src={item.order.image || storeIdToImage[item.order.storeId]}
+                            alt={title}
+                            className={styles.activeOrderThumb}
+                            onError={(e) => {
+                              e.currentTarget.onerror = null
+                              e.currentTarget.src = '/logo.png'
+                            }}
+                          />
+                        ) : (
+                          <span className="material-symbols-outlined text-white text-2xl">
+                            {waiting ? 'receipt_long' : 'skillet'}
+                          </span>
+                        )}
                       </div>
                       <div className={styles.activeOrderText}>
                         <div className={styles.activeOrderStatusRow}>
@@ -500,6 +527,10 @@ function OrderHistoryPage({
                     src={order.image}
                     alt={order.storeName}
                     className={styles.orderImage}
+                    onError={(e) => {
+                      if (e.currentTarget.src.endsWith('/logo.png')) return
+                      e.currentTarget.src = '/logo.png'
+                    }}
                   />
 
                   {/* 정보 */}
@@ -538,7 +569,14 @@ function OrderHistoryPage({
                 </div>
 
                 <div className={styles.orderActions}>
-                  <button type="button" className={styles.reorderButton}>
+                  <button
+                    type="button"
+                    className={styles.reorderButton}
+                    onClick={() => {
+                      if (order.storeId > 0) onStoreClick?.(order.storeId)
+                      else onGoHome()
+                    }}
+                  >
                     다시 주문하기
                   </button>
                   {order.status === 'completed' && order.storeId > 0 && (

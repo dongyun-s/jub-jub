@@ -68,17 +68,37 @@ function isRecentLocalOrder(o: OrderContextRow, graceMs = LOCAL_ORDER_SYNC_GRACE
 
 /**
  * 서버 GET /orders/me 성공 후: 서버에 없는 오래된 로컬 주문(데모·테스트 잔여) 제거.
- * 방금 결제한 주문만 grace 구간 동안 로컬에 유지.
+ * 서버 상태가 PAID면 로컬 pickupCompleted 잔상을 지운다.
  */
 export function syncLocalOrdersWithApiList(apiOrders: MyOrderItem[]): void {
   if (typeof window === 'undefined') return
   try {
-    const apiIds = new Set(apiOrders.map((o) => o.orderId))
-    const kept = readLocalOrders().filter((lo) => {
-      if (!isLocalOrderPaid(lo)) return false
-      if (apiIds.has(lo.orderId)) return true
-      return isRecentLocalOrder(lo)
-    })
+    const apiById = new Map(apiOrders.map((o) => [o.orderId, o]))
+    const kept = readLocalOrders()
+      .filter((lo) => {
+        if (!isLocalOrderPaid(lo)) return false
+        if (apiById.has(lo.orderId)) return true
+        return isRecentLocalOrder(lo)
+      })
+      .map((lo) => {
+        const api = apiById.get(lo.orderId)
+        if (!api) return lo
+        if (api.orderStatus === 'COMPLETED' || api.orderStatus === 'REFUNDED') {
+          return {
+            ...lo,
+            orderStatus: api.orderStatus,
+            paymentStatus: api.paymentStatus ?? lo.paymentStatus,
+            pickupCompleted: true,
+          }
+        }
+        // 서버가 아직 진행 중이면 로컬 완료 플래그를 지우다
+        return {
+          ...lo,
+          orderStatus: api.orderStatus,
+          paymentStatus: api.paymentStatus ?? lo.paymentStatus,
+          pickupCompleted: false,
+        }
+      })
     window.localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(kept))
     window.dispatchEvent(new Event('jubjub:orders-updated'))
   } catch {
@@ -98,32 +118,25 @@ export function readLocalOrdersPendingApiSync(apiOrderIds: Set<number>): OrderCo
 }
 
 function mapApiOrderToContext(hit: MyOrderItem, localMatch?: OrderContextRow): OrderContextRow {
-  const localDone =
-    Boolean(localMatch?.pickupCompleted) ||
-    localMatch?.orderStatus === 'COMPLETED' ||
-    localMatch?.orderStatus === 'REFUNDED'
   const apiDone = hit.orderStatus === 'COMPLETED' || hit.orderStatus === 'REFUNDED'
   return {
     orderId: hit.orderId,
     storeId: hit.storeId ?? localMatch?.storeId ?? 0,
     storeName: hit.storeName,
     menuSummary: localMatch?.menuSummary ?? hit.orderNo,
-    orderStatus: apiDone || localDone ? (hit.orderStatus === 'REFUNDED' || localMatch?.orderStatus === 'REFUNDED' ? 'REFUNDED' : 'COMPLETED') : hit.orderStatus,
+    // 서버 상태를 우선한다. 로컬 pickupCompleted만으로 완료 처리하지 않는다.
+    orderStatus: hit.orderStatus,
     paymentStatus: hit.paymentStatus ?? undefined,
-    pickupCompleted: apiDone || localDone,
+    pickupCompleted: apiDone,
     createdAt: localMatch?.createdAt ?? hit.orderedAt,
     paidAt: hit.paidAt ?? localMatch?.paidAt,
+    image: localMatch?.image ?? null,
   }
 }
 
 function listActivePickupCandidates(orders: MyOrderItem[]): MyOrderItem[] {
-  const localDoneIds = new Set(
-    readLocalOrders()
-      .filter((o) => o.pickupCompleted || o.orderStatus === 'COMPLETED' || o.orderStatus === 'REFUNDED')
-      .map((o) => o.orderId),
-  )
   return orders
-    .filter((o) => isActivePickupOrder(o) && !localDoneIds.has(o.orderId))
+    .filter((o) => isActivePickupOrder(o))
     .sort((a, b) => {
       const ta = new Date(a.orderedAt).getTime()
       const tb = new Date(b.orderedAt).getTime()

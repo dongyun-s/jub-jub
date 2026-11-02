@@ -5,7 +5,6 @@ import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal
 import { Icon } from '../../components/Icon'
 import { ApiError } from '../../api/authClient'
 import { ownerSignup, verifyConfirm, verifySend } from '../../api/auth'
-import { formatBusinessNumber, verifyBusinessNumber } from '../../api/business'
 import { openDaumPostcode } from '../../lib/daumPostcode'
 import { useOwnerMockData } from '../../lib/ownerConfig'
 import { saveMockOwnerCredential, saveOwnerStoreProfile } from '../../lib/ownerSession'
@@ -29,9 +28,6 @@ export function SignUpPage() {
   const [phone, setPhone] = useState('')
   const [nickname, setNickname] = useState('')
   const [businessNumber, setBusinessNumber] = useState('')
-  const [bizVerified, setBizVerified] = useState(false)
-  const [bizStatusLabel, setBizStatusLabel] = useState<string | null>(null)
-  const [bizChecking, setBizChecking] = useState(false)
   const [storeName, setStoreName] = useState('')
   const [categoryId, setCategoryId] = useState<StoreCategoryId>(1)
   const [zonecode, setZonecode] = useState('')
@@ -115,29 +111,6 @@ export function SignUpPage() {
     }
   }
 
-  const handleBizVerify = async () => {
-    setError(null)
-    setInfo(null)
-    setBizChecking(true)
-    try {
-      const result = await verifyBusinessNumber(businessNumber)
-      setBizVerified(result.ok)
-      setBizStatusLabel(result.ok ? result.message : null)
-      if (result.ok) {
-        setBusinessNumber(formatBusinessNumber(result.businessNumber))
-        setInfo(result.message)
-      } else {
-        setError(result.message)
-      }
-    } catch (err) {
-      setBizVerified(false)
-      setBizStatusLabel(null)
-      setError(err instanceof Error ? err.message : '사업자번호 확인에 실패했습니다.')
-    } finally {
-      setBizChecking(false)
-    }
-  }
-
   const handleAddressSearch = async () => {
     setError(null)
     try {
@@ -167,10 +140,6 @@ export function SignUpPage() {
     const bizDigits = digitsOnly(businessNumber)
     if (bizDigits.length < 10) {
       setError('사업자번호를 확인해 주세요. (숫자 10자리)')
-      return
-    }
-    if (!bizVerified) {
-      setError('사업자번호 확인을 완료해 주세요.')
       return
     }
     if (!storeAddress.trim()) {
@@ -372,30 +341,16 @@ export function SignUpPage() {
             <label className="owner-input-label" htmlFor="businessNumber">
               사업자번호
             </label>
-            <div className={styles.fieldWithBtn}>
-              <input
-                id="businessNumber"
-                className="owner-input-field"
-                value={businessNumber}
-                onChange={(e) => {
-                  setBusinessNumber(e.target.value)
-                  setBizVerified(false)
-                  setBizStatusLabel(null)
-                }}
-                placeholder="000-00-00000"
-                inputMode="numeric"
-                required
-              />
-              <button
-                type="button"
-                className={styles.sideBtn}
-                disabled={bizChecking || loading}
-                onClick={() => void handleBizVerify()}
-              >
-                {bizChecking ? '확인 중…' : bizVerified ? '확인됨' : '번호 확인'}
-              </button>
-            </div>
-            {bizVerified && bizStatusLabel ? <p className={styles.okNote}>{bizStatusLabel}</p> : null}
+            <input
+              id="businessNumber"
+              className="owner-input-field"
+              value={businessNumber}
+              onChange={(e) => setBusinessNumber(e.target.value)}
+              placeholder="000-00-00000"
+              inputMode="numeric"
+              required
+            />
+            <p className={styles.categoryHint}>사업자번호 국세청 확인은 잠시 꺼 두었습니다. 숫자 10자리만 입력하면 됩니다.</p>
           </div>
 
           <div className={styles.row}>

@@ -286,7 +286,7 @@ export function OwnerOrdersProvider({ children }: { children: ReactNode }) {
               label: '신규',
               acceptedAtMs: undefined,
               estimatedPickupTime: null,
-              time: snapshot?.time ?? o.time,
+              time: o.time,
             }
           }),
         )

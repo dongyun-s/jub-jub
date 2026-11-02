@@ -85,6 +85,19 @@ function App() {
   const handledPickupRewardIds = useRef<Set<number>>(new Set())
   const rewardBaselineRef = useRef<Awaited<ReturnType<typeof fetchRewardMe>> | null>(null)
 
+  useEffect(() => {
+    const onAuthCleared = () => {
+      setCurrentPage('login')
+      setCartItems([])
+      setCartStoreId(null)
+      setCartStoreName(null)
+      setAppliedCoupon(null)
+      setFocusOrderId(null)
+    }
+    window.addEventListener('jubjub:auth-cleared', onAuthCleared)
+    return () => window.removeEventListener('jubjub:auth-cleared', onAuthCleared)
+  }, [])
+
   const {
     activeOrder,
     trackableOrders,
@@ -539,6 +552,7 @@ function App() {
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
+            onStoreClick={(storeId) => openStoreById(storeId)}
             onReviewWriteClick={openReviewWrite}
             trackableOrders={trackableOrders}
             cartCount={cartCount}
