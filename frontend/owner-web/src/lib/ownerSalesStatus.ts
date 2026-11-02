@@ -16,14 +16,18 @@ function normalize(raw: SalesPauseState): SalesPauseState {
 
 export function readSalesPause(storeId: number): SalesPauseState {
   try {
+    const raw = localStorage.getItem(storageKey(storeId))
+    if (raw) {
+      return normalize(JSON.parse(raw) as SalesPauseState)
+    }
+
+    // 예전 키만 남아 있을 때만 사용. untilMs가 없으므로 무기한으로 취급한다.
     const legacyKey = `owner_sales_paused_${storeId}`
     const legacy = localStorage.getItem(legacyKey)
     if (legacy === '1') return { paused: true, untilMs: null }
     if (legacy === '0') return { paused: false, untilMs: null }
 
-    const raw = localStorage.getItem(storageKey(storeId))
-    if (!raw) return { paused: false, untilMs: null }
-    return normalize(JSON.parse(raw) as SalesPauseState)
+    return { paused: false, untilMs: null }
   } catch {
     return { paused: false, untilMs: null }
   }

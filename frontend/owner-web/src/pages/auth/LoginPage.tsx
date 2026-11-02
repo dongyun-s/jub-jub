@@ -5,6 +5,7 @@ import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal
 import { ApiError, getOwnerAccessToken } from '../../api/authClient'
 import { isOwnerRole, login } from '../../api/auth'
 import { setSessionEmail, setSessionRole, setTokens } from '../../lib/authStorage'
+import { useAuth } from '../../context/AuthProvider'
 import { useOwnerMockData } from '../../lib/ownerConfig'
 import {
   activateOwnerStoreForEmail,
@@ -26,12 +27,13 @@ function resolvePostLoginPath(from: string | undefined): string {
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { markLoggedIn, isLoggedIn } = useAuth()
   const from = useMemo(
     () => resolvePostLoginPath((location.state as LocationState | null)?.from),
     [location.state],
   )
   const mockMode = useOwnerMockData()
-  const alreadyLoggedIn = Boolean(getOwnerAccessToken())
+  const alreadyLoggedIn = isLoggedIn || Boolean(getOwnerAccessToken())
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -40,6 +42,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   const goAfterLogin = () => {
+    markLoggedIn()
     navigate(from, { replace: true })
   }
 

@@ -47,6 +47,8 @@ import type { NotificationNavigateTarget } from './lib/notificationNavigation'
 /** 앱에서 사용하는 모든 페이지 식별자 */
 type Page = 'login' | 'signup' | 'findId' | 'findPassword' | 'home' | 'category' | 'store' | 'menu' | 'cart' | 'orders' | 'orderStatus' | 'coupon' | 'map' | 'mypage' | 'myReviews' | 'reviewWrite' | 'favorites' | 'notifications' | 'ranking'
 
+const AUTH_ONLY_PAGES: Page[] = ['login', 'signup', 'findId', 'findPassword']
+
 /** 장바구니에 적용된 쿠폰 정보 */
 interface AppliedCoupon {
   id: number
@@ -59,7 +61,8 @@ type CartItem = ServerCartLineUi
 
 function App() {
   /** 현재 화면에 표시할 페이지 */
-  const [currentPage, setCurrentPage] = useState<Page>(() => (getAccessToken() ? 'home' : 'login'))
+  /** 첫 진입은 메인(홈). 로그인/마이페이지 등은 필요할 때 이동 */
+  const [currentPage, setCurrentPage] = useState<Page>('home')
   /** 직전에 보고 있던 페이지 (뒤로가기용) */
   const [lastPage, setLastPage] = useState<Page | null>(null)
   /** 장바구니에서 사용 중인 쿠폰 (미사용 시 null) */
@@ -84,6 +87,26 @@ function App() {
   const [pickupRewardStoreId, setPickupRewardStoreId] = useState<number | null>(null)
   const handledPickupRewardIds = useRef<Set<number>>(new Set())
   const rewardBaselineRef = useRef<Awaited<ReturnType<typeof fetchRewardMe>> | null>(null)
+
+  useEffect(() => {
+    const onAuthCleared = () => {
+      setCurrentPage('login')
+      setCartItems([])
+      setCartStoreId(null)
+      setCartStoreName(null)
+      setAppliedCoupon(null)
+      setFocusOrderId(null)
+    }
+    window.addEventListener('jubjub:auth-cleared', onAuthCleared)
+    return () => window.removeEventListener('jubjub:auth-cleared', onAuthCleared)
+  }, [])
+
+  /** 비로그인이면 인증 화면 외로 진입 불가 — 무조건 로그인 */
+  useEffect(() => {
+    if (getAccessToken()) return
+    if (AUTH_ONLY_PAGES.includes(currentPage)) return
+    setCurrentPage('login')
+  }, [currentPage])
 
   const {
     activeOrder,
@@ -539,6 +562,7 @@ function App() {
             onMypageClick={goTo('mypage')}
             onFavoritesClick={goTo('favorites')}
             onNotificationsClick={goTo('notifications')}
+            onStoreClick={(storeId) => openStoreById(storeId)}
             onReviewWriteClick={openReviewWrite}
             trackableOrders={trackableOrders}
             cartCount={cartCount}

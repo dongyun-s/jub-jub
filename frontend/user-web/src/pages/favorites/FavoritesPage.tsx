@@ -10,6 +10,8 @@ import BottomNav from '../../components/BottomNav'
 import SimpleAlertModal from '../../components/SimpleAlertModal/SimpleAlertModal'
 import { ApiError } from '../../api/authClient'
 import { fetchMyFavorites, toggleStoreFavorite, type FavoriteStoreDto } from '../../api/favorites'
+import { fetchStores } from '../../api/store'
+import { DEFAULT_STORE_IMAGE, resolveStoreCardImage } from '../../lib/menuImage'
 import styles from './FavoritesPage.module.css'
 
 interface FavoritesPageProps {
@@ -42,8 +44,22 @@ function FavoritesPage({
   const refresh = async () => {
     setLoading(true)
     try {
-      const list = await fetchMyFavorites()
-      setFavorites(list)
+      const [list, stores] = await Promise.all([
+        fetchMyFavorites(),
+        fetchStores().catch(() => []),
+      ])
+      const imageByStoreId = new Map(
+        stores.map((s) => [s.storeId, resolveStoreCardImage(s.imageUrl)] as const),
+      )
+      setFavorites(
+        list.map((fav) => ({
+          ...fav,
+          storeImageUrl:
+            imageByStoreId.get(fav.storeId) ||
+            resolveStoreCardImage(fav.storeImageUrl) ||
+            DEFAULT_STORE_IMAGE,
+        })),
+      )
     } catch (e) {
       const msg =
         e instanceof ApiError ? e.message : '찜 목록을 불러오지 못했습니다.'
@@ -111,9 +127,13 @@ function FavoritesPage({
                   <div className={styles.cardInner}>
                     <button onClick={() => onStoreClick?.(store.storeId)} className={styles.imageButton}>
                       <img
-                        src={store.storeImageUrl}
+                        src={resolveStoreCardImage(store.storeImageUrl)}
                         alt={store.storeName}
                         className={styles.storeImage}
+                        onError={(e) => {
+                          if (e.currentTarget.src.endsWith('/logo.png')) return
+                          e.currentTarget.src = DEFAULT_STORE_IMAGE
+                        }}
                       />
                     </button>
                     <div className={styles.info}>

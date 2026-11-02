@@ -118,16 +118,16 @@ function NotificationsPage({
     item.type === 'COUPON_ISSUED' || item.type === 'COUPON_EXPIRING'
 
   const handleCardClick = (item: UnifiedNotificationItem) => {
-    if (isCouponNotification(item) && onNavigate) {
-      if (!item.read) {
-        void markAsRead(item).then(bumpBadge).catch(() => {
-          /* ignore */
-        })
-      }
-      handleNavigateOnly(item)
+    if (!onNavigate) {
+      handleMarkReadOnly(item)
       return
     }
-    handleMarkReadOnly(item)
+    if (!item.read) {
+      void markAsRead(item).then(bumpBadge).catch(() => {
+        /* ignore */
+      })
+    }
+    handleNavigateOnly(item)
   }
 
   const handleSwipeRead = (item: UnifiedNotificationItem) => {

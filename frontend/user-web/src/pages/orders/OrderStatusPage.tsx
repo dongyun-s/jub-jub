@@ -26,6 +26,7 @@ import {
   formatPickupEtaSentence,
   formatPickupHhMm,
 } from '../../lib/pickupEta'
+import { DEFAULT_STORE_IMAGE, resolveStoreCardImage } from '../../lib/menuImage'
 import { useDistanceToCoords } from '../../hooks/useDistanceToCoords'
 import { useUserLocation } from '../../hooks/useUserLocation'
 import { LocationPermissionBanner } from '../../components/LocationPermissionBanner/LocationPermissionBanner'
@@ -597,7 +598,19 @@ function OrderStatusPage({
             <div className={styles.storeCard}>
               <div className={styles.storeCardHeader}>
                 <div className={styles.storeCardIcon}>
-                  <span className={`material-symbols-outlined ${styles.storeCardIconSpan}`}>storefront</span>
+                  {pickupDestination?.imageUrl ? (
+                    <img
+                      src={resolveStoreCardImage(pickupDestination.imageUrl)}
+                      alt={display.storeName}
+                      className={styles.storeCardThumb}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null
+                        e.currentTarget.src = DEFAULT_STORE_IMAGE
+                      }}
+                    />
+                  ) : (
+                    <span className={`material-symbols-outlined ${styles.storeCardIconSpan}`}>storefront</span>
+                  )}
                 </div>
                 <div>
                   <h3 className={styles.storeCardName}>{display.storeName}</h3>

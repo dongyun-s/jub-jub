@@ -1,10 +1,10 @@
 import { ApiError } from '../api/authClient'
 import { reissue } from '../api/auth'
-import { getRefreshToken, setTokens } from './authStorage'
+import { clearTokens, getRefreshToken, setTokens } from './authStorage'
 
 /**
  * 401/403 시 refresh 토큰으로 access 재발급 후 한 번 재시도.
- * (백엔드 수정 없이 만료·거부 토큰으로 인한 픽업 완료 실패 완화)
+ * 재발급 실패 시 토큰을 지워 반쯤 로그인된 상태를 남기지 않는다.
  */
 export async function withAuthRetry<T>(request: () => Promise<T>): Promise<T> {
   try {
@@ -14,12 +14,16 @@ export async function withAuthRetry<T>(request: () => Promise<T>): Promise<T> {
       throw e
     }
     const refresh = getRefreshToken()
-    if (!refresh) throw e
+    if (!refresh) {
+      clearTokens()
+      throw e
+    }
     try {
       const tokens = await reissue(refresh)
       setTokens(tokens.accessToken, tokens.refreshToken)
       return await request()
     } catch {
+      clearTokens()
       throw e
     }
   }
