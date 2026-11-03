@@ -1,0 +1,17 @@
+.wrap {
+  margin: 0 0 1.25rem;
+}
+
+.loadingCard {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.125rem;
+  border-radius: 0.75rem;
+  color: #ffffff;
+}
+
+.loading {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+}

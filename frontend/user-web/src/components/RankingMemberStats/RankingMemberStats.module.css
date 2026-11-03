@@ -1,0 +1,45 @@
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: rgb(71 85 105);
+  background-color: rgb(248 250 252);
+  border: 1px solid rgb(241 245 249);
+}
+
+.chip .material-symbols-outlined {
+  font-size: 0.875rem;
+  color: var(--color-primary);
+}
+
+.chipThemed .material-symbols-outlined {
+  font-variation-settings: 'FILL' 1;
+}
+
+.chipHighlight {
+  font-weight: 800;
+}
+
+.compactMeta {
+  display: block;
+  width: 100%;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: rgb(100 116 139);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

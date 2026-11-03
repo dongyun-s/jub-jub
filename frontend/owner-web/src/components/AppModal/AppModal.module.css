@@ -1,0 +1,78 @@
+/**
+ * Jub-Jub 공통 모달 셸 — 오버레이 + 패널 (핑크 링·블러)
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(17, 12, 20, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: overlayFadeIn 200ms ease-out forwards;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.panel {
+  position: relative;
+  width: 100%;
+  animation: panelPopIn 280ms cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+
+/* 기본 알림/확인 모달용 흰 카드 */
+.panelCard {
+  border-radius: 1.25rem;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(246, 49, 154, 0.1),
+    0 20px 40px -12px rgba(0, 0, 0, 0.18);
+}
+
+.panelPadded {
+  padding: 1.5rem 1.25rem 1.25rem;
+}
+
+/* flush=true 일 때 패널 카드 외곽 (내부 레이아웃은 자식이 담당) */
+.panelFlushCard {
+  border-radius: 1.25rem;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(246, 49, 154, 0.1),
+    0 20px 40px -12px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.sizeSm {
+  max-width: 20rem;
+}
+
+.sizeMd {
+  max-width: 22rem;
+}
+
+.sizeLg {
+  max-width: 24rem;
+}
+
+@keyframes panelPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

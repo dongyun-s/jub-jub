@@ -1,0 +1,82 @@
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Icon } from '../components/Icon'
+import { NewOrderAlertHost } from '../components/NewOrderAlertHost/NewOrderAlertHost'
+import { OwnerNotificationBanner } from '../components/OwnerNotificationBanner/OwnerNotificationBanner'
+import { useAuth } from '../context/AuthProvider'
+import { OwnerOrdersProvider } from '../context/OwnerOrdersProvider'
+import { OwnerSalesProvider } from '../context/OwnerSalesProvider'
+import styles from './OwnerShell.module.css'
+
+const nav: { to: string; label: string; icon: string; end?: boolean }[] = [
+  { to: '/dashboard', label: '대시보드', icon: 'dashboard' },
+  { to: '/sales', label: '영업 상태', icon: 'storefront' },
+  { to: '/orders', label: '실시간 주문', icon: 'receipt_long', end: true },
+  { to: '/orders/completed', label: '완료 주문', icon: 'task_alt' },
+  { to: '/store', label: '매장 정보', icon: 'store' },
+  { to: '/menu', label: '메뉴관리', icon: 'restaurant_menu' },
+  { to: '/reviews', label: '리뷰관리', icon: 'rate_review' },
+]
+
+export function OwnerShell() {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/auth/login', { replace: true })
+  }
+
+  return (
+    <div className={styles.root}>
+      <aside className={styles.sidebar}>
+        <div className={styles.logoWrap}>
+          <img src="/logo.png" alt="JubJub" className={styles.logoImg} width={36} height={36} />
+          <span className={styles.logoText}>줍줍</span>
+        </div>
+        <nav className={styles.nav}>
+          {nav.map(({ to, label, icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end ?? to !== '/menu'}
+              className={({ isActive }: { isActive: boolean }) => {
+                const active =
+                  to === '/menu'
+                    ? pathname.startsWith('/menu')
+                    : to === '/store'
+                      ? pathname.startsWith('/store')
+                      : to === '/orders'
+                      ? pathname === '/orders'
+                      : isActive
+                return [styles.navItem, active ? styles.navItemActive : ''].filter(Boolean).join(' ')
+              }}
+            >
+                <Icon name={icon} />
+                <span className={styles.navLabel}>{label}</span>
+              </NavLink>
+          ))}
+        </nav>
+        <div className={styles.profileWrap}>
+          <button type="button" className={styles.logoutBtn} onClick={handleLogout} title="로그아웃">
+            <Icon name="logout" />
+            <span className={styles.navLabel}>로그아웃</span>
+          </button>
+        </div>
+      </aside>
+      <div className={styles.content}>
+        <OwnerSalesProvider>
+          <OwnerOrdersProvider>
+            <div className={styles.shellBody}>
+              <OwnerNotificationBanner />
+              <NewOrderAlertHost />
+              <div className={styles.pageArea}>
+                <Outlet />
+              </div>
+            </div>
+          </OwnerOrdersProvider>
+        </OwnerSalesProvider>
+      </div>
+    </div>
+  )
+}

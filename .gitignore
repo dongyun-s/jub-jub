@@ -1,0 +1,88 @@
+HELP.md
+
+### Gradle ###
+.gradle
+.gradle-home/
+build/
+backend/build/
+backend/.gradle/
+
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+# ========================
+# Logs
+# ========================
+*.log
+logs/
+
+# ========================
+# OS files
+# ========================
+.DS_Store
+
+# ========================
+# Node / Next.js
+# ========================
+/node_modules/
+frontend/node_modules/
+frontend/user-web/node_modules/
+frontend/owner-web/node_modules/
+frontend/dist/
+frontend/user-web/dist/
+frontend/owner-web/dist/
+frontend/.vite/
+frontend/user-web/.vite/
+frontend/owner-web/.vite/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+
+# ========================
+# Environment
+# ========================
+.env*
+!.env.example
+!.env.*.example
+
+# ========================
+# Docker
+# ========================
+docker-compose.override.yml
+
+# ========================
+# Spring Local Config
+# ========================
+application-local.yml

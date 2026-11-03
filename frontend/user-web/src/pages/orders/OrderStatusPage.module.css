@@ -1,0 +1,455 @@
+/**
+ * OrderStatusPage.module.css
+ * 주문 현황 페이지 - 실시간 주문 상태 및 픽업 정보
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  height: 3.5rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.backButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: -0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backIcon {
+  color: rgb(31 41 55);
+}
+
+.headerTitle {
+  flex: 1;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.headerSpacer {
+  width: 2.5rem;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 5rem;
+}
+
+.mapWrap {
+  position: relative;
+  height: 18rem;
+  background-color: rgb(243 244 246);
+}
+
+.mapIframe {
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.distanceCard {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+}
+
+.distanceCardInner {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.distanceIconWrap {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-image: linear-gradient(to bottom right, var(--color-primary), #f472b6);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.distanceIcon {
+  color: #ffffff;
+}
+
+.distanceLabel {
+  font-size: 0.75rem;
+  color: rgb(107 114 128);
+}
+
+.distanceValue {
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.distanceTime {
+  color: var(--color-primary);
+}
+
+.orderSection {
+  padding: 1rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.orderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.orderNumber {
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.pickupBadge {
+  padding: 0.25rem 0.75rem;
+  background-color: rgba(246, 49, 154, 0.1);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 9999px;
+}
+
+.orderTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.stepsSection {
+  padding: 1rem 1rem 1.5rem;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.pickupDoneWrap {
+  margin-top: 1.25rem;
+}
+
+.pickupDoneHint {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: rgb(156 163 175);
+  font-weight: 500;
+}
+
+.pickupDoneButton {
+  width: 100%;
+  margin-top: 0;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #ffffff;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, #ec4899 0%, var(--color-primary) 100%);
+  box-shadow: 0 4px 14px rgba(246, 49, 154, 0.3);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.pickupDoneButton:active {
+  transform: scale(0.99);
+}
+
+.cookingWaitBox {
+  margin-top: 1.25rem;
+  padding: 1.25rem 1rem;
+  border-radius: 0.875rem;
+  background: linear-gradient(135deg, rgba(253, 242, 248, 0.95), #ffffff);
+  border: 1px solid rgba(246, 49, 154, 0.15);
+  text-align: center;
+}
+
+.cookingWaitIcon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.cookingWaitIconSpan {
+  font-size: 2.25rem;
+  color: var(--color-primary);
+  animation: cookingPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes cookingPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+.cookingWaitTitle {
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(31 41 55);
+  margin-bottom: 0.5rem;
+}
+
+.cookingWaitDesc {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(107 114 128);
+  margin-bottom: 0.75rem;
+}
+
+.cookingWaitDesc strong {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.departureBox {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(246, 49, 154, 0.18);
+  text-align: left;
+}
+
+.departureBoxUrgent {
+  background: rgba(246, 49, 154, 0.08);
+  border-color: rgba(246, 49, 154, 0.35);
+}
+
+.departureTitle {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.departureDesc {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgb(75 85 99);
+}
+
+.reviewLinkBtn {
+  margin-top: 0.25rem;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reviewLinkBtn:active {
+  transform: scale(0.98);
+}
+
+.cookingCountdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(55 65 81);
+  padding: 0.5rem 0.85rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 9999px;
+  border: 1px solid rgb(243 244 246);
+}
+
+.cookingCountdown .material-symbols-outlined {
+  font-size: 1.125rem;
+  color: var(--color-primary);
+}
+
+.cookingCountdown strong {
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepsRow {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.stepItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 4.25rem;
+  min-width: 0;
+}
+
+.stepIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.stepIconCompleted {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.stepIconActive {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(246, 49, 154, 0.2);
+}
+
+.stepIconPending {
+  background-color: rgb(243 244 246);
+  color: rgb(209 213 219);
+}
+
+.stepIconSpan {
+  font-size: 1.25rem;
+}
+
+.stepLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+.stepLabelActive {
+  color: var(--color-primary);
+}
+
+.stepLabelCompleted {
+  color: rgb(75 85 99);
+}
+
+.stepLabelPending {
+  color: rgb(209 213 219);
+}
+
+.stepConnector {
+  flex: 1 1 0;
+  min-width: 0.25rem;
+  height: 0.125rem;
+  margin-top: 1.5rem;
+  align-self: flex-start;
+}
+
+.stepConnectorDone {
+  background-color: var(--color-primary);
+}
+
+.stepConnectorPending {
+  background-color: rgb(229 231 235);
+}
+
+.storeSection {
+  padding: 1rem;
+}
+
+.storeCard {
+  background-image: linear-gradient(to right, #f472b6, var(--color-primary));
+  border-radius: 1rem;
+  padding: 1.25rem;
+  color: #ffffff;
+}
+
+.storeCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.storeCardIcon {
+  width: 3rem;
+  height: 3rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.storeCardThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.storeCardIconSpan {
+  font-size: 1.5rem;
+}
+
+.storeCardName {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.storeCardAddress {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.storeCardAddressIcon {
+  font-size: 0.875rem;
+}
+
+.navButton {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #ffffff;
+  color: var(--color-primary);
+  font-weight: 700;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: transform 150ms ease;
+}
+
+.navButton:active {
+  transform: scale(0.98);
+}

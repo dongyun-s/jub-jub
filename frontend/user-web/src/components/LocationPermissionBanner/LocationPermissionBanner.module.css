@@ -1,0 +1,60 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0 1rem 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.875rem;
+  background: rgb(254 242 242);
+  border: 1px solid rgb(254 202 202);
+}
+
+.icon {
+  flex-shrink: 0;
+  font-size: 1.35rem;
+  color: rgb(220 38 38);
+  margin-top: 0.1rem;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: rgb(185 28 28);
+}
+
+.message {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: rgb(127 29 29);
+}
+
+.retryButton {
+  margin-top: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(220 38 38);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retryButton:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.retryIcon {
+  font-size: 1rem;
+}

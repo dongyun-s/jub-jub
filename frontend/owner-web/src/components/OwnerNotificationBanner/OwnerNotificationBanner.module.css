@@ -1,0 +1,53 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--owner-primary-container) 25%, transparent);
+  background: color-mix(in srgb, var(--owner-primary-container) 12%, var(--owner-surface-low));
+}
+
+.icon {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  font-size: 1.25rem;
+  color: var(--owner-primary-container);
+}
+
+.text {
+  flex: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--owner-on-surface);
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.enableBtn {
+  cursor: pointer;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--owner-primary-container);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--owner-on-primary-container);
+  white-space: nowrap;
+}
+
+.dismissBtn {
+  cursor: pointer;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--owner-on-surface-variant);
+  white-space: nowrap;
+}

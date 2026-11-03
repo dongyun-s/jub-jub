@@ -1,0 +1,4 @@
+package io.github.dongyuns.jubjub.domain.customer.auth.dto;
+import java.time.LocalDateTime;
+
+public record VerificationSendResponse(Long logId, LocalDateTime expiresAt) {}

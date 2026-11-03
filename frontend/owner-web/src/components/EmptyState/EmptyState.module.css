@@ -1,0 +1,43 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.iconWrap {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--owner-primary-container) 18%, transparent);
+  margin-bottom: 1rem;
+}
+
+.icon {
+  font-size: 2rem;
+  color: var(--owner-primary-container);
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--owner-on-surface);
+}
+
+.desc {
+  margin: 0 0 1rem;
+  max-width: 22rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--owner-on-surface-variant);
+}
+
+.action {
+  margin-top: 0.5rem;
+}
